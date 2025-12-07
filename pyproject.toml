@@ -23,12 +23,6 @@ onnx = [
     "onnx>=1.15.0",
     "onnxruntime-gpu>=1.16.0",
 ]
-tensorrt = [
-    "nvidia-tensorrt>=8.6.0",
-]
-rust-acceleration = [
-    "vision-analysis-rust @ file:///rust_extensions",
-]
 dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
