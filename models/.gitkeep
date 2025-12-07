@@ -1,0 +1,11 @@
+# 模型文件目录
+
+请将训练好的模型文件放置在此目录：
+
+- `best.pt` - YOLOv8 PyTorch 模型
+- `best.onnx` - ONNX 格式模型
+- `best.engine` - TensorRT 引擎（NVIDIA GPU）
+
+## 模型训练
+
+参见项目文档：[docs/development.md](../docs/development.md)

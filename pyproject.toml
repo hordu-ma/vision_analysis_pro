@@ -1,0 +1,74 @@
+[project]
+name = "vision-analysis-pro"
+version = "0.1.0"
+description = "工程基础设施图像识别智能运维系统 - 基于 YOLO 的无人机巡检解决方案"
+readme = "README.md"
+authors = [
+    { name = "Liguo Ma", email = "maliguo@outlook.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "ultralytics>=8.0.0",
+    "opencv-python>=4.8.0",
+    "numpy>=1.24.0",
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "python-multipart>=0.0.6",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+]
+
+[project.optional-dependencies]
+onnx = [
+    "onnx>=1.15.0",
+    "onnxruntime-gpu>=1.16.0",
+]
+tensorrt = [
+    "nvidia-tensorrt>=8.6.0",
+]
+rust-acceleration = [
+    "vision-analysis-rust @ file:///rust_extensions",
+]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
+    "httpx>=0.24.0",
+]
+
+[project.scripts]
+edge-agent = "vision_analysis_pro.edge_agent.agent:main"
+api-server = "vision_analysis_pro.web.api.main:main"
+
+[build-system]
+requires = ["uv_build>=0.9.8,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+    "B008",  # do not perform function calls in argument defaults
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --cov=src/vision_analysis_pro --cov-report=term-missing"
