@@ -447,8 +447,173 @@ Day 5: ✅ 端到端 Demo（文档 + 脚本）
 - ✅ 标注规范文档完整（类别定义、规则、示例、流程）
 - ✅ 类目配置模块可复用（其他模块可导入使用）
 - ✅ 可视化功能增强（类别颜色自动映射）
+**DoD 验收**：
+- ✅ 训练脚本可复现（固定随机种子 seed=42）
+- ✅ 成功生成 best.pt 和 last.pt 模型
+- ✅ 训练日志和可视化结果完整
+- ✅ 评估脚本功能正常（输出详细指标）
+- ✅ 所有测试通过（49/49 passed）
+
+**Week 2 进度总结**：
+```
+Day 6: ✅ 类目与标注口径定稿（5 类 + 标注规范）
+Day 7: ✅ 数据目录与样例数据（YOLO 格式 + 10 张测试图）
+Day 8: ✅ 训练脚本跑通（best.pt 生成 + 评估脚本）
+```
+
+**下一步（Day 9）**：
+- 集成真实 YOLOv8 推理引擎
+- 替换 API 中的 StubInferenceEngine
+- 使用 best.pt 进行真实推理
+
+---
+
+### Day 7 完成：数据目录与样例数据 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 构建标准 YOLO 数据目录结构
+- ✅ 编写 data.yaml 配置文件
+- ✅ 生成 10 张合成测试图像（25 个标注目标）
+- ✅ 实现数据验证脚本
+- ✅ 所有数据格式验证通过
+
+**关键交付物**：
+
+1. **数据目录结构**：
+   ```
+   data/
+   ├── data.yaml           # YOLO 配置文件
+   ├── README.md           # 数据集说明文档
+   ├── images/
+   │   ├── train/          # 训练集图像（6 张）
+   │   ├── val/            # 验证集图像（2 张）
+   │   └── test/           # 测试集图像（2 张）
+   └── labels/
+       ├── train/          # 训练集标注（6 个）
+       ├── val/            # 验证集标注（2 个）
+       └── test/           # 测试集标注（2 个）
+   ```
+
+2. **data.yaml 配置**：
+   ```yaml
+   path: data              # 数据集根目录
+   train: images/train     # 训练集路径
+   val: images/val         # 验证集路径
+   test: images/test       # 测试集路径
+   nc: 5                   # 类别数
+   names:                  # 类别名称列表
+     0: crack
+     1: rust
+     2: deformation
+     3: spalling
+     4: corrosion
+   ```
+
+3. **测试数据生成**（scripts/generate_test_data.py）：
+   - 生成 10 张合成图像（640x480）
+   - 每张图像 1-4 个随机目标（共 25 个）
+   - 覆盖所有 5 个类别
+   - 随机种子固定（seed=42，确保可复现）
+   - 自动划分 train/val/test（6:2:2）
+
+4. **数据验证脚本**（scripts/validate_data.py）：
+   - 检查 data.yaml 配置完整性
+   - 验证图像/标签文件匹配
+   - 检查标注格式（class_id, x_center, y_center, width, height）
+   - 统计数据集分布（图像数、目标数、类别分布）
+   - 输出验证报告
+
+**数据统计**：
+- 总图像数：10 张（train: 6, val: 2, test: 2）
+- 总目标数：25 个
+- 类别分布：crack 32%, rust 36%, deformation 8%, spalling 12%, corrosion 12%
+- 验证结果：✅ 所有标注格式正确
+
+**DoD 验收**：
+- ✅ 数据目录符合 YOLO 标准格式
+- ✅ data.yaml 配置完整且正确
+- ✅ 测试数据可复现（固定随机种子）
+- ✅ 验证脚本确认所有格式正确
 - ✅ 所有测试通过（38/38 passed）
-- ✅ 代码无语法错误（ruff 检查通过）
+
+**下一步（Day 8）**：
+- 创建训练脚本（train.py）
+- 运行训练验证（生成 best.pt）
+- 创建评估脚本（evaluate.py）
+
+---
+
+### Day 8 完成：训练脚本跑通 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 创建完整的训练脚本（支持参数化配置）
+- ✅ 成功训练生成 best.pt 和 last.pt 模型
+- ✅ 创建模型评估脚本
+- ✅ 新增 11 个训练相关测试（总计 49 个测试全部通过）
+
+**关键交付物**：
+
+1. **训练脚本**（scripts/train.py）：
+   - 使用 Ultralytics YOLO API（yolov8n.pt 预训练模型）
+   - 支持参数化配置（epochs, batch, device, imgsz 等）
+   - 固定随机种子（seed=42）确保可复现
+   - 默认配置：epochs=10, batch=8, imgsz=640, device=cpu
+   - 完整的日志输出（配置信息、训练进度、性能指标）
+   - 自动保存训练结果（模型权重、日志、可视化图表）
+
+2. **训练产物**（runs/train/exp/）：
+   - **模型权重**：
+     - best.pt（最佳模型，6.2MB）
+     - last.pt（最终模型，6.2MB）
+   - **训练日志**：
+     - results.csv（训练指标记录）
+     - args.yaml（训练参数配置）
+   - **可视化结果**（自动生成）：
+     - confusion_matrix.png（混淆矩阵）
+     - results.png（训练曲线）
+     - BoxP_curve.png（Precision 曲线）
+     - BoxR_curve.png（Recall 曲线）
+     - BoxF1_curve.png（F1 曲线）
+     - BoxPR_curve.png（PR 曲线）
+     - labels.jpg（标签分布）
+     - train_batch*.jpg（训练批次可视化）
+     - val_batch*.jpg（验证批次可视化）
+
+3. **评估脚本**（scripts/evaluate.py）：
+   - 支持 train/val/test 数据集评估
+   - 自定义置信度阈值（conf）和 IoU 阈值（iou）
+   - 输出详细性能指标（mAP50, mAP50-95, Precision, Recall, F1）
+   - 各类别性能分析
+   - 推理速度统计（预处理、推理、后处理）
+   - 支持保存 JSON 格式结果
+
+4. **训练验证结果**（2 epochs 快速验证）：
+   - 训练时间：约 1.5 秒（2 epochs）
+   - 模型参数量：3,011,823 parameters
+   - 模型大小：6.2 MB
+   - 推理速度：28.7 ms/image（35 FPS）
+   - 性能指标（数据量太小，指标为 0 属正常）：
+     - mAP50: 0.0000
+     - mAP50-95: 0.0000
+     - Precision: 0.0000
+     - Recall: 0.0000
+
+5. **测试覆盖**：
+   - 新增 `test_training.py`（11 个测试）：
+     - 脚本文件存在性测试（train.py, evaluate.py）
+     - data.yaml 配置验证
+     - 训练输出结构验证（weights, logs, plots）
+     - 模型权重可复现性验证（seed, deterministic）
+     - 训练数据完整性测试（images, labels）
+     - 标签格式验证（class_id, bbox）
+     - 模型加载测试（best.pt, last.pt）
+   - 总计 49 个测试全部通过（之前 38 个，新增 11 个）
+
+**DoD 验收**- ✅ 代码无语法错误（ruff 检查通过）
 
 ---
 
