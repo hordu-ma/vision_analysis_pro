@@ -1,3 +1,126 @@
+# 开发进度与运行指南
+
+面向当前阶段（MVP 打通）的开发说明，涵盖环境、配置、运行、测试与目录要点。
+
+---
+
+## 📆 最新进度（2025-12-17）
+
+### Day 1 完成：对齐契约 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 明确 `DetectionBox` 坐标系与字段定义
+- ✅ 定义统一错误响应结构 `ErrorResponse`
+- ✅ 更新 API schemas 并在 OpenAPI 中呈现完整示例
+
+**关键决策与契约**：
+
+1. **检测结果 schema（DetectionBox）**：
+   - **bbox 坐标系**：像素坐标，格式为 `[x1, y1, x2, y2]`（左上角与右下角坐标）
+   - **label**：字符串类型，对应类目名称（如 "crack", "rust" 等）
+   - **confidence**：浮点数 [0.0, 1.0]，表示置信度
+
+2. **错误响应结构（ErrorResponse）**：
+   - **code**：错误码（如 "MODEL_NOT_LOADED"）
+   - **message**：错误消息（用户友好）
+   - **detail**：详细错误信息（可选，用于调试）
+
+3. **API 响应示例**：
+   ```json
+   {
+     "filename": "test_image.jpg",
+     "detections": [
+       {
+         "label": "crack",
+         "confidence": 0.95,
+         "bbox": [100.0, 150.0, 300.0, 400.0]
+       }
+     ],
+     "metadata": {
+       "inference_time_ms": 45.2,
+       "model_version": "v1.0"
+     }
+   }
+   ```
+
+**代码变更**：
+- 更新 `src/vision_analysis_pro/web/api/schemas.py`：
+  - 补充完整的字段说明与示例
+  - 添加 `ErrorResponse` schema
+  - 将 `box` 字段统一为 `bbox`（列表格式）
+- 更新 `src/vision_analysis_pro/web/api/routers/inference.py`：
+  - 适配 `bbox` 字段（兼容 box/bbox 两种 key）
+  - 修复函数参数顺序（Depends 参数前置）
+- 更新 `src/vision_analysis_pro/web/api/main.py`：
+  - 在 FastAPI app 中注册全局错误响应示例
+
+**DoD 验收**：
+- ✅ OpenAPI 文档（访问 `/docs`）可查看完整的请求/响应示例
+- ✅ 代码无语法错误（`ruff`/`pytest` 可运行）
+- ✅ 契约决策已记录到本文档
+
+**下一步（Day 2）**：
+- 实现推理 stub 引擎（不依赖真实模型也能返回固定检测结果）
+- 编写 stub 的单元测试
+
+---
+
+## 环境与依赖
+- Python 3.12（仓库含 `.python-version`）
+- 推荐使用 `uv`：
+  - 安装基础依赖：`uv sync`
+  - 安装开发依赖：`uv sync --extra dev`
+  - 如需 ONNX/TensorRT：`uv sync --extra onnx`
+
+## 配置
+- 参考 `.env.example`，常用项：
+  - `MODEL_PATH`：模型路径，默认 `models/best.pt`
+  - `CONFIDENCE_THRESHOLD` / `IOU_THRESHOLD`
+  - `API_HOST` / `API_PORT`
+- 运行时通过 `vision_analysis_pro.settings.Settings` 加载（pydantic-settings），支持 `.env`。
+
+## 运行
+- 启动 API（开发模式）：
+  ```bash
+  uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+  ```
+- 核心路由：
+  - `GET /api/v1/health`：健康检查（返回版本与模型加载状态）
+  - `POST /api/v1/inference/image`：图片推理上传接口（当前返回占位检测结果结构）
+
+## 测试
+- 先安装开发依赖：`uv sync --extra dev`
+- 运行：`uv run pytest -q`
+- API 测试说明：`tests/test_api_inference.py` 使用依赖覆盖：
+  - 覆盖 `get_settings` 提供假模型路径
+  - 覆盖 `get_inference_engine` 使用 stub 引擎返回固定检测结果
+
+## 目录与近期变更
+- 配置层：`src/vision_analysis_pro/settings.py`
+- API 依赖：`src/vision_analysis_pro/web/api/deps.py`（缓存推理引擎，缺模型/依赖时返回 503）
+- API 模型：`src/vision_analysis_pro/web/api/schemas.py`
+- API 路由：`src/vision_analysis_pro/web/api/routers/inference.py`（上传→推理→结构化返回）
+- 健康检查：`src/vision_analysis_pro/web/api/main.py`（返回版本与模型加载状态）
+
+## 已完成功能（本迭代）
+- 建立配置读取与依赖注入（Settings + 缓存推理引擎）
+- 健康检查接口加强并注册路由
+- 推理上传接口雏形（带检测结果结构化返回）
+- API 层测试用例（依赖覆盖、健康检查与推理路径）
+
+## 下一步建议
+1. 接入真实 YOLO 结果解析：将 `ultralytics` 输出转为 `DetectionBox` 列表。
+2. 增强推理预处理：支持 ndarray/path 输入、自动尺寸/格式校验与异常返回。
+3. 错误路径测试：模型缺失、未安装 `ultralytics`、空文件上传等。
+4. 性能与监控：为推理与上传请求添加耗时日志、基础 metrics 钩子。
+
+
+---
+
+## 📋 开发日志 (2025-12-07)
+
 # 开发日志 - 2025-12-07
 
 ## 📅 基本信息
