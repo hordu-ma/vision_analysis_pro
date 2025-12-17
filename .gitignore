@@ -42,6 +42,9 @@ models/*.engine
 data/
 datasets/
 !data/.gitkeep
+!data/data.yaml
+!data/README.md
+!data/samples/README.md
 
 # 日志
 logs/
