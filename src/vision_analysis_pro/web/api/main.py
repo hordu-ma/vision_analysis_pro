@@ -1,5 +1,8 @@
 """FastAPI 应用主入口"""
 
+import os
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -77,11 +80,22 @@ async def root() -> JSONResponse:
 async def health() -> JSONResponse:
     """健康检查接口"""
     settings = get_settings()
-    model_loaded = settings.model_path.exists()
+
+    engine_type = os.getenv("INFERENCE_ENGINE", "yolo").lower()
+    if engine_type == "stub":
+        engine_name = "StubInferenceEngine"
+        model_loaded = False
+    else:
+        engine_name = "YOLOInferenceEngine"
+        model_path = os.getenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
+        # 兼容：如果用户仍想走 settings.model_path，也允许通过 env 覆盖为相同路径。
+        model_loaded = Path(model_path).exists() or settings.model_path.exists()
+
     return JSONResponse(
         content={
             "status": "healthy",
             "version": app.version,
             "model_loaded": model_loaded,
+            "engine": engine_name,
         }
     )

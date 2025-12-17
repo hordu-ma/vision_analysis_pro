@@ -43,7 +43,7 @@ web/
 
 ### 环境要求
 
-- Node.js >= 18.0.0
+- Node.js >= 20.0.0
 - npm >= 9.0.0
 
 ### 安装依赖
@@ -179,7 +179,7 @@ apiService.analyze(file: File, visualize?: boolean): Promise<InferenceResponse>
 **参数**:
 
 - `file`: 图片文件
-- `visualize`: 是否返回可视化图片（默认 true）
+- `visualize`: 是否返回可视化图片（后端默认 false；前端调用默认 true）
 
 **响应**:
 
@@ -256,6 +256,13 @@ try {
   ElMessage.error(errorMessage)
 }
 ```
+
+后续计划（与总体进度对齐）：
+
+- 补充全局错误拦截器（axios 拦截器 + 统一提示）与错误边界
+- 体验优化：加载/骨架、上传进度、缩放与快捷键
+- 评估 Pinia：保留或移除，或用于历史记录/设置
+- 构建与性能：Element Plus 按需、代码分割、生产构建与预览
 
 ## 测试
 

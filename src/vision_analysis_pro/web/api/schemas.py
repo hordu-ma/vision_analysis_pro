@@ -18,6 +18,11 @@ class HealthResponse(BaseModel):
     status: str = Field(..., description="服务状态", example="healthy")
     version: str = Field(..., description="API 版本", example="0.1.0")
     model_loaded: bool = Field(..., description="模型是否已加载", example=True)
+    engine: str | None = Field(
+        None,
+        description="当前推理引擎类型（仅用于展示与排障）",
+        example="YOLOInferenceEngine",
+    )
 
 
 class DetectionBox(BaseModel):

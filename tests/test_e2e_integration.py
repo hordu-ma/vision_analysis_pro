@@ -26,7 +26,8 @@ class TestE2EWithYOLOEngine:
     @pytest.fixture(autouse=True)
     def setup_yolo_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """设置使用 YOLO 引擎"""
-        monkeypatch.setenv("USE_YOLO_ENGINE", "true")
+        monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
+        monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
 
     @pytest.mark.asyncio
     async def test_full_workflow_with_yolo(self) -> None:
@@ -93,13 +94,13 @@ class TestE2EWithStubEngine:
     """Stub 引擎的端到端测试
 
     注意：由于依赖注入使用了 lru_cache，在同一测试会话中动态切换引擎有限制。
-    如需测试 Stub 引擎，请在启动测试前设置环境变量 USE_YOLO_ENGINE=false
+    如需测试 Stub 引擎，请在启动测试前设置环境变量 INFERENCE_ENGINE=stub
     """
 
     @pytest.fixture(autouse=True)
     def setup_stub_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """设置使用 Stub 引擎（注意：仅在独立运行时生效）"""
-        monkeypatch.setenv("USE_YOLO_ENGINE", "false")
+        monkeypatch.setenv("INFERENCE_ENGINE", "stub")
 
     @pytest.mark.skip(reason="依赖注入缓存限制，需要在独立进程中运行")
     @pytest.mark.asyncio
@@ -124,7 +125,7 @@ class TestE2EWithStubEngine:
             data = response.json()
 
             # Stub 引擎应该返回模拟数据
-            assert data["metadata"]["engine"] == "PythonInferenceEngine"
+            assert data["metadata"]["engine"] == "StubInferenceEngine"
             assert isinstance(data["detections"], list)
 
             # Stub 引擎返回固定数量的检测结果（根据实际实现）
@@ -148,7 +149,8 @@ class TestEngineSwitching:
         image_bytes = encoded_image.tobytes()
 
         # 设置使用 YOLO 引擎（默认）
-        monkeypatch.setenv("USE_YOLO_ENGINE", "true")
+        monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
+        monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -168,14 +170,14 @@ class TestEngineSwitching:
         image_bytes = encoded_image.tobytes()
 
         # 设置使用 Stub 引擎
-        monkeypatch.setenv("USE_YOLO_ENGINE", "false")
+        monkeypatch.setenv("INFERENCE_ENGINE", "stub")
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:
             files = {"file": ("test.jpg", image_bytes, "image/jpeg")}
             response = await client.post("/api/v1/inference/image", files=files)
             data = response.json()
-            assert data["metadata"]["engine"] == "PythonInferenceEngine"
+            assert data["metadata"]["engine"] == "StubInferenceEngine"
 
 
 class TestDemoScriptCompatibility:
@@ -282,14 +284,12 @@ class TestModelFilesExistence:
     def test_yolo_model_file_exists(self) -> None:
         """验证 YOLO 模型文件存在"""
         # 从环境变量或默认路径获取模型路径
-        model_path = os.getenv(
-            "YOLO_MODEL_PATH", "models/yolov8n.pt"
-        )  # 使用 yolov8n.pt 作为默认
+        model_path = os.getenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
         model_file = Path(model_path)
 
         # 如果使用 YOLO 引擎，模型文件必须存在
-        use_yolo = os.getenv("USE_YOLO_ENGINE", "false").lower() == "true"
-        if use_yolo:
+        engine_type = os.getenv("INFERENCE_ENGINE", "yolo").lower()
+        if engine_type != "stub":
             assert model_file.exists(), (
                 f"YOLO 模型文件不存在: {model_file}，demo 将无法运行"
             )

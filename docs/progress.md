@@ -6,10 +6,11 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ## 📊 项目概览
 
-**当前状态**：Week 2 Day 10 完成 ✅  
+**当前状态**：Week 2 Day 10（后端 M1 闭环）+ 前端 Web MVP ✅  
 **最后更新**：2025-12-17  
 **后端测试**：78 passed, 2 skipped  
-**代码质量**：ruff 全绿
+**前端测试**：19 passed（vitest）  
+**代码质量**：ruff 全绿，ESLint 全绿
 
 ---
 
@@ -333,8 +334,11 @@ class YOLOInferenceEngine(InferenceEngine):
 
 ```python
 # 环境变量控制
-USE_YOLO_ENGINE=true   # 使用 YOLO 引擎
-USE_YOLO_ENGINE=false  # 使用 Stub 引擎
+INFERENCE_ENGINE=yolo  # 使用 YOLO 引擎（默认）
+INFERENCE_ENGINE=stub  # 使用 Stub 引擎
+
+# 可选：指定 YOLO 模型路径（仅在 yolo 模式下生效）
+YOLO_MODEL_PATH=runs/train/exp/weights/best.pt
 ```
 
 **测试覆盖**：
@@ -397,6 +401,37 @@ USE_YOLO_ENGINE=false  # 使用 Stub 引擎
 - `tests/test_e2e_integration.py` (11 个测试)
 - `core/inference/yolo_engine.py` (添加 bytes 支持)
 - Git commit: `af059cf`
+
+---
+
+## 🖼️ 前端 Web MVP 与测试 ✅
+
+**完成时间**：2025-12-17
+
+**核心成果**：
+
+- ✅ 建立 Vue3 + TypeScript 前端（Vite）并完成基础页面（上传 → 推理 → 展示）
+- ✅ 修复路径别名与 ESLint/TS 类型告警，问题面板清空
+- ✅ 编写并通过前端单元测试（19/19，vitest）：`ImageUpload`、`DetectionResult`、`HealthStatus`、API 调用 mock
+- ✅ 更新前端文档 [web/README.md](../web/README.md)，覆盖结构、开发、测试、部署
+
+**质量指标**：
+
+- ESLint 0 错误；TypeScript 0 编译错误
+- vitest 19/19 通过；覆盖核心组件与 API mock
+
+**主要改动**：
+
+- 组件与服务：`web/src/components/*.vue`、`web/src/services/api.ts`
+- 测试：`web/src/components/*.spec.ts`、`web/src/services/api.spec.ts`
+- 文档：`web/README.md`
+
+**下一步（前端）**：
+
+1. 统一错误处理（axios 拦截器、全局错误提示、错误边界）
+2. 体验优化（加载/骨架、上传进度、缩放与预览、快捷键）
+3. 评估 Pinia（保留/移除或接入历史与设置）
+4. 性能与构建（Element Plus 按需、代码分割、生产构建与预览、Nginx 示例）
 
 **Week 2 小结**：
 

@@ -41,7 +41,11 @@ pip install -e .
 ### 3. 启动 API 服务
 
 ```bash
+# 默认：使用 YOLO 引擎（需模型文件存在；默认路径 runs/train/exp/weights/best.pt）
 uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+
+# 如果你希望得到“可复现、固定输出”的演示结果，可切换为 Stub 引擎：
+# INFERENCE_ENGINE=stub uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 ```
 
 服务将在 `http://127.0.0.1:8000` 启动。
@@ -58,7 +62,8 @@ curl http://127.0.0.1:8000/api/v1/health
 {
   "status": "healthy",
   "version": "0.1.0",
-  "model_loaded": false
+  "model_loaded": true,
+  "engine": "YOLOInferenceEngine"
 }
 ```
 
@@ -207,11 +212,11 @@ uv run python demo_request.py
 
 ## ⚠️ 当前限制（MVP 阶段）
 
-1. **模型状态**：当前使用 `StubInferenceEngine`，返回固定的检测结果（不依赖真实 YOLO 模型）
+1. **引擎选择**：默认使用 YOLO 引擎；如需固定可复现输出，可用 `INFERENCE_ENGINE=stub` 切换到 Stub 引擎。
 2. **文件限制**：
    - 最大文件大小：10MB
    - 支持格式：JPEG, PNG, JPG, WebP
-3. **检测结果**：固定返回 3 个检测框（crack, rust, deformation）
+3. **可视化行为**：当 `visualize=true` 且检测结果非空时返回可视化图像；检测结果为空时 `visualization` 为 null。
 
 ---
 

@@ -94,7 +94,7 @@ def get_inference_engine(
     根据环境变量 INFERENCE_ENGINE 选择引擎：
     - "yolo" (默认): 使用 YOLOInferenceEngine (真实 YOLO 推理)
     - "stub": 使用 StubInferenceEngine (测试用 stub)
-    - "yolo_path" (环境变量): YOLO 模型路径，默认 "runs/train/exp/weights/best.pt"
+    - "YOLO_MODEL_PATH" (环境变量): YOLO 模型路径，默认 "runs/train/exp/weights/best.pt"
 
     Returns:
         推理引擎实例（YOLOInferenceEngine 或 StubInferenceEngine）

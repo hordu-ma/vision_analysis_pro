@@ -8,66 +8,53 @@
 
 ### 核心特性
 
-- 🚁 **无人机巡检**：支持视频流和图像分析
-- 🤖 **AI 检测**：基于 YOLOv8/v11 的高精度目标检测
-- 🔧 **边缘计算**：支持 Jetson/NUC 等边缘设备部署
-- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端管理平台
-- ⚡ **高性能**：支持 ONNX Runtime/TensorRT 加速推理
-- 🦀 **Rust 优化**：关键模块支持 Rust 加速（可选）
+- 🚁 **无人机巡检**：支持图片/视频输入链路设计
+- 🤖 **AI 检测**：YOLOv8 推理（真实模型 + Stub 切换）
+- 🔧 **边缘计算**：预留 Jetson/NUC 部署路径
+- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传 → 推理 → 展示）
+- ⚡ **高性能**：训练脚本、模型缓存，后续支持 ORT/TensorRT
 
 ## 快速开始
 
 ### 环境要求
 
-- Python >= 3.12
-- uv >= 0.9.8
-- CUDA >= 11.8（GPU 推理）
+- Python >= 3.12，uv >= 0.9.8
+- Node.js 20+（前端）
+- 可选：CUDA >= 11.8（GPU 推理）
 
-### 安装
+### 后端（API + 模型）
 
 ```bash
-# 1. 克隆项目
+# 克隆并安装
 git clone <repository_url>
 cd vision_analysis_pro
+uv sync                      # 基础依赖
+uv sync --extra dev          # 开发/测试
 
-# 2. 安装依赖（基础版本）
-uv sync
-
-# 3. 安装 GPU 加速版本（可选）
-uv sync --extra onnx
-
-# 4. 安装开发依赖
-uv sync --extra dev
-
-# 5. 配置环境变量
-cp .env.example .env
-# 编辑 .env 文件，配置模型路径等参数
-```
-
-### 运行
-
-#### 启动 Web API 服务
-
-```bash
+# 运行 API（开发）
 uv run uvicorn vision_analysis_pro.web.api.main:app --reload
-```
+# 打开 http://localhost:8000 查看 OpenAPI
 
-访问 http://localhost:8000 查看 API 文档。
-
-#### 运行边缘 Agent（开发中）
-
-```bash
-uv run edge-agent --config config/edge_config.yaml
-```
-
-#### 运行测试
-
-```bash
-# 运行所有测试
+# 运行测试
 uv run pytest
+```
 
-# 查看覆盖率
-uv run pytest --cov-report=html
+### 前端（web/）
+
+```bash
+cd web
+npm install
+
+# 开发预览
+npm run dev
+
+# 质量检查与测试
+npm run lint
+npm run test -- --run
+
+# 生产构建与预览
+npm run build
+npm run preview
 ```
 
 ## 项目结构
@@ -75,28 +62,20 @@ uv run pytest --cov-report=html
 ```
 vision_analysis_pro/
 ├── src/vision_analysis_pro/
-│   ├── core/                   # 核心模块
-│   │   ├── inference/          # 推理引擎
-│   │   │   ├── base.py         # 推理引擎抽象基类
-│   │   │   ├── python_engine.py # Python 实现
-│   │   │   └── rust_engine.py  # Rust 加速版（可选）
-│   │   └── preprocessing/      # 图像预处理
-│   │       └── transforms.py   # 预处理变换
-│   ├── edge_agent/             # 边缘推理 Agent
-│   │   └── agent.py            # Agent 主程序
-│   └── web/                    # Web 管理后台
-│       └── api/                # FastAPI 后端
-│           ├── main.py         # API 入口
-│           └── routers/        # API 路由
-│               └── inference.py # 推理接口
-├── tests/                      # 测试
-├── docs/                       # 文档
-├── models/                     # 模型文件（需自行添加）
-├── data/                       # 数据集（需自行添加）
-├── rust_extensions/            # Rust 扩展（阶段 2）
-├── edge_agent_rust/            # Rust 边缘 Agent（阶段 3）
-├── pyproject.toml              # 项目配置
-├── ruff.toml                   # 代码检查配置
+│   ├── core/
+│   │   ├── inference/          # 推理引擎（stub/python/yolo）
+│   │   └── preprocessing/      # 预处理与可视化
+│   ├── web/api/                # FastAPI 路由与依赖
+│   └── edge_agent/             # 边缘 Agent 原型
+├── scripts/                    # 训练/验证/评估脚本
+├── data/                       # YOLO 数据集与 data.yaml
+├── models/                     # 训练/导出模型产物
+├── web/                        # 前端（Vue3 + Vite + TS）
+│   └── src/components|services # 组件与 API 客户端
+├── tests/                      # Python 测试
+├── docs/                       # 计划与进度文档
+├── pyproject.toml              # Python 依赖与工具链
+├── ruff.toml                   # ruff 配置
 └── .env.example                # 环境变量示例
 ```
 
@@ -104,34 +83,17 @@ vision_analysis_pro/
 
 ### 代码规范
 
-项目使用 `ruff` 进行代码检查和格式化：
+- Python：`uv run ruff check .`；格式化 `uv run ruff format .`
+- 前端：`npm run lint`（ESLint + TypeScript）
 
-```bash
-# 检查代码
-uv run ruff check .
+### 测试
 
-# 自动修复
-uv run ruff check --fix .
-
-# 格式化代码
-uv run ruff format .
-```
-
-### 类型检查
-
-```bash
-uv run mypy src/vision_analysis_pro
-```
+- 后端：`uv run pytest`
+- 前端：`npm run test -- --run`
 
 ### 提交规范
 
-遵循 Conventional Commits 规范：
-
-```
-feat(core): 添加 ONNX 推理引擎支持
-fix(api): 修复图像上传接口错误
-docs(readme): 更新安装说明
-```
+遵循 Conventional Commits：`feat(core): ...`、`fix(api): ...`、`docs(web): ...`
 
 ## 技术栈
 
@@ -151,32 +113,31 @@ docs(readme): 更新安装说明
 
 ### 前端（规划中）
 
-- TypeScript + Vue3
-- Element Plus / Ant Design Vue
-- Vite
+- TypeScript + Vue3 + Vite
+- 组件：Element Plus（按需引入规划中）
+- 测试：Vitest + Vue Test Utils
 
 ## 路线图
 
 ### ✅ MVP 阶段（第 1-2 周）
 
-- [x] 项目基础结构搭建
-- [ ] YOLOv8 模型训练 pipeline
-- [ ] Python 推理引擎实现
-- [ ] 基础 Web API 接口
+- [x] YOLO 训练脚本与最小数据集（`scripts/train.py` + `data.yaml`）
+- [x] 推理引擎（Stub + YOLO 切换）与 API 上传/可视化闭环
+- [x] 前端 Web MVP（上传 → 推理 → 展示，vitest 通过）
 
 ### 🚧 优化阶段（第 3-4 周）
 
-- [ ] ONNX/TensorRT 导出与优化
-- [ ] PyO3 图像预处理加速（可选）
-- [ ] 边缘 Agent Python 版本
-- [ ] Web 前端界面
+- [ ] 统一错误处理与用户体验优化（前端）
+- [ ] ONNX/TensorRT 导出与性能基准
+- [ ] 边缘 Agent Python 版本（采集/上报/缓存）
 
 ### 📋 生产阶段（第 5+ 周）
 
-- [ ] Rust 边缘 Agent 重写
-- [ ] 模型管理功能
-- [ ] 设备管理与监控
-- [ ] 完整文档与部署指南
+- [ ] Element Plus 按需、代码分割与生产构建
+- [ ] CI/CD、容器化与监控
+- [ ] Rust/PyO3 加速与边缘 Agent 重写
+
+更多细节参见 `docs/progress.md` 与 `docs/development-plan.md`。
 
 ## 贡献
 

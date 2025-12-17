@@ -42,7 +42,8 @@ curl http://localhost:8000/api/v1/health
 {
   "status": "healthy",
   "version": "0.1.0",
-  "model_loaded": false
+  "model_loaded": false,
+  "engine": "YOLOInferenceEngine"
 }
 ```
 

@@ -22,10 +22,8 @@ class Settings(BaseSettings):
     edge_upload_interval: int = Field(60, ge=1, description="结果上报间隔 (秒)")
     edge_video_source: str | int = Field("0", description="视频源")
 
-    cloud_api_url: HttpUrl = Field(
-        "http://localhost:8000", description="云端 API 地址"
-    )
-    cloud_api_key: str = Field("your-api-key-here", description="云端 API Key")
+    cloud_api_url: HttpUrl = Field("http://localhost:8000", description="云端 API 地址")
+    cloud_api_key: str = Field("", description="云端 API Key（通过环境变量注入）")
 
     class Config:
         env_file = ".env"
