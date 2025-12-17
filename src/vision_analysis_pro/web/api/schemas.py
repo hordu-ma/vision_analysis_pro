@@ -57,6 +57,11 @@ class InferenceResponse(BaseModel):
         description="元信息（如推理耗时、模型版本等）",
         example={"inference_time_ms": 45.2, "model_version": "v1.0"},
     )
+    visualization: str | None = Field(
+        None,
+        description="可视化图像的 base64 编码（当 visualize=true 时返回）",
+        example="data:image/jpeg;base64,/9j/4AAQSkZJRg...",
+    )
 
     class Config:
         json_schema_extra = {

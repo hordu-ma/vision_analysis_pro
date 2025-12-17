@@ -1,9 +1,11 @@
 """推理相关 API"""
 
+import base64
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 
+from vision_analysis_pro.core.preprocessing.visualization import draw_detections
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.deps import get_inference_engine
@@ -60,6 +62,7 @@ async def inference_image(
     settings: Annotated[Settings, Depends(get_settings)],
     engine: Annotated[Any, Depends(get_inference_engine)],
     file: UploadFile = File(...),
+    visualize: bool = Query(False, description="是否返回可视化图像"),
 ) -> schemas.InferenceResponse:
     """图像推理接口"""
     # 文件校验：空文件
@@ -112,8 +115,30 @@ async def inference_image(
             },
         ) from e
 
+    # 生成可视化图像（可选）
+    visualization_data = None
+    if visualize and detections:
+        try:
+            # 转换 DetectionBox 为字典格式
+            detection_dicts = [
+                {
+                    "label": det.label,
+                    "confidence": det.confidence,
+                    "bbox": det.bbox,
+                }
+                for det in detections
+            ]
+            vis_bytes = draw_detections(file_bytes, detection_dicts)
+            # 转换为 base64 Data URI
+            vis_base64 = base64.b64encode(vis_bytes).decode("utf-8")
+            visualization_data = f"data:image/jpeg;base64,{vis_base64}"
+        except Exception:
+            # 可视化失败不影响推理结果返回
+            visualization_data = None
+
     return schemas.InferenceResponse(
         filename=file.filename or "unknown",
         detections=detections,
         metadata={"engine": engine.__class__.__name__},
+        visualization=visualization_data,
     )

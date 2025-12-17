@@ -1,5 +1,9 @@
 """API 层测试"""
 
+import base64
+
+import cv2
+import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -7,6 +11,15 @@ from vision_analysis_pro.core.inference.stub_engine import StubInferenceEngine
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api.deps import get_inference_engine
 from vision_analysis_pro.web.api.main import app
+
+
+def _create_test_image() -> bytes:
+    """创建一个简单的测试图像"""
+    img = np.zeros((100, 100, 3), dtype=np.uint8)
+    img[:] = (128, 128, 128)  # 灰色
+    success, encoded = cv2.imencode(".jpg", img)
+    assert success
+    return encoded.tobytes()
 
 
 @pytest.fixture(autouse=True)
@@ -133,3 +146,67 @@ async def test_inference_endpoint_error_mode() -> None:
         data = resp.json()
         assert data["code"] == "INFERENCE_ERROR"
         assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_inference_endpoint_with_visualization() -> None:
+    """测试带可视化的推理接口"""
+    # 恢复 normal 模式
+    app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+        mode="normal"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 创建真实图像用于可视化
+        test_image = _create_test_image()
+
+        resp = await client.post(
+            "/api/v1/inference/image?visualize=true",
+            files={"file": ("test.jpg", test_image, "image/jpeg")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # 验证基本响应
+        assert data["filename"] == "test.jpg"
+        assert len(data["detections"]) == 3
+
+        # 验证可视化字段存在
+        assert "visualization" in data
+        assert data["visualization"] is not None
+
+        # 验证 base64 格式
+        assert data["visualization"].startswith("data:image/jpeg;base64,")
+
+        # 验证可以解码 base64
+        base64_data = data["visualization"].split(",")[1]
+        decoded_bytes = base64.b64decode(base64_data)
+        assert len(decoded_bytes) > 0
+
+        # 验证解码后的图像有效
+        nparr = np.frombuffer(decoded_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        assert img is not None
+
+
+@pytest.mark.asyncio
+async def test_inference_endpoint_without_visualization() -> None:
+    """测试不带可视化的推理接口（默认行为）"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        test_image = _create_test_image()
+
+        resp = await client.post(
+            "/api/v1/inference/image",
+            files={"file": ("test.jpg", test_image, "image/jpeg")},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+
+        # 验证基本响应
+        assert data["filename"] == "test.jpg"
+        assert len(data["detections"]) == 3
+
+        # 验证 visualization 字段为 None（默认不返回）
+        assert data.get("visualization") is None

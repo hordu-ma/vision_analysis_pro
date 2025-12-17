@@ -207,6 +207,93 @@
 
 ---
 
+### Day 4 完成：可视化最小能力 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 实现 bbox 绘制工具函数（输入原图 + 检测结果 → 输出带框图）
+- ✅ API 支持可选可视化输出（visualize 参数）
+- ✅ 可视化结果通过 base64 Data URI 返回
+- ✅ 编写完整测试（6 个工具测试 + 2 个 API 测试）
+
+**关键实现**：
+
+1. **绘制工具函数 `draw_detections`**：
+   - **输入**：图像 bytes + 检测结果列表（label/confidence/bbox）
+   - **输出**：带框图的 bytes（JPEG 格式）
+   - **绘制内容**：
+     - 绿色矩形框（可自定义颜色和粗细）
+     - 标签文本："label: confidence"（白色文本 + 黑色半透明背景）
+   - **支持**：多个检测框、空检测结果、浮点数坐标自动转整数
+
+2. **API 可视化支持**：
+   - 新增查询参数 `visualize`（bool，默认 false）
+   - 当 `visualize=true` 时：
+     - 调用 `draw_detections` 生成带框图
+     - 转换为 base64 编码
+     - 返回 Data URI 格式：`data:image/jpeg;base64,{base64_data}`
+   - 可视化失败不影响推理结果返回
+
+3. **Schema 扩展**：
+   ```python
+   class InferenceResponse(BaseModel):
+       filename: str
+       detections: list[DetectionBox]
+       metadata: dict[str, Any]
+       visualization: str | None  # 新增字段
+   ```
+
+4. **测试覆盖**：
+   ```
+   21 passed in 0.47s
+   可视化工具测试（6 个）：
+   - test_draw_single_detection: 绘制单个检测框
+   - test_draw_multiple_detections: 绘制多个检测框
+   - test_draw_empty_detections: 空检测结果返回原图
+   - test_invalid_image_bytes: 无效图像抛出 ValueError
+   - test_custom_color_and_thickness: 自定义绘制参数
+   - test_bbox_with_float_coordinates: 浮点数坐标转整数
+   
+   API 可视化测试（2 个）：
+   - test_inference_endpoint_with_visualization: visualize=true 返回 base64
+   - test_inference_endpoint_without_visualization: 默认不返回可视化
+   ```
+
+**代码变更**：
+- 新增 `src/vision_analysis_pro/core/preprocessing/visualization.py`：
+  - 实现 `draw_detections` 函数（使用 OpenCV cv2.rectangle + cv2.putText）
+  - 支持自定义颜色、线条粗细、字体大小
+  - 异常处理（图像解码失败、编码失败）
+- 更新 `src/vision_analysis_pro/web/api/schemas.py`：
+  - InferenceResponse 添加 `visualization` 字段（可选）
+- 更新 `src/vision_analysis_pro/web/api/routers/inference.py`：
+  - 导入 `draw_detections` 和 `base64`
+  - 添加 `visualize` 查询参数
+  - 可视化逻辑：检测结果 → 字典 → draw_detections → base64 → Data URI
+  - 异常捕获（可视化失败不影响主流程）
+- 新增 `tests/test_visualization.py`：
+  - 6 个单元测试覆盖各种场景
+  - `_create_test_image` 辅助函数生成测试图像
+- 更新 `tests/test_api_inference.py`：
+  - 添加 `_create_test_image` 函数（使用真实图像）
+  - 新增带可视化和不带可视化的 API 测试
+  - 验证 base64 解码和图像有效性
+
+**DoD 验收**：
+- ✅ 同一检测结果下，JSON 与可视化一致（bbox 位置、标签、置信度）
+- ✅ 可通过 API 稳定复现输出带框图（visualize=true）
+- ✅ 可视化图像可以正常解码（base64 → bytes → cv2.imdecode）
+- ✅ 代码无语法错误（ruff 检查通过）
+- ✅ 所有测试通过（21/21 passed）
+
+**下一步（Day 5）**：
+- 端到端 Demo Day：编写 demo 步骤文档
+- 补齐关键错误路径（模型缺失、依赖缺失）的返回行为
+- 在干净环境复现 demo（至少本机新 venv）
+
+---
+
 ## 环境与依赖
 - Python 3.12（仓库含 `.python-version`）
 - 推荐使用 `uv`：
