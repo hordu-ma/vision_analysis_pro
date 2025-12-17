@@ -138,3 +138,48 @@ class TestDrawDetections:
         nparr = np.frombuffer(result_bytes, np.uint8)
         img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         assert img is not None
+
+    def test_category_colors(self):
+        """测试类别颜色映射功能"""
+        image_bytes = _create_test_image()
+        detections = [
+            {"label": "crack", "confidence": 0.95, "bbox": [50, 50, 150, 150]},
+            {"label": "rust", "confidence": 0.88, "bbox": [200, 50, 300, 150]},
+            {
+                "label": "deformation",
+                "confidence": 0.92,
+                "bbox": [350, 50, 450, 150],
+            },
+            {"label": "spalling", "confidence": 0.85, "bbox": [500, 50, 600, 150]},
+        ]
+
+        # 使用类别颜色
+        result_bytes = draw_detections(
+            image_bytes, detections, use_category_colors=True
+        )
+        assert result_bytes is not None
+
+        # 验证图像有效
+        nparr = np.frombuffer(result_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        assert img is not None
+
+    def test_disable_category_colors(self):
+        """测试禁用类别颜色，使用统一颜色"""
+        image_bytes = _create_test_image()
+        detections = [
+            {"label": "crack", "confidence": 0.95, "bbox": [100, 100, 200, 200]},
+            {"label": "rust", "confidence": 0.88, "bbox": [250, 100, 350, 200]},
+        ]
+
+        # 禁用类别颜色，使用自定义颜色
+        custom_color = (255, 0, 0)  # 蓝色
+        result_bytes = draw_detections(
+            image_bytes, detections, color=custom_color, use_category_colors=False
+        )
+        assert result_bytes is not None
+
+        # 验证图像有效
+        nparr = np.frombuffer(result_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        assert img is not None
