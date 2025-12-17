@@ -67,6 +67,70 @@
 
 ---
 
+### Day 2 完成：Stub 推理引擎打通 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 实现 StubInferenceEngine（支持 normal/empty/error 三种模式）
+- ✅ 编写完整单元测试（6 个测试用例全部通过）
+- ✅ 更新 API 测试使用真实 stub 引擎
+- ✅ 无需真实模型即可演示 API 推理流程
+
+**关键实现**：
+
+1. **StubInferenceEngine 三种模式**：
+   - **normal**（默认）：返回固定的 3 个检测结果（crack 0.95, rust 0.88, deformation 0.72）
+   - **empty**：返回空列表（模拟未检测到目标）
+   - **error**：抛出 RuntimeError（模拟推理失败场景）
+
+2. **接口符合规范**：
+   - `warmup()`: 无操作（stub 不需要预热）
+   - `predict()`: 返回符合 Day 1 契约的检测结果
+   - 支持 `conf` 置信度阈值过滤
+   - 不依赖 `model_path` 参数
+
+3. **测试覆盖**：
+   ```
+   10 passed in 0.60s
+   - test_health_endpoint: API 健康检查
+   - test_inference_endpoint_returns_detections: 推理返回检测结果
+   - test_inference_endpoint_empty_file: 空文件错误处理
+   - test_stub_normal_mode: 正常模式返回 3 个检测框
+   - test_stub_empty_mode: 空模式返回 0 个检测框
+   - test_stub_confidence_filtering: 置信度阈值过滤
+   - test_stub_error_mode: 错误模式抛出异常
+   - test_stub_warmup: warmup 为空操作
+   - test_stub_model_path_optional: 无需模型路径
+   - test_inference_engine_placeholder: 基础推理测试
+   ```
+
+**代码变更**：
+- 新增 `src/vision_analysis_pro/core/inference/stub_engine.py`：
+  - 实现 `StubInferenceEngine` 类（继承 `BaseInferenceEngine`）
+  - 支持通过 `mode` 参数切换行为（normal/empty/error）
+  - 固定返回格式：`{"label": str, "confidence": float, "bbox": [x1,y1,x2,y2]}`
+- 新增 `tests/test_stub_engine.py`：
+  - 6 个测试用例覆盖所有模式与边界条件
+  - 测试置信度过滤逻辑
+- 更新 `tests/test_api_inference.py`：
+  - 使用真实 `StubInferenceEngine` 替代 Mock
+  - 新增空文件上传错误场景测试
+- 环境修复：
+  - 添加 `httpx` 到开发依赖（API 测试必需）
+
+**DoD 验收**：
+- ✅ StubInferenceEngine 有单元测试且全部通过
+- ✅ API 可在无真实模型情况下演示推理流程
+- ✅ 返回结果符合 Day 1 定义的 bbox 格式
+- ✅ 代码无语法错误（ruff 检查通过）
+
+**下一步（Day 3）**：
+- 实现 API 上传闭环（文件校验、错误响应、异步处理）
+- 处理非法文件格式与大小限制
+
+---
+
 ## 环境与依赖
 - Python 3.12（仓库含 `.python-version`）
 - 推荐使用 `uv`：

@@ -66,3 +66,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
 addopts = "-v --cov=src/vision_analysis_pro --cov-report=term-missing"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+]
