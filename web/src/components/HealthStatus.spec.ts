@@ -66,13 +66,13 @@ describe('HealthStatus.vue', () => {
     const wrapper = mount(HealthStatus)
     await flushPromises()
 
-    expect(wrapper.vm.healthData).toEqual({ status: 'unhealthy' })
+    const component = wrapper.vm as unknown as { healthData: { status: string } | null }
+    expect(component.healthData).toEqual({ status: 'unhealthy' })
   })
 
   it('加载中时应该显示检查中状态', async () => {
-    let resolvePromise: () => void
     const promise = new Promise<HealthResponse>(resolve => {
-      resolvePromise = () => resolve({ status: 'healthy' })
+      setTimeout(() => resolve({ status: 'healthy' }), 100)
     })
 
     vi.mocked(apiService.health).mockReturnValue(promise)
@@ -83,8 +83,9 @@ describe('HealthStatus.vue', () => {
     await wrapper.vm.$nextTick()
 
     // 此时应该显示检查中
-    expect(wrapper.vm.loading).toBe(true)
-    expect(wrapper.vm.statusText).toBe('检查中...')
+    const component = wrapper.vm as unknown as { loading: boolean; statusText: string }
+    expect(component.loading).toBe(true)
+    expect(component.statusText).toBe('检查中...')
   })
 
   it('应该正确计算状态类型', async () => {
@@ -97,7 +98,8 @@ describe('HealthStatus.vue', () => {
     const wrapper = mount(HealthStatus)
     await flushPromises()
 
-    expect(wrapper.vm.statusType).toBe('success')
+    const component = wrapper.vm as unknown as { statusType: string }
+    expect(component.statusType).toBe('success')
   })
 
   it('不健康状态应该返回danger类型', async () => {
@@ -110,6 +112,7 @@ describe('HealthStatus.vue', () => {
     const wrapper = mount(HealthStatus)
     await flushPromises()
 
-    expect(wrapper.vm.statusType).toBe('danger')
+    const component = wrapper.vm as unknown as { statusType: string }
+    expect(component.statusType).toBe('danger')
   })
 })

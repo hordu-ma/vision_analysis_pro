@@ -11,6 +11,7 @@ const mockPost = vi.fn()
 vi.mocked(axios.create).mockReturnValue({
   get: mockGet,
   post: mockPost
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any)
 
 // 重新导入 apiService（在 mock 之后）

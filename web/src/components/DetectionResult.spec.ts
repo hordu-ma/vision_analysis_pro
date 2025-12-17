@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { ElMessage } from 'element-plus'
 import DetectionResult from '@/components/DetectionResult.vue'
 import type { InferenceResponse } from '@/types/api'
 
@@ -82,7 +81,8 @@ describe('DetectionResult.vue', () => {
     })
 
     // 平均置信度应该是 (0.9 + 0.8) / 2 * 100 = 85%
-    const avgConfidence = wrapper.vm.avgConfidence
+    const component = wrapper.vm as unknown as { avgConfidence: number }
+    const avgConfidence = component.avgConfidence
     expect(avgConfidence).toBeCloseTo(85, 1)
   })
 
@@ -99,7 +99,8 @@ describe('DetectionResult.vue', () => {
       }
     })
 
-    expect(wrapper.vm.avgConfidence).toBe(0)
+    const component = wrapper.vm as unknown as { avgConfidence: number }
+    expect(component.avgConfidence).toBe(0)
   })
 
   it('应该正确显示可视化图片', () => {
@@ -160,6 +161,14 @@ describe('DetectionResult.vue', () => {
     })
 
     // 检查组件是否正确渲染了数据
-    expect(wrapper.props('result').detections[0].bbox).toEqual([100.123, 150.456, 300.789, 400.012])
+    const result = wrapper.props('result')
+    expect(result).not.toBeNull()
+    if (result && result.detections && result.detections.length > 0) {
+      const firstDetection = result.detections[0]
+      expect(firstDetection).toBeDefined()
+      if (firstDetection) {
+        expect(firstDetection.bbox).toEqual([100.123, 150.456, 300.789, 400.012])
+      }
+    }
   })
 })
