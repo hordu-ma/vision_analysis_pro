@@ -294,6 +294,98 @@
 
 ---
 
+### Day 5 完成：端到端 Demo Day ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 编写完整的 Demo 运行文档（docs/demo.md）
+- ✅ 创建演示脚本（examples/demo_request.py）
+- ✅ 修复依赖注入问题（StubInferenceEngine 默认使用）
+- ✅ 所有测试通过（21/21 passed）
+
+**关键实现**：
+
+1. **Demo 文档（docs/demo.md）**：
+   - **快速开始**：环境安装 → 启动服务 → 验证健康检查
+   - **3 个演示场景**：
+     - 场景 1：基础推理（curl 发送请求，返回 JSON）
+     - 场景 2：带可视化推理（base64 解码保存图片）
+     - 场景 3：Python 脚本调用（完整示例代码）
+   - **故障排除**：常见问题与解决方案（模块缺失、端口占用等）
+   - **下一步开发**：清晰的 Day 6-10 roadmap
+
+2. **演示脚本（examples/demo_request.py）**：
+   - **功能**：
+     - 自动创建测试图像（如果未提供）
+     - 发送带可视化的推理请求
+     - 打印检测结果（标签、置信度、bbox）
+     - 保存可视化图像到本地
+   - **特性**：
+     - 完整的错误处理（HTTP 错误、连接失败）
+     - 友好的命令行输出（emoji + 格式化）
+     - 类型注解完整（ruff 检查通过）
+
+3. **依赖注入修复（deps.py）**：
+   - **问题**：Settings 对象不可哈希，无法用于 lru_cache
+   - **解决**：
+     - 移除 Settings 的缓存逻辑
+     - `get_inference_engine` 直接返回 StubInferenceEngine（MVP 阶段）
+     - 保留 `_load_engine` 函数供后续真实模型使用
+   - **影响**：测试全部通过，API 正常运行
+
+4. **测试验证**：
+   ```
+   21 passed in 0.46s
+   - 6 个 API 测试（健康检查、推理、错误处理、可视化）
+   - 6 个可视化工具测试
+   - 6 个 stub 引擎测试
+   - 1 个基础推理测试
+   - 2 个 API 可视化测试
+   ```
+
+**代码变更**：
+- 新增 `docs/demo.md`：
+  - 完整的端到端演示指南（600+ 行）
+  - 3 个场景示例（curl/Python/可视化）
+  - 故障排除章节
+- 新增 `examples/demo_request.py`：
+  - 完整的 Python 演示脚本（140+ 行）
+  - 自动创建测试图像（cv2 绘制矩形和圆形）
+  - base64 解码并保存可视化结果
+- 更新 `src/vision_analysis_pro/web/api/deps.py`：
+  - 简化 `get_inference_engine`（直接返回 StubInferenceEngine）
+  - 修复 lru_cache 的 unhashable 类型问题
+  - 添加类型注解（PythonInferenceEngine | StubInferenceEngine）
+
+**DoD 验收**：
+- ✅ 在干净环境可复现（`uv sync` 后所有测试通过）
+- ✅ Demo 包含可视化带框图（base64 → JPEG 文件）
+- ✅ 文档清晰可执行（命令、示例、预期输出）
+- ✅ 代码无语法错误（ruff 检查通过）
+- ✅ 所有测试通过（21/21 passed）
+
+**MVP Week 1 总结**：
+```
+Day 1: ✅ API 契约定义（DetectionBox schema）
+Day 2: ✅ Stub 推理引擎（3 种模式）
+Day 3: ✅ API 上传闭环（文件校验、错误处理）
+Day 4: ✅ 可视化最小能力（bbox 绘制）
+Day 5: ✅ 端到端 Demo（文档 + 脚本）
+```
+
+**Week 1 交付物**：
+- ✅ 可演示的 API 服务（启动 → 上传 → 获取结果）
+- ✅ 带可视化的推理输出（base64 图像）
+- ✅ 完整的测试覆盖（21 个测试）
+- ✅ 清晰的文档（README + demo.md + progress.md）
+
+**下一步（Week 2 - Day 6）**：
+- 类目与标注口径定稿（为训练做准备）
+- 定义 label 集、边界框规则、难例策略
+
+---
+
 ## 环境与依赖
 - Python 3.12（仓库含 `.python-version`）
 - 推荐使用 `uv`：
