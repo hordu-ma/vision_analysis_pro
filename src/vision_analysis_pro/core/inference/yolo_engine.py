@@ -6,6 +6,9 @@
 from pathlib import Path
 from typing import Any
 
+import cv2
+import numpy as np
+
 from .base import InferenceEngine
 
 
@@ -55,7 +58,12 @@ class YOLOInferenceEngine(InferenceEngine):
         """执行推理
 
         Args:
-            image: 输入图像（numpy 数组、PIL Image、路径或 URL）
+            image: 输入图像（支持多种格式）:
+                - numpy 数组 (HxWxC)
+                - PIL Image
+                - 文件路径 (str/Path)
+                - URL (http/https)
+                - 图像字节流 (bytes)
             conf: 置信度阈值 (0.0 - 1.0)
             iou: NMS IoU 阈值 (0.0 - 1.0)
 
@@ -72,6 +80,22 @@ class YOLOInferenceEngine(InferenceEngine):
         if not (0.0 <= iou <= 1.0):
             msg = f"IoU 阈值应在 [0.0, 1.0] 范围内，实际: {iou}"
             raise ValueError(msg)
+
+        # 如果是字节流，转换为 numpy 数组
+        if isinstance(image, bytes):
+            try:
+                nparr = np.frombuffer(image, np.uint8)
+                decoded_image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                if decoded_image is None:
+                    msg = "无法解码图像字节流（可能不是有效的图像格式）"
+                    raise RuntimeError(msg)
+                image = decoded_image
+            except RuntimeError:
+                # 重新抛出 RuntimeError
+                raise
+            except Exception as e:
+                msg = f"图像解码失败: {e}"
+                raise RuntimeError(msg) from e
 
         try:
             # 执行推理
