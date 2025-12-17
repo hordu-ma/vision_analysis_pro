@@ -53,8 +53,9 @@ class TestStubInferenceEngine:
 
     def test_error_mode_raises_exception(self):
         """测试错误模式抛出异常"""
-        with pytest.raises(RuntimeError, match="模拟：模型加载失败"):
-            StubInferenceEngine(mode="error")
+        engine = StubInferenceEngine(mode="error")
+        with pytest.raises(RuntimeError, match="模拟：推理失败"):
+            engine.predict(image=b"fake_image_bytes")
 
     def test_warmup_no_op(self):
         """测试预热方法（无操作）"""

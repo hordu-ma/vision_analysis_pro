@@ -78,3 +78,58 @@ async def test_inference_endpoint_empty_file() -> None:
             files={"file": ("empty.jpg", b"", "image/jpeg")},
         )
         assert resp.status_code == 400
+        data = resp.json()
+        assert data["code"] == "EMPTY_FILE"
+        assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_inference_endpoint_file_too_large() -> None:
+    """测试上传超大文件返回错误"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 创建超过 10MB 的文件
+        large_file = b"x" * (11 * 1024 * 1024)
+        resp = await client.post(
+            "/api/v1/inference/image",
+            files={"file": ("large.jpg", large_file, "image/jpeg")},
+        )
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["code"] == "FILE_TOO_LARGE"
+        assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_inference_endpoint_invalid_format() -> None:
+    """测试上传非图片格式返回错误"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/inference/image",
+            files={"file": ("document.pdf", b"fake-pdf-content", "application/pdf")},
+        )
+        assert resp.status_code == 400
+        data = resp.json()
+        assert data["code"] == "INVALID_FORMAT"
+        assert "message" in data
+
+
+@pytest.mark.asyncio
+async def test_inference_endpoint_error_mode() -> None:
+    """测试推理引擎错误时返回 500"""
+    # 临时覆盖为 error 模式引擎
+    app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+        mode="error"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/inference/image",
+            files={"file": ("test.jpg", b"fake-image-bytes", "image/jpeg")},
+        )
+        assert resp.status_code == 500
+        data = resp.json()
+        assert data["code"] == "INFERENCE_ERROR"
+        assert "message" in data

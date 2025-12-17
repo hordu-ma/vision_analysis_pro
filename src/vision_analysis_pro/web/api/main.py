@@ -1,6 +1,6 @@
 """FastAPI 应用主入口"""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -32,6 +32,39 @@ app.add_middleware(
 
 # 路由注册
 app.include_router(inference.router)
+
+
+# 统一异常处理
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """处理 HTTPException，返回统一的 ErrorResponse 格式"""
+    # 如果 detail 已经是字典格式（包含 code/message/detail），直接返回
+    if isinstance(exc.detail, dict):
+        return JSONResponse(status_code=exc.status_code, content=exc.detail)
+
+    # 否则，构造标准错误响应
+    error_code = f"HTTP_{exc.status_code}"
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "code": error_code,
+            "message": str(exc.detail) if exc.detail else "请求错误",
+            "detail": None,
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """捕获所有未处理的异常，返回统一的 500 错误"""
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={
+            "code": "INTERNAL_ERROR",
+            "message": "服务器内部错误",
+            "detail": str(exc),
+        },
+    )
 
 
 @app.get("/", response_model=schemas.HealthResponse)

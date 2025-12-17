@@ -131,6 +131,82 @@
 
 ---
 
+### Day 3 完成：API 上传闭环 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 实现完整的文件上传校验（空文件、大小限制、格式检查）
+- ✅ 统一异常处理机制（HTTPException 和通用异常）
+- ✅ 所有错误响应符合 ErrorResponse 契约
+- ✅ 编写完整的 API 集成测试（6 个测试用例）
+
+**关键实现**：
+
+1. **文件校验规则**：
+   - **空文件检查**：`len(file_bytes) == 0` → 400 EMPTY_FILE
+   - **大小限制**：最大 10MB → 400 FILE_TOO_LARGE
+   - **格式校验**：仅允许 image/jpeg, image/png, image/jpg, image/webp → 400 INVALID_FORMAT
+
+2. **统一异常处理**：
+   - `http_exception_handler`: 处理 HTTPException，支持字典格式的 detail（包含 code/message/detail）
+   - `general_exception_handler`: 捕获所有未处理异常，返回 500 INTERNAL_ERROR
+   - 推理失败抛出 500 INFERENCE_ERROR（RuntimeError → HTTPException）
+
+3. **错误码定义**：
+   ```
+   - EMPTY_FILE: 上传的文件为空
+   - FILE_TOO_LARGE: 文件大小超过限制（10MB）
+   - INVALID_FORMAT: 不支持的文件格式
+   - INFERENCE_ERROR: 推理失败（引擎抛出异常）
+   - INTERNAL_ERROR: 服务器内部错误（兜底）
+   ```
+
+4. **测试覆盖**：
+   ```
+   13 passed in 0.39s
+   - test_health_endpoint: 健康检查
+   - test_inference_endpoint_returns_detections: 正常推理返回结果
+   - test_inference_endpoint_empty_file: 空文件返回 400 EMPTY_FILE
+   - test_inference_endpoint_file_too_large: 超大文件返回 400 FILE_TOO_LARGE
+   - test_inference_endpoint_invalid_format: PDF 文件返回 400 INVALID_FORMAT
+   - test_inference_endpoint_error_mode: 推理失败返回 500 INFERENCE_ERROR
+   + 6 个 stub 引擎单元测试
+   + 1 个基础推理测试
+   ```
+
+**代码变更**：
+- 更新 `src/vision_analysis_pro/web/api/routers/inference.py`：
+  - 添加文件校验常量（MAX_FILE_SIZE, ALLOWED_MIME_TYPES）
+  - 实现三层校验逻辑（空文件、大小、格式）
+  - 所有错误返回标准 ErrorResponse 格式（dict with code/message/detail）
+  - 捕获 RuntimeError 转换为 INFERENCE_ERROR
+- 更新 `src/vision_analysis_pro/web/api/main.py`：
+  - 添加全局异常处理器（http_exception_handler, general_exception_handler）
+  - 支持字典格式的 detail 直接返回
+  - 兜底异常统一返回 INTERNAL_ERROR
+- 更新 `tests/test_api_inference.py`：
+  - 新增 4 个错误场景测试（空文件、超大文件、非法格式、推理失败）
+  - 验证所有错误响应包含 code/message 字段
+- 更新 `src/vision_analysis_pro/core/inference/stub_engine.py`：
+  - error 模式改为在 predict 时抛出（而非 __init__）
+  - 错误消息改为"模拟：推理失败"
+- 更新 `tests/test_stub_engine.py`：
+  - 修复 error 模式测试（调用 predict 而非初始化）
+
+**DoD 验收**：
+- ✅ API 集成测试覆盖健康检查与上传推理（基于 stub）
+- ✅ 文件校验完整（空文件、过大、非法格式）
+- ✅ 统一错误响应（所有错误返回 ErrorResponse 格式）
+- ✅ 代码无语法错误（ruff 检查通过）
+- ✅ 所有测试通过（13/13 passed）
+
+**下一步（Day 4）**：
+- 实现可视化最小能力（绘制 bbox 工具函数）
+- API 可选返回可视化结果或提供 debug 输出
+
+---
+
 ## 环境与依赖
 - Python 3.12（仓库含 `.python-version`）
 - 推荐使用 `uv`：

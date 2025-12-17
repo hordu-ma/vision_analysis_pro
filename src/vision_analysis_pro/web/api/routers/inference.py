@@ -43,27 +43,77 @@ def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
     return detections
 
 
-@router.post("/image", response_model=schemas.InferenceResponse)
+# 文件校验常量
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
+
+
+@router.post(
+    "/image",
+    response_model=schemas.InferenceResponse,
+    responses={
+        400: {"model": schemas.ErrorResponse},
+        500: {"model": schemas.ErrorResponse},
+    },
+)
 async def inference_image(
     settings: Annotated[Settings, Depends(get_settings)],
     engine: Annotated[Any, Depends(get_inference_engine)],
     file: UploadFile = File(...),
 ) -> schemas.InferenceResponse:
     """图像推理接口"""
+    # 文件校验：空文件
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="上传的文件为空"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "EMPTY_FILE",
+                "message": "上传的文件为空",
+                "detail": f"文件名: {file.filename}",
+            },
+        )
+
+    # 文件校验：大小限制
+    if len(file_bytes) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "FILE_TOO_LARGE",
+                "message": "文件大小超过限制",
+                "detail": f"文件大小: {len(file_bytes)} bytes, 最大允许: {MAX_FILE_SIZE} bytes",
+            },
+        )
+
+    # 文件校验：MIME 类型
+    if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "INVALID_FORMAT",
+                "message": "不支持的文件格式",
+                "detail": f"当前格式: {file.content_type}, 支持格式: {', '.join(ALLOWED_MIME_TYPES)}",
+            },
         )
 
     # 调用推理引擎
-    raw_result = engine.predict(
-        file_bytes, conf=settings.confidence_threshold, iou=settings.iou_threshold
-    )  # type: ignore[arg-type]
-    detections = _serialize_detections(raw_result)
+    try:
+        raw_result = engine.predict(
+            file_bytes, conf=settings.confidence_threshold, iou=settings.iou_threshold
+        )  # type: ignore[arg-type]
+        detections = _serialize_detections(raw_result)
+    except RuntimeError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "code": "INFERENCE_ERROR",
+                "message": "推理失败",
+                "detail": str(e),
+            },
+        ) from e
 
     return schemas.InferenceResponse(
-        filename=file.filename,
+        filename=file.filename or "unknown",
         detections=detections,
         metadata={"engine": engine.__class__.__name__},
     )

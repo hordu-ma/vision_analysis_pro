@@ -30,13 +30,10 @@ class StubInferenceEngine:
             mode: 模式选择
                 - "normal": 返回固定检测结果
                 - "empty": 返回空结果
-                - "error": 模拟模型加载失败
+                - "error": 模拟推理失败（在 predict 时抛出）
         """
         self.model_path = Path(model_path) if model_path else Path("models/stub.pt")
         self.mode = mode
-
-        if mode == "error":
-            raise RuntimeError("模拟：模型加载失败")
 
     def predict(
         self,
@@ -54,6 +51,9 @@ class StubInferenceEngine:
         Returns:
             检测结果列表，每项包含 label/confidence/bbox
         """
+        if self.mode == "error":
+            raise RuntimeError("模拟：推理失败")
+
         if self.mode == "empty":
             return []
 
