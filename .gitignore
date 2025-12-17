@@ -68,3 +68,6 @@ node_modules/
 web/dist/
 web/.nuxt/
 web/.output/
+
+# Serena (AI 工具工作目录)
+.serena/
