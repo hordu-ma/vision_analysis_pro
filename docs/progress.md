@@ -468,6 +468,94 @@ Day 8: ✅ 训练脚本跑通（best.pt 生成 + 评估脚本）
 
 ---
 
+### Day 9 完成：真实模型接入推理 ✅
+
+**完成时间**：2025-12-17
+
+**目标达成**：
+- ✅ 实现 YOLOInferenceEngine（基于 Ultralytics YOLO）
+- ✅ 实现 YOLO 输出到标准 schema 的转换
+- ✅ 支持在 StubInferenceEngine 和 YOLOInferenceEngine 间切换
+- ✅ 新增 9 个 YOLO 引擎测试（总计 58 个测试全部通过）
+- ✅ 代码质量检查通过（ruff 无错误）
+
+**关键交付物**：
+
+1. **YOLOv8 推理引擎**（src/vision_analysis_pro/core/inference/yolo_engine.py）：
+   - 继承 InferenceEngine 基类
+   - 使用 Ultralytics YOLO 进行真实推理
+   - YOLO 输出自动转换为标准 DetectionBox 格式：
+     - label: 类别名称 (str)
+     - confidence: 置信度 (float, [0.0, 1.0])
+     - bbox: [x1, y1, x2, y2] 像素坐标 (list[float])
+   - 支持参数校验（conf/iou 范围检查）
+   - 包含模型信息查询接口（get_model_info）
+
+2. **依赖注入配置更新**（src/vision_analysis_pro/web/api/deps.py）：
+   - 新增 `_load_yolo_engine()` 函数（带缓存）
+   - 支持环境变量切换引擎：
+     - `INFERENCE_ENGINE=yolo` (默认): 使用 YOLOv8 引擎
+     - `INFERENCE_ENGINE=stub`: 使用 Stub 引擎（测试用）
+   - `YOLO_MODEL_PATH` 环境变量配置模型路径（默认 "runs/train/exp/weights/best.pt"）
+   - API 可通过环境变量无缝切换，无需修改代码
+
+3. **测试覆盖**（tests/test_yolo_engine.py）：
+   - 9 个测试用例：
+     - 引擎初始化成功测试
+     - 模型不存在错误处理
+     - 模型信息查询
+     - 虚拟图像推理测试
+     - 置信度阈值参数校验
+     - IoU 阈值参数校验
+     - 模型预热测试
+     - 不同置信度过滤效果验证
+     - 检测框格式一致性验证
+   - 所有测试均通过（包括边界条件和参数校验）
+
+4. **代码质量**：
+   - ruff 检查全绿（已修复 C414 和 B905 问题）
+   - 所有 58 个测试通过
+
+**输出一致性**：
+YOLOInferenceEngine 与 StubInferenceEngine 输出格式完全一致：
+```json
+{
+  "detections": [
+    {
+      "label": "crack",
+      "confidence": 0.95,
+      "bbox": [100.0, 150.0, 300.0, 400.0]
+    }
+  ]
+}
+```
+
+**DoD 验收**：
+- ✅ API 在真实模型与 stub 间可切换（通过环境变量）
+- ✅ 输出格式与 Week 1 schema 契约一致
+- ✅ 参数校验完整（conf/iou 范围检查）
+- ✅ 所有测试通过（58/58 passed）
+- ✅ 代码质量检查通过（ruff 无错误）
+
+**使用方法**：
+```bash
+# 使用 YOLO 引擎（真实推理）
+export INFERENCE_ENGINE=yolo
+export YOLO_MODEL_PATH=runs/train/exp/weights/best.pt
+uv run python -m uvicorn vision_analysis_pro.web.api.main:app
+
+# 使用 Stub 引擎（测试）
+export INFERENCE_ENGINE=stub
+uv run python -m uvicorn vision_analysis_pro.web.api.main:app
+```
+
+**下一步（Day 10）**：
+- 回归测试与边界条件补齐
+- 整理进度记录
+- 确保 demo 不依赖临时手工步骤
+
+---
+
 ### Day 7 完成：数据目录与样例数据 ✅
 
 **完成时间**：2025-12-17

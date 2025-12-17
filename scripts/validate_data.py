@@ -94,7 +94,7 @@ def check_dataset_split(
     print(f"  找到 {len(img_files)} 张图像")
 
     # 收集标注文件
-    label_files = sorted(list(label_dir.glob("*.txt")))
+    label_files = sorted(label_dir.glob("*.txt"))
     print(f"  找到 {len(label_files)} 个标注文件")
 
     # 检查图像与标注匹配
