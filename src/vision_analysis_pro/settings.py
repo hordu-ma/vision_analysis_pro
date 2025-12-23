@@ -4,11 +4,17 @@ from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field, HttpUrl
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """应用配置"""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
 
     api_host: str = Field("0.0.0.0", description="API 监听地址")
     api_port: int = Field(8000, description="API 监听端口")
@@ -24,11 +30,6 @@ class Settings(BaseSettings):
 
     cloud_api_url: HttpUrl = Field("http://localhost:8000", description="云端 API 地址")
     cloud_api_key: str = Field("", description="云端 API Key（通过环境变量注入）")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
 
 
 @lru_cache(maxsize=1)

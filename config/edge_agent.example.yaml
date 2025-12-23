@@ -1,0 +1,108 @@
+# Vision Analysis Pro - 边缘 Agent 配置文件示例
+#
+# 配置优先级: 环境变量 > YAML 配置文件 > 默认值
+# 环境变量命名规则: EDGE_AGENT_{SECTION}_{KEY}
+# 例如: EDGE_AGENT_DEVICE_ID, EDGE_AGENT_SOURCE_TYPE
+
+# 设备标识
+device_id: "edge-agent-001"
+
+# 日志级别: DEBUG, INFO, WARNING, ERROR
+log_level: "INFO"
+
+# 仅上报有检测结果的帧 (设为 false 则上报所有帧)
+report_only_detections: true
+
+# 数据源配置
+source:
+  # 类型: video (视频文件), folder (图像文件夹), camera (摄像头), rtsp (RTSP流)
+  type: "folder"
+
+  # 数据源路径
+  # - video: 视频文件路径, 如 "/path/to/video.mp4"
+  # - folder: 图像文件夹路径, 如 "/path/to/images"
+  # - camera: 摄像头索引, 如 "0" (默认摄像头)
+  # - rtsp: RTSP URL, 如 "rtsp://user:pass@192.168.1.100:554/stream"
+  path: "data/images/test"
+
+  # 帧率限制 (0 表示不限制)
+  fps_limit: 5.0
+
+  # 是否循环播放 (仅对 video 和 folder 有效)
+  loop: false
+
+  # 跳帧数 (0 表示不跳帧, 1 表示每隔1帧处理1帧)
+  skip_frames: 0
+
+  # 支持的图像扩展名 (仅对 folder 有效)
+  extensions:
+    - ".jpg"
+    - ".jpeg"
+    - ".png"
+    - ".bmp"
+
+# 推理配置
+inference:
+  # 推理引擎: onnx (ONNX Runtime), yolo (Ultralytics YOLO)
+  engine: "onnx"
+
+  # 模型文件路径
+  model_path: "models/best.onnx"
+
+  # 置信度阈值 [0.0, 1.0]
+  confidence: 0.5
+
+  # IoU 阈值 [0.0, 1.0]
+  iou: 0.5
+
+  # 推理设备: cpu, cuda, mps (Apple Silicon)
+  device: "cpu"
+
+  # 是否预热模型 (首次推理前执行空推理以初始化)
+  warmup: true
+
+# 上报器配置
+reporter:
+  # 上报类型: http, mqtt (mqtt 暂未实现)
+  type: "http"
+
+  # 上报地址
+  url: "http://localhost:8000/api/v1/report"
+
+  # API 密钥 (建议通过环境变量 EDGE_AGENT_REPORTER_API_KEY 设置)
+  # api_key: ""
+
+  # 请求超时 (秒)
+  timeout: 30.0
+
+  # 最大重试次数
+  retry_max: 3
+
+  # 重试初始延迟 (秒)
+  retry_delay: 1.0
+
+  # 重试退避倍数 (指数退避)
+  retry_backoff: 2.0
+
+  # 批量上报大小 (累积多少结果后上报)
+  batch_size: 10
+
+  # 批量上报间隔 (秒, 即使未达到 batch_size 也会上报)
+  batch_interval: 5.0
+
+# 离线缓存配置
+cache:
+  # 是否启用离线缓存 (网络不可用时暂存数据)
+  enabled: true
+
+  # SQLite 数据库路径
+  db_path: "cache/edge_agent.db"
+
+  # 最大缓存条目数
+  max_entries: 10000
+
+  # 最大缓存时长 (小时)
+  max_age_hours: 24.0
+
+  # 缓存刷新间隔 (秒, 定期尝试上报缓存数据)
+  flush_interval: 60.0

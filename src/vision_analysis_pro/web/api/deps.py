@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, status
 
 from vision_analysis_pro.core.inference import (
+    ONNXInferenceEngine,
     PythonInferenceEngine,
     StubInferenceEngine,
     YOLOInferenceEngine,
@@ -54,6 +55,44 @@ def _load_yolo_engine(model_path: str) -> YOLOInferenceEngine:
 
 
 @lru_cache(maxsize=1)
+def _load_onnx_engine(model_path: str) -> ONNXInferenceEngine:
+    """加载 ONNX 推理引擎（带缓存）
+
+    Args:
+        model_path: ONNX 模型文件路径（字符串，可哈希）
+
+    Returns:
+        ONNXInferenceEngine 实例
+
+    Raises:
+        HTTPException: 模型文件不存在或加载失败
+    """
+    path = Path(model_path)
+    if not path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"ONNX 模型文件不存在: {model_path}",
+        )
+    try:
+        return ONNXInferenceEngine(path)
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="未安装 onnxruntime，请运行: uv sync --extra onnx",
+        ) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"模型文件错误: {exc}",
+        ) from exc
+    except Exception as exc:  # pragma: no cover
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"ONNX 模型加载失败: {exc}",
+        ) from exc
+
+
+@lru_cache(maxsize=1)
 def _load_python_engine(model_path: str) -> PythonInferenceEngine:
     """加载 Python 推理引擎（带缓存）
 
@@ -88,22 +127,32 @@ def _load_python_engine(model_path: str) -> PythonInferenceEngine:
 
 def get_inference_engine(
     settings: Annotated[Settings, Depends(get_settings)],
-) -> YOLOInferenceEngine | StubInferenceEngine:
+) -> YOLOInferenceEngine | ONNXInferenceEngine | StubInferenceEngine:
     """获取推理引擎实例
 
     根据环境变量 INFERENCE_ENGINE 选择引擎：
     - "yolo" (默认): 使用 YOLOInferenceEngine (真实 YOLO 推理)
+    - "onnx": 使用 ONNXInferenceEngine (ONNX Runtime 推理)
     - "stub": 使用 StubInferenceEngine (测试用 stub)
-    - "YOLO_MODEL_PATH" (环境变量): YOLO 模型路径，默认 "runs/train/exp/weights/best.pt"
+
+    相关环境变量：
+    - INFERENCE_ENGINE: 引擎类型 ("yolo", "onnx", "stub")
+    - YOLO_MODEL_PATH: YOLO 模型路径，默认 "runs/train/exp/weights/best.pt"
+    - ONNX_MODEL_PATH: ONNX 模型路径，默认 "models/best.onnx"
 
     Returns:
-        推理引擎实例（YOLOInferenceEngine 或 StubInferenceEngine）
+        推理引擎实例
     """
     engine_type = os.getenv("INFERENCE_ENGINE", "yolo").lower()
 
     if engine_type == "stub":
         # 使用 stub 引擎（用于测试）
         return StubInferenceEngine(mode="normal")
+
+    if engine_type == "onnx":
+        # 使用 ONNX Runtime 引擎
+        model_path = os.getenv("ONNX_MODEL_PATH", "models/best.onnx")
+        return _load_onnx_engine(model_path)
 
     # 默认使用 YOLO 引擎
     model_path = os.getenv(

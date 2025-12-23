@@ -4,11 +4,18 @@
 
 本文档只回答“要做什么、何时做、做到什么算完成”；项目当前进度与变更记录请参见 `docs/progress.md`。
 
-**当前进度快照（截至 2025-12-17）**
+**当前进度快照（截至 2025-12-24）**
 
-- 后端 M1 闭环完成：YOLO 训练脚本、真实推理引擎、API 上传与可视化、78 passed / 2 skipped，ruff 全绿。
-- 前端 Web MVP 完成：Vue3 + TS 页面闭环（上传 → 推理 → 展示）、路径别名与 ESLint/TS 告警清零、vitest 19/19 通过、前端文档更新。
-- 待办优先级（前端）：统一错误处理（axios 拦截器 + 全局提示 + 错误边界）、体验优化（加载/进度/缩放/快捷键）、Pinia 取舍、Element Plus 按需与生产构建/预览。
+| 里程碑 | 状态 | 说明 |
+|--------|------|------|
+| M1: MVP 闭环 | ✅ 完成 | YOLO 训练、推理引擎、API 闭环 |
+| M2: 性能与可视化 | ✅ 完成 | ONNX 导出（7.25x 加速）、前端 UX 优化 |
+| M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
+| M4: 生产化 | 📋 待开始 | CI/CD、容器化、监控 |
+
+- **后端测试**：138 passed, 2 skipped，ruff 全绿
+- **前端测试**：28 passed（vitest），ESLint 全绿
+- **下一步**：CI/CD 与容器化、端到端集成测试、生产部署文档
 
 ---
 
@@ -63,19 +70,21 @@
 
 ## 4. 现状与差距（基于仓库当前内容）
 
-### 4.1 已具备
+### 4.1 已具备 ✅
 
-- Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent`。
-- 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制。
-- 数据与训练雏形：已有最小数据集配置（`data/data.yaml`）与训练脚本（`scripts/train.py`），并产出训练权重（如 `runs/train/exp/weights/best.pt`）。
-- API 与测试：已完成 `/api/v1/health` 与 `/api/v1/inference/image` 闭环，并有较完整测试（具体以 `docs/progress.md` 为准）。
+- ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
+- ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
+- ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
+- ✅ API 与测试：`/api/v1/health` 与 `/api/v1/inference/image` 闭环，138 个后端测试通过
+- ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
+- ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
+- ✅ 前端 Web：Vue3 + TS 页面闭环，28 个前端测试通过
 
-### 4.2 主要差距
+### 4.2 剩余差距
 
-- 数据与训练：需要补齐“可复现的数据切分/规模化数据集/评估报告（mAP/PR）”等，避免仅停留在最小样例。
-- 推理：需要补齐性能基准、更多异常路径与后端一致性验证（例如导出后端与 PyTorch 后端输出对齐）。
-- 边缘 Agent：需要端到端跑通采集 → 推理 → 上报（含离线缓存）。
-- 生产化：容器化、观测性、CI/CD 仍需体系化落地。
+- 数据与训练：需要规模化数据集、评估报告（mAP/PR）
+- 生产化：容器化、CI/CD、观测性仍需体系化落地
+- 可选优化：MQTT 上报器、Rust/PyO3 加速
 
 ---
 
@@ -99,78 +108,77 @@
 
 > 时间仅为建议节奏；实际以数据准备与硬件条件为约束。
 
-### M1（第 1-2 周）：MVP 闭环打通
+### M1（第 1-2 周）：MVP 闭环打通 ✅ 已完成
 
 **目标**：数据/训练/推理/API 四件套跑通，交付端到端 demo。
 
 **交付物**：
 
-- 数据与训练：
-  - `data/` 目录规范、`data.yaml`、类目定义与标注规范（最小可用版）。
-  - `scripts/train.py`（或等价命令文档）可复现训练；产出训练权重（默认形态：`runs/train/exp/weights/best.pt`；如需发布可复制到 `models/best.pt`）。
-  - （待实现）导出 ONNX：补齐导出入口脚本/命令与 smoke test（目标产物：`models/best.onnx`）。
-- 推理引擎（Python 基线）：
-  - 支持图片输入（path/bytes/ndarray）；阈值可配置；结果映射到 schema。
-  - 基础性能策略：模型缓存/预热；线程安全（或明确单进程单实例策略）。
-- Web API：
-  - `GET /api/v1/health`：返回版本与模型状态。
-  - `POST /api/v1/inference/image`：上传图片并返回检测结果 JSON。
-- 测试：
-  - 单元测试覆盖推理输出 schema、异常路径；API 集成测试覆盖健康检查与上传推理。
+- ✅ 数据与训练：
+  - ✅ `data/` 目录规范、`data.yaml`、类目定义与标注规范
+  - ✅ `scripts/train.py` 可复现训练；产出训练权重 `runs/train/exp/weights/best.pt`
+  - ✅ 导出 ONNX：`scripts/export_onnx.py`，产出 `models/best.onnx`
+- ✅ 推理引擎（Python 基线）：
+  - ✅ 支持图片输入（path/bytes/ndarray）；阈值可配置；结果映射到 schema
+  - ✅ Stub、YOLO、ONNX 三种引擎实现
+- ✅ Web API：
+  - ✅ `GET /api/v1/health`：返回版本与模型状态
+  - ✅ `POST /api/v1/inference/image`：上传图片并返回检测结果 JSON
+- ✅ 测试：58 个测试覆盖推理输出 schema、异常路径、API 集成
 
-**验收标准**：
+**验收结果**：✅ 全部通过
 
-- 本地可用 `uv` 复现：安装依赖 → 启动 API → 上传样例图片 → 返回结构化结果。
-- `ruff` 无错误；`pytest` 通过；核心路径覆盖率目标 ≥ 60%。
-
-### M2（第 3-4 周）：性能与可视化
+### M2（第 3-4 周）：性能与可视化 ✅ 已完成
 
 **目标**：将推理后端与可视化/批量能力补齐，形成可演示的结果展示。
 
 **交付物**：
 
-- ONNX Runtime 推理路径（CPU/GPU 视平台而定），并与 Python 基线对齐输出。
-- 性能基准脚本（单张、批量、不同输入尺寸），输出吞吐/延迟报告。
-- 可视化：输出带框图片（API 可提供可选返回，或生成文件/bytes）。
-- （规划）前端：先以最小页面验证上传与展示链路（若前端不在本仓库，可只保留接口契约）。
+- ✅ ONNX Runtime 推理路径（CPU/GPU 自动选择），与 YOLO 基线输出一致
+- ✅ 性能基准脚本 `scripts/benchmark.py`，输出吞吐/延迟报告
+  - ONNX 相比 YOLO 提升 **7.25x**（33.36ms → 4.60ms）
+- ✅ 可视化：API `?visualize=true` 返回带框图片（base64 Data URI）
+- ✅ 前端 Web MVP：Vue3 + TS 页面闭环（上传 → 推理 → 展示）
+  - ✅ 错误处理（axios 拦截器、ApiError 类）
+  - ✅ 上传进度条
+  - ✅ 健康状态自动刷新
+  - ✅ 28 个前端测试通过
 
-**验收标准**：
+**验收结果**：✅ 全部通过，性能报告见 `docs/benchmark-report.md`
 
-- 同一输入在不同后端输出 schema 一致；性能报告可复现。
+### M3（第 5-8 周）：生产化与边缘 Agent ✅ 已完成（Agent 部分）
 
-### M3（第 5-8 周）：生产化与边缘 Agent
-
-**目标**：让系统具备“部署、运行、观测、回滚”的基本生产能力，并落地边缘 Agent。
-
-**交付物**：
-
-- 边缘 Agent（Python 版）：
-  - 数据源：RTSP/本地视频/图片目录至少支持一种。
-  - 上报：HTTP（优先）或 MQTT（二选一）；失败重试与离线缓存。
-  - 配置：YAML/ENV（与 `Settings` 体系一致）。
-- 工程化：
-  - CI（lint + test）；Dockerfile（API 服务镜像）；基础发布说明。
-  - 观测性：请求/推理耗时日志；简单 metrics（Prometheus 友好格式或日志采集约定）。
-- 模型与配置版本：
-  - 模型命名/版本策略（如 `best-v{n}.onnx` + 元信息）。
-
-**验收标准**：
-
-- 在目标边缘设备或等价环境中可稳定运行，断网/失败可恢复；关键指标可采集。
-
-### M4（第 9-12 周）：Rust/加速与稳态运营
-
-**目标**：把“性能瓶颈”路径迁移到 Rust 或更高性能后端，提升边缘侧体验并稳定运营。
+**目标**：让系统具备"部署、运行、观测、回滚"的基本生产能力，并落地边缘 Agent。
 
 **交付物**：
 
-- PyO3 预处理/后处理加速模块（以基准为导向，先做收益最大的环节）。
-- （可选）独立 Rust 边缘 Agent 或 Rust 推理后端（ORT/TensorRT 视平台）。
-- 运维能力：灰度发布、模型回滚、集中日志/告警策略（最小可用版）。
+- ✅ 边缘 Agent（Python 版）完整实现：
+  - ✅ 数据源：视频文件、图像文件夹、摄像头、RTSP 流全部支持
+  - ✅ 上报：HTTP（指数退避重试）
+  - ✅ 离线缓存：SQLite 实现，支持过期/溢出清理
+  - ✅ 配置：YAML + ENV（优先级：ENV > YAML > 默认值）
+  - ✅ 优雅关闭（SIGINT/SIGTERM 信号处理）
+  - ✅ 38 个单元测试全部通过
+- 📋 工程化（待完成）：
+  - [ ] CI（lint + test）
+  - [ ] Dockerfile（API 服务镜像）
+  - [ ] 观测性（Prometheus metrics）
+
+**验收结果**：Agent 功能 ✅ 完成，工程化 📋 待后续迭代
+
+### M4（第 9-12 周）：Rust/加速与稳态运营 📋 待开始
+
+**目标**：把"性能瓶颈"路径迁移到 Rust 或更高性能后端，提升边缘侧体验并稳定运营。
+
+**交付物**：
+
+- [ ] PyO3 预处理/后处理加速模块（以基准为导向，先做收益最大的环节）
+- [ ] （可选）独立 Rust 边缘 Agent 或 Rust 推理后端（ORT/TensorRT 视平台）
+- [ ] 运维能力：灰度发布、模型回滚、集中日志/告警策略（最小可用版）
 
 **验收标准**：
 
-- 关键链路性能提升有量化对比；回滚/灰度流程可演练。
+- 关键链路性能提升有量化对比；回滚/灰度流程可演练
 
 ---
 

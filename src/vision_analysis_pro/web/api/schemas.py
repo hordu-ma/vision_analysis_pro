@@ -9,19 +9,29 @@
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HealthResponse(BaseModel):
     """健康检查响应"""
 
-    status: str = Field(..., description="服务状态", example="healthy")
-    version: str = Field(..., description="API 版本", example="0.1.0")
-    model_loaded: bool = Field(..., description="模型是否已加载", example=True)
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "healthy",
+                "version": "0.1.0",
+                "model_loaded": True,
+                "engine": "YOLOInferenceEngine",
+            }
+        }
+    )
+
+    status: str = Field(..., description="服务状态")
+    version: str = Field(..., description="API 版本")
+    model_loaded: bool = Field(..., description="模型是否已加载")
     engine: str | None = Field(
         None,
         description="当前推理引擎类型（仅用于展示与排障）",
-        example="YOLOInferenceEngine",
     )
 
 
@@ -32,44 +42,29 @@ class DetectionBox(BaseModel):
     bbox 格式：[x1, y1, x2, y2]（左上角与右下角坐标）
     """
 
-    label: str = Field(..., description="检测类别", example="crack")
-    confidence: float = Field(
-        ..., ge=0.0, le=1.0, description="置信度 [0.0, 1.0]", example=0.95
-    )
-    bbox: list[float] = Field(
-        ...,
-        description="边界框坐标 [x1, y1, x2, y2]，像素坐标",
-        example=[100.0, 150.0, 300.0, 400.0],
-    )
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "label": "crack",
                 "confidence": 0.95,
                 "bbox": [100.0, 150.0, 300.0, 400.0],
             }
         }
+    )
+
+    label: str = Field(..., description="检测类别")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="置信度 [0.0, 1.0]")
+    bbox: list[float] = Field(
+        ...,
+        description="边界框坐标 [x1, y1, x2, y2]，像素坐标",
+    )
 
 
 class InferenceResponse(BaseModel):
     """推理响应"""
 
-    filename: str = Field(..., description="上传的文件名", example="test_image.jpg")
-    detections: list[DetectionBox] = Field(..., description="检测结果列表")
-    metadata: dict[str, Any] = Field(
-        default_factory=dict,
-        description="元信息（如推理耗时、模型版本等）",
-        example={"inference_time_ms": 45.2, "model_version": "v1.0"},
-    )
-    visualization: str | None = Field(
-        None,
-        description="可视化图像的 base64 编码（当 visualize=true 时返回）",
-        example="data:image/jpeg;base64,/9j/4AAQSkZJRg...",
-    )
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "filename": "test_image.jpg",
                 "detections": [
@@ -88,26 +83,39 @@ class InferenceResponse(BaseModel):
                     "inference_time_ms": 45.2,
                     "model_version": "v1.0",
                 },
+                "visualization": None,
             }
         }
+    )
+
+    filename: str = Field(..., description="上传的文件名")
+    detections: list[DetectionBox] = Field(..., description="检测结果列表")
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="元信息（如推理耗时、模型版本等）",
+    )
+    visualization: str | None = Field(
+        None,
+        description="可视化图像的 base64 编码（当 visualize=true 时返回）",
+    )
 
 
 class ErrorResponse(BaseModel):
     """统一错误响应结构"""
 
-    code: str = Field(..., description="错误码", example="MODEL_NOT_LOADED")
-    message: str = Field(..., description="错误消息", example="模型未加载")
-    detail: str | None = Field(
-        None,
-        description="详细错误信息（可选）",
-        example="模型文件不存在: models/best.pt",
-    )
-
-    class Config:
-        json_schema_extra = {
+    model_config = ConfigDict(
+        json_schema_extra={
             "example": {
                 "code": "MODEL_NOT_LOADED",
                 "message": "模型未加载",
                 "detail": "模型文件不存在: models/best.pt",
             }
         }
+    )
+
+    code: str = Field(..., description="错误码")
+    message: str = Field(..., description="错误消息")
+    detail: str | None = Field(
+        None,
+        description="详细错误信息（可选）",
+    )

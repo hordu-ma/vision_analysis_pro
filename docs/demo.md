@@ -1,12 +1,13 @@
 # 端到端 Demo 演示指南
 
-本文档演示如何在本地环境运行完整的推理服务，并获取带可视化的检测结果。
+本文档演示如何在本地环境运行完整的推理服务和边缘 Agent，并获取检测结果。
 
 ---
 
 ## 📋 前置要求
 
 - **Python 3.12+**（推荐使用 `uv` 管理环境）
+- **Node.js 20+**（前端开发）
 - **操作系统**：macOS / Linux / Windows
 
 ---
@@ -22,30 +23,28 @@ cd vision_analysis_pro
 
 ### 2. 安装依赖
 
-使用 `uv` 安装（推荐）：
-
 ```bash
 # 安装基础依赖
 uv sync
 
-# 安装开发依赖（可选，用于测试）
+# 安装 ONNX Runtime 支持（推荐，性能提升 7.25x）
+uv sync --extra onnx
+
+# 安装开发依赖（测试）
 uv sync --extra dev
-```
-
-或使用 pip：
-
-```bash
-pip install -e .
 ```
 
 ### 3. 启动 API 服务
 
 ```bash
-# 默认：使用 YOLO 引擎（需模型文件存在；默认路径 runs/train/exp/weights/best.pt）
+# 默认：使用 YOLO 引擎
 uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 
-# 如果你希望得到“可复现、固定输出”的演示结果，可切换为 Stub 引擎：
-# INFERENCE_ENGINE=stub uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+# 使用 ONNX 引擎（更快）
+INFERENCE_ENGINE=onnx uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+
+# 使用 Stub 引擎（固定输出，用于演示）
+INFERENCE_ENGINE=stub uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 ```
 
 服务将在 `http://127.0.0.1:8000` 启动。
@@ -69,18 +68,9 @@ curl http://127.0.0.1:8000/api/v1/health
 
 ---
 
-## 🎯 Demo 演示
+## 🎯 API 推理演示
 
 ### 场景 1：基础推理（返回 JSON 检测结果）
-
-**准备测试图片**（或使用任意图片）：
-
-```bash
-# 创建一个简单的测试图片
-python3 -c "import cv2; import numpy as np; img = np.zeros((640,480,3), dtype=np.uint8); img[:] = (200,200,200); cv2.imwrite('test_image.jpg', img)"
-```
-
-**发送推理请求**：
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/v1/inference/image" \
@@ -98,106 +88,148 @@ curl -X POST "http://127.0.0.1:8000/api/v1/inference/image" \
       "label": "crack",
       "confidence": 0.95,
       "bbox": [100.0, 150.0, 300.0, 400.0]
-    },
-    {
-      "label": "rust",
-      "confidence": 0.88,
-      "bbox": [450.0, 200.0, 550.0, 350.0]
-    },
-    {
-      "label": "deformation",
-      "confidence": 0.72,
-      "bbox": [200.0, 300.0, 350.0, 450.0]
     }
   ],
   "metadata": {
-    "engine": "StubInferenceEngine"
+    "engine": "YOLOInferenceEngine"
   },
   "visualization": null
 }
 ```
 
----
-
-### 场景 2：带可视化的推理（返回 base64 图像）
-
-**发送带可视化的请求**：
+### 场景 2：带可视化的推理
 
 ```bash
 curl -X POST "http://127.0.0.1:8000/api/v1/inference/image?visualize=true" \
   -F "file=@test_image.jpg" \
-  -H "Content-Type: multipart/form-data" \
   -o response.json
-```
 
-**查看响应**：
-
-```bash
-cat response.json | jq .
-```
-
-响应中 `visualization` 字段包含 base64 编码的可视化图像：
-
-```json
-{
-  "filename": "test_image.jpg",
-  "detections": [...],
-  "metadata": {...},
-  "visualization": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
-}
-```
-
-**提取并保存可视化图像**：
-
-```bash
-# 使用 jq 提取 base64 数据并解码保存为图片
+# 提取并保存可视化图像
 cat response.json | jq -r '.visualization' | sed 's/^data:image\/jpeg;base64,//' | base64 -d > output_with_bbox.jpg
+```
 
-# 查看图片（macOS）
-open output_with_bbox.jpg
+### 场景 3：使用 Python 脚本
 
-# 或（Linux）
-xdg-open output_with_bbox.jpg
+```bash
+python examples/demo_request.py test_image.jpg
 ```
 
 ---
 
-### 场景 3：使用 Python 脚本调用 API
+## 🤖 边缘 Agent 演示
 
-创建文件 `demo_request.py`（见 `examples/demo_request.py`）：
+边缘 Agent 支持从多种数据源采集图像，执行推理，并将结果上报到云端。
 
-```python
-import base64
-from pathlib import Path
+### 启动方式
 
-import httpx
-
-API_URL = "http://127.0.0.1:8000/api/v1/inference/image"
-
-# 上传图片并获取带可视化的结果
-with open("test_image.jpg", "rb") as f:
-    files = {"file": ("test_image.jpg", f, "image/jpeg")}
-    response = httpx.post(f"{API_URL}?visualize=true", files=files)
-
-data = response.json()
-
-print(f"检测到 {len(data['detections'])} 个目标：")
-for det in data["detections"]:
-    print(f"  - {det['label']}: {det['confidence']:.2f} at {det['bbox']}")
-
-# 保存可视化图像
-if data.get("visualization"):
-    base64_data = data["visualization"].split(",")[1]
-    img_bytes = base64.b64decode(base64_data)
-    Path("output_visualization.jpg").write_bytes(img_bytes)
-    print("✅ 可视化图像已保存到 output_visualization.jpg")
-```
-
-**运行脚本**：
+#### 方式 1：使用配置文件
 
 ```bash
-uv run python demo_request.py
+# 复制示例配置
+cp config/edge_agent.example.yaml config/edge_agent.yaml
+
+# 根据需要修改配置
+vim config/edge_agent.yaml
+
+# 启动 Agent
+edge-agent -c config/edge_agent.yaml
 ```
+
+#### 方式 2：使用命令行参数
+
+```bash
+python examples/run_edge_agent.py \
+  --source-type folder \
+  --source-path data/images/test \
+  --engine onnx \
+  --model-path models/best.onnx \
+  --report-url http://localhost:8000/api/v1/report \
+  --fps-limit 5
+```
+
+#### 方式 3：使用环境变量
+
+```bash
+EDGE_AGENT_DEVICE_ID=edge-001 \
+EDGE_AGENT_SOURCE_TYPE=folder \
+EDGE_AGENT_SOURCE_PATH=data/images/test \
+EDGE_AGENT_INFERENCE_ENGINE=onnx \
+EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
+edge-agent
+```
+
+### 支持的数据源
+
+| 类型 | 说明 | 示例配置 |
+|------|------|----------|
+| `folder` | 图像文件夹 | `path: /path/to/images` |
+| `video` | 视频文件 | `path: /path/to/video.mp4` |
+| `camera` | 本地摄像头 | `path: 0` (摄像头索引) |
+| `rtsp` | RTSP 视频流 | `path: rtsp://user:pass@ip:554/stream` |
+
+### 配置文件示例
+
+```yaml
+# config/edge_agent.yaml
+device_id: "edge-agent-001"
+log_level: "INFO"
+
+source:
+  type: folder
+  path: data/images/test
+  fps_limit: 5.0
+  loop: false
+
+inference:
+  engine: onnx
+  model_path: models/best.onnx
+  confidence: 0.5
+  iou: 0.5
+
+reporter:
+  type: http
+  url: http://localhost:8000/api/v1/report
+  timeout: 30.0
+  retry_max: 3
+  batch_size: 10
+  batch_interval: 5.0
+
+cache:
+  enabled: true
+  db_path: cache/edge_agent.db
+  max_entries: 10000
+  max_age_hours: 24.0
+```
+
+### 功能特性
+
+- ✅ **多数据源**：视频、图像文件夹、摄像头、RTSP 流
+- ✅ **高性能推理**：ONNX Runtime（7.25x 加速）
+- ✅ **可靠上报**：指数退避重试
+- ✅ **离线缓存**：网络不可用时本地缓存
+- ✅ **优雅关闭**：Ctrl+C 安全退出
+- ✅ **灵活配置**：YAML + 环境变量
+
+---
+
+## 🌐 前端演示
+
+### 启动前端
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+访问 http://localhost:5173
+
+### 功能
+
+1. **图片上传**：拖拽或点击上传图片
+2. **实时推理**：自动调用后端 API
+3. **结果展示**：检测框、置信度、类别
+4. **健康状态**：实时显示后端服务状态
 
 ---
 
@@ -210,38 +242,60 @@ uv run python demo_request.py
 
 ---
 
-## ⚠️ 当前限制（MVP 阶段）
+## 📊 性能基准
 
-1. **引擎选择**：默认使用 YOLO 引擎；如需固定可复现输出，可用 `INFERENCE_ENGINE=stub` 切换到 Stub 引擎。
-2. **文件限制**：
-   - 最大文件大小：10MB
-   - 支持格式：JPEG, PNG, JPG, WebP
-3. **可视化行为**：当 `visualize=true` 且检测结果非空时返回可视化图像；检测结果为空时 `visualization` 为 null。
+运行性能基准测试：
+
+```bash
+uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-report.md
+```
+
+**测试结果**（Apple M4）：
+
+| 引擎 | 平均延迟 (ms) | P95 (ms) | FPS | 加速比 |
+|------|--------------|----------|-----|--------|
+| YOLO | 33.36 | 34.78 | 29.97 | 1.0x |
+| ONNX | 4.60 | 5.38 | 217.24 | **7.25x** |
 
 ---
 
 ## 🧪 运行测试
 
 ```bash
-# 运行所有测试
+# 全部后端测试
 uv run pytest tests/ -v
 
-# 运行 API 测试
-uv run pytest tests/test_api_inference.py -v
+# 边缘 Agent 测试
+uv run pytest tests/test_edge_agent.py -v
 
-# 运行可视化测试
-uv run pytest tests/test_visualization.py -v
+# 前端测试
+cd web && npm run test -- --run
 ```
 
-预期：21 个测试全部通过 ✅
+**预期结果**：
+- 后端：138 passed, 2 skipped ✅
+- 前端：28 passed ✅
+
+---
+
+## ⚠️ 当前限制
+
+1. **文件限制**：
+   - 最大文件大小：10MB
+   - 支持格式：JPEG, PNG, JPG, WebP
+
+2. **边缘 Agent**：
+   - MQTT 上报器尚未实现（使用 HTTP）
+   - 批量推理尚未优化
+
+3. **可视化**：
+   - 当检测结果为空时不生成可视化图像
 
 ---
 
 ## 🐛 常见问题
 
 ### 问题 1: `ModuleNotFoundError: No module named 'vision_analysis_pro'`
-
-**解决方案**：
 
 ```bash
 # 方案 1：使用 PYTHONPATH
@@ -251,33 +305,32 @@ PYTHONPATH=src uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 uv pip install -e .
 ```
 
-### 问题 2: 端口 8000 被占用
-
-**解决方案**：
+### 问题 2: ONNX 模型不存在
 
 ```bash
-# 使用其他端口
+# 导出 ONNX 模型
+uv run python scripts/export_onnx.py --output models/best.onnx
+```
+
+### 问题 3: 端口 8000 被占用
+
+```bash
 uv run uvicorn vision_analysis_pro.web.api.main:app --reload --port 8001
 ```
 
-### 问题 3: `httpx` 模块缺失（运行测试时）
+### 问题 4: 边缘 Agent 上报失败
 
-**解决方案**：
-
-```bash
-uv sync --extra dev
-```
-
----
-
-## 📝 下一步开发
-
-- [ ] Day 6-7：数据准备（类目定义、标注规范、data.yaml）
-- [ ] Day 8-9：YOLO 训练与导出
-- [ ] Day 10：集成真实推理引擎（替换 StubInferenceEngine）
+检查：
+1. 云端 API 是否启动
+2. 上报 URL 是否正确
+3. 查看离线缓存：`cache/edge_agent.db`
 
 ---
 
 ## 📞 反馈
 
 如遇到问题或有建议，请提交 Issue 或联系开发团队。
+
+---
+
+**最后更新**：2025-12-24
