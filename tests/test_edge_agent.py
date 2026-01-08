@@ -547,7 +547,7 @@ class TestFolderSource:
             frames = list(source)
 
         assert len(frames) == 3
-        for i, frame in enumerate(frames):
+        for _i, frame in enumerate(frames):
             assert isinstance(frame, FrameData)
             assert frame.source_id == "test-folder"
             assert frame.image.shape == (100, 100, 3)
