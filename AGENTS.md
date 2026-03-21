@@ -31,3 +31,30 @@
 - Avoid committing large model weights or private data; use `models/` and `data/` as git-ignored caches unless required artifacts are documented.  
 - Prefer YAML configs in `config/` and environment variables for secrets; never hardcode credentials.  
 - When benchmarking or exporting models, use `scripts/` to keep parameters reproducible and checked in as command examples.
+
+## AI Collaboration Workflow
+
+### Required Context Order
+- Read `AGENTS.md` first, then `README.md`, then the target module and its related tests before proposing changes.
+- For backend work, check `pyproject.toml`, `pytest.ini`, and `ruff.toml` so command, test, and lint assumptions stay correct.
+- For frontend work, check `web/package.json` and the nearest component/store/test files before editing.
+
+### Change Playbooks
+- Backend API changes: inspect `src/vision_analysis_pro/web/api/`, shared models/config, and matching tests under `tests/`.
+- Inference or preprocessing changes: inspect `src/vision_analysis_pro/core/` plus benchmark/export scripts if behavior or interfaces may shift.
+- Edge Agent changes: inspect `src/vision_analysis_pro/edge_agent/`, config examples under `config/`, and reporter/source tests.
+- Frontend changes: inspect `web/src/` plus the API contract consumed by the page or component you touch.
+
+### Execution Rules for AI Agents
+- Start with a short TODO list containing at most 5 steps.
+- Prefer surgical edits over broad rewrites; reuse existing helpers and patterns before creating new abstractions.
+- Validate only the relevant checks for the surface you changed:
+  - Backend: `uv run ruff check .` and `uv run pytest`
+  - Frontend: `cd web && npm run lint && npm run test -- --run && npm run build`
+- If a task changes shared contracts between backend and frontend, validate both sides.
+- Do not invent new architecture documents or planning files inside the repo unless explicitly requested.
+
+### Completion Checklist
+- Commands and file paths mentioned in the response must match the repository exactly.
+- Any behavior change should be reflected in tests or in a directly related prompt/config update.
+- Final summaries should state: what changed, why it changed, and how it was validated.

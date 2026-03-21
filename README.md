@@ -102,6 +102,15 @@ vision_analysis_pro/
 
 ## 开发指南
 
+### AI 协作入口
+
+- 仓库级协作规范：`AGENTS.md`
+- GitHub Copilot 项目指令：`.github/copilot-instructions.md`
+- 常用任务 prompt：
+  - `.github/prompts/plan-visionAnalysisPro.prompt.md`
+  - `.github/prompts/implement-change.prompt.md`
+  - `.github/prompts/debug-failure.prompt.md`
+
 ### 代码规范
 
 - Python：`uv run ruff check .`；格式化 `uv run ruff format .`
