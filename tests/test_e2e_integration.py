@@ -17,15 +17,20 @@ import numpy as np
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from vision_analysis_pro.web.api.deps import clear_inference_engine_caches
 from vision_analysis_pro.web.api.main import app
 
+pytestmark = [pytest.mark.integration, pytest.mark.e2e]
 
+
+@pytest.mark.model
 class TestE2EWithYOLOEngine:
     """YOLO 引擎的端到端测试"""
 
     @pytest.fixture(autouse=True)
     def setup_yolo_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """设置使用 YOLO 引擎"""
+        clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
         monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
 
@@ -90,19 +95,16 @@ class TestE2EWithYOLOEngine:
             assert "model_loaded" in data
 
 
+@pytest.mark.unit
 class TestE2EWithStubEngine:
-    """Stub 引擎的端到端测试
-
-    注意：由于依赖注入使用了 lru_cache，在同一测试会话中动态切换引擎有限制。
-    如需测试 Stub 引擎，请在启动测试前设置环境变量 INFERENCE_ENGINE=stub
-    """
+    """Stub 引擎的端到端测试"""
 
     @pytest.fixture(autouse=True)
     def setup_stub_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """设置使用 Stub 引擎（注意：仅在独立运行时生效）"""
+        """设置使用 Stub 引擎"""
+        clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "stub")
 
-    @pytest.mark.skip(reason="依赖注入缓存限制，需要在独立进程中运行")
     @pytest.mark.asyncio
     async def test_full_workflow_with_stub(self) -> None:
         """Stub 引擎完整工作流（需要独立运行）"""
@@ -132,12 +134,9 @@ class TestE2EWithStubEngine:
             assert len(data["detections"]) >= 0  # 可能为 0 或更多
 
 
+@pytest.mark.integration
 class TestEngineSwitching:
-    """环境变量切换引擎测试
-
-    注意：由于依赖注入使用了 lru_cache，在同一测试会话中动态切换引擎有限制。
-    这些测试验证环境变量的读取逻辑，但实际切换需要重启应用。
-    """
+    """环境变量切换引擎测试"""
 
     @pytest.mark.asyncio
     async def test_yolo_engine_is_used(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -149,6 +148,7 @@ class TestEngineSwitching:
         image_bytes = encoded_image.tobytes()
 
         # 设置使用 YOLO 引擎（默认）
+        clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
         monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
 
@@ -159,7 +159,6 @@ class TestEngineSwitching:
             data = response.json()
             assert data["metadata"]["engine"] == "YOLOInferenceEngine"
 
-    @pytest.mark.skip(reason="依赖注入缓存限制，Stub 引擎需要在独立进程中测试")
     @pytest.mark.asyncio
     async def test_stub_engine_is_used(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试使用 Stub 引擎（需要独立运行）"""
@@ -170,6 +169,7 @@ class TestEngineSwitching:
         image_bytes = encoded_image.tobytes()
 
         # 设置使用 Stub 引擎
+        clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "stub")
 
         transport = ASGITransport(app=app)
@@ -180,6 +180,7 @@ class TestEngineSwitching:
             assert data["metadata"]["engine"] == "StubInferenceEngine"
 
 
+@pytest.mark.integration
 class TestDemoScriptCompatibility:
     """验证 demo 脚本的兼容性"""
 
@@ -226,6 +227,7 @@ class TestDemoScriptCompatibility:
                 assert data["visualization"].startswith("data:image/jpeg;base64,")
 
 
+@pytest.mark.integration
 class TestErrorHandlingE2E:
     """端到端错误处理测试"""
 
@@ -278,6 +280,7 @@ class TestErrorHandlingE2E:
             assert "large" in detail_str or "大" in detail_str or "size" in detail_str
 
 
+@pytest.mark.model
 class TestModelFilesExistence:
     """验证模型文件存在性（保证 demo 可运行）"""
 

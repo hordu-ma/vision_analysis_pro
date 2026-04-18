@@ -1,8 +1,11 @@
 """训练相关测试"""
 
+import importlib
 from pathlib import Path
 
 import pytest
+
+pytestmark = [pytest.mark.integration, pytest.mark.model]
 
 
 class TestTrainingScripts:
@@ -161,10 +164,10 @@ class TestModelLoading:
         if not best_pt.exists():
             pytest.skip("best.pt 不存在，跳过加载测试")
 
-        from ultralytics import YOLO
+        yolo_class = importlib.import_module("ultralytics").YOLO
 
         # 加载模型
-        model = YOLO(str(best_pt))
+        model = yolo_class(str(best_pt))
 
         # 验证模型属性
         assert model is not None, "模型加载失败"
@@ -177,10 +180,10 @@ class TestModelLoading:
         if not last_pt.exists():
             pytest.skip("last.pt 不存在，跳过加载测试")
 
-        from ultralytics import YOLO
+        yolo_class = importlib.import_module("ultralytics").YOLO
 
         # 加载模型
-        model = YOLO(str(last_pt))
+        model = yolo_class(str(last_pt))
 
         # 验证模型属性
         assert model is not None, "模型加载失败"

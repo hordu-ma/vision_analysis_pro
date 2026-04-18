@@ -10,6 +10,8 @@ import pytest
 
 from vision_analysis_pro.core.inference import YOLOInferenceEngine
 
+pytestmark = pytest.mark.model
+
 
 class TestYOLOInferenceEngine:
     """YOLOInferenceEngine 功能测试"""

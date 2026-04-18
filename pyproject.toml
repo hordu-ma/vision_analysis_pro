@@ -63,11 +63,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_functions = ["test_*"]
-addopts = "-v --cov=src/vision_analysis_pro --cov-report=term-missing"
+
 
 [dependency-groups]
 dev = [

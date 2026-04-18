@@ -28,10 +28,12 @@ def override_dependencies():
     original_overrides = app.dependency_overrides.copy()
 
     def _fake_settings() -> Settings:
-        return Settings(
-            model_path="models/fake.pt",
-            confidence_threshold=0.5,
-            iou_threshold=0.5,
+        return Settings.model_validate(
+            {
+                "model_path": "models/fake.pt",
+                "confidence_threshold": 0.5,
+                "iou_threshold": 0.5,
+            }
         )
 
     app.dependency_overrides[get_settings] = _fake_settings

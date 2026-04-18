@@ -1,6 +1,7 @@
 """FastAPI 依赖"""
 
 import os
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
@@ -125,6 +126,16 @@ def _load_python_engine(model_path: str) -> PythonInferenceEngine:
         ) from exc
 
 
+def clear_inference_engine_caches() -> None:
+    """清理推理引擎缓存
+
+    供测试或需要重新加载模型的场景显式调用。
+    """
+    _load_yolo_engine.cache_clear()
+    _load_onnx_engine.cache_clear()
+    _load_python_engine.cache_clear()
+
+
 def get_inference_engine(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> YOLOInferenceEngine | ONNXInferenceEngine | StubInferenceEngine:
@@ -143,6 +154,7 @@ def get_inference_engine(
     Returns:
         推理引擎实例
     """
+    _ = settings
     engine_type = os.getenv("INFERENCE_ENGINE", "yolo").lower()
 
     if engine_type == "stub":
@@ -160,3 +172,11 @@ def get_inference_engine(
         "runs/train/exp/weights/best.pt",
     )
     return _load_yolo_engine(model_path)
+
+
+def get_inference_engine_cache_clearer() -> Callable[[], None]:
+    """返回推理引擎缓存清理函数
+
+    供测试代码通过公开入口清理缓存，避免直接依赖私有实现细节。
+    """
+    return clear_inference_engine_caches

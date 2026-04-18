@@ -3,6 +3,7 @@
 补齐各种边界情况和错误处理路径的测试覆盖。
 """
 
+from collections.abc import Callable
 from pathlib import Path
 
 import cv2
@@ -34,6 +35,26 @@ def _create_test_image(width: int = 100, height: int = 100) -> bytes:
     return encoded.tobytes()
 
 
+def _build_test_settings(
+    *,
+    model_path: str | None = None,
+    confidence_threshold: float = 0.5,
+    iou_threshold: float = 0.5,
+) -> Callable[[], Settings]:
+    """构造测试用 Settings 提供函数。"""
+
+    def _factory() -> Settings:
+        data: dict[str, object] = {
+            "confidence_threshold": confidence_threshold,
+            "iou_threshold": iou_threshold,
+        }
+        if model_path is not None:
+            data["model_path"] = model_path
+        return Settings.model_validate(data)
+
+    return _factory
+
+
 class TestAPIWithYOLOEngine:
     """测试 API 在使用 YOLO 引擎时的集成场景"""
 
@@ -46,12 +67,11 @@ class TestAPIWithYOLOEngine:
 
         original_overrides = app.dependency_overrides.copy()
 
-        def _fake_settings() -> Settings:
-            return Settings(
-                model_path=str(model_path),
-                confidence_threshold=0.3,
-                iou_threshold=0.5,
-            )
+        _fake_settings = _build_test_settings(
+            model_path=str(model_path),
+            confidence_threshold=0.3,
+            iou_threshold=0.5,
+        )
 
         def _get_yolo_engine() -> YOLOInferenceEngine:
             return YOLOInferenceEngine(model_path)
@@ -141,12 +161,12 @@ class TestDependencyInjection:
         monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
         monkeypatch.setenv("YOLO_MODEL_PATH", str(model_path))
 
-        # 清除 LRU 缓存
-        from vision_analysis_pro.web.api.deps import _load_yolo_engine
+        # 使用显式缓存清理接口
+        from vision_analysis_pro.web.api.deps import clear_inference_engine_caches
 
-        _load_yolo_engine.cache_clear()
+        clear_inference_engine_caches()
 
-        settings = Settings()
+        settings = _build_test_settings(model_path=str(model_path))()
         engine = get_inference_engine(settings)
 
         assert isinstance(engine, YOLOInferenceEngine)
@@ -155,7 +175,7 @@ class TestDependencyInjection:
         """测试通过环境变量获取 Stub 引擎"""
         monkeypatch.setenv("INFERENCE_ENGINE", "stub")
 
-        settings = Settings()
+        settings = _build_test_settings()()
         engine = get_inference_engine(settings)
 
         assert isinstance(engine, StubInferenceEngine)

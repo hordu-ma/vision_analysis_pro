@@ -11,6 +11,8 @@ import pytest
 
 from vision_analysis_pro.core.inference import ONNXInferenceEngine
 
+pytestmark = [pytest.mark.model]
+
 # 测试用 ONNX 模型路径
 ONNX_MODEL_PATH = Path("models/best.onnx")
 
