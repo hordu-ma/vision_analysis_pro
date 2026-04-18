@@ -11,11 +11,11 @@
 | M1: MVP 闭环 | ✅ 完成 | YOLO 训练、推理引擎、API 闭环 |
 | M2: 性能与可视化 | ✅ 完成 | ONNX 导出（7.25x 加速）、前端 UX 优化 |
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
-| M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、最小 metrics、边缘上报接收已落地 |
+| M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报接收已落地 |
 
-- **后端测试**：132 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
+- **后端测试**：137 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
 - **前端测试**：28 passed（vitest），ESLint 全绿
-- **下一步**：浏览器级端到端验证、边缘 Agent 上报稳态测试、部署补充
+- **下一步**：Edge Agent 上报持久化/幂等/API Key 校验、浏览器级端到端验证、边缘 Agent 上报稳态测试
 
 ---
 
@@ -75,7 +75,7 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report` 闭环，当前后端测试基线为 157 collected
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report` 闭环，当前后端测试基线为 162 collected
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
 - ✅ 前端 Web：Vue3 + TS 页面闭环，28 个前端测试通过
@@ -83,7 +83,7 @@
 ### 4.2 剩余差距
 
 - 数据与训练：需要规模化数据集、评估报告（mAP/PR）
-- 生产化：CI/Docker/最小 metrics 已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
+- 生产化：CI/Docker/API CLI/最小 metrics 已落地，仍需上报持久化与幂等、浏览器级 E2E、上报稳态测试、部署编排与告警示例
 - 可选优化：MQTT 上报器、Rust/PyO3 加速
 
 ---
@@ -162,6 +162,9 @@
 - ✅ 工程化基础：
   - [x] CI（ruff + pytest，frontend lint/test/build）
   - [x] Dockerfile（API 服务镜像）
+  - [x] `api-server` 控制台入口
+  - [x] Docker ONNX 可选构建参数
+  - [x] Edge Agent YAML + ENV 配置合并回归测试
   - [x] 最小观测性（request_id、live/ready、Prometheus 风格 metrics）
   - [x] 云端 `POST /api/v1/report` 接收 Edge Agent 上报
 

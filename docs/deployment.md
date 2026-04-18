@@ -207,6 +207,18 @@ export INFERENCE_ENGINE=stub
 - 通过环境变量注入运行参数
 - 通过挂载卷提供模型文件
 
+构建基础镜像：
+
+```/dev/null/bash.sh#L1-1
+docker build -t vision-analysis-pro:latest .
+```
+
+如果容器内要使用 ONNX Runtime，构建时启用 ONNX 依赖：
+
+```/dev/null/bash.sh#L1-1
+docker build --build-arg INSTALL_ONNX=true -t vision-analysis-pro:onnx .
+```
+
 推荐运行约定：
 
 ### 7.1 端口映射
@@ -258,7 +270,7 @@ docker run --rm \
   -e API_PORT=8000 \
   -e API_RELOAD=false \
   -v ./models:/app/models \
-  vision-analysis-pro:latest
+  vision-analysis-pro:onnx
 ```
 
 ---
@@ -365,7 +377,7 @@ curl -X POST "http://localhost:8000/api/v1/report" \
 
 - 模型文件损坏
 - 依赖未安装完整
-- ONNX 模式下未安装 `onnxruntime`
+- ONNX 模式下未安装 `onnxruntime`；Docker 运行时需使用 `--build-arg INSTALL_ONNX=true` 构建的镜像
 - YOLO 模式下未安装 `ultralytics`
 
 建议先确认：

@@ -23,6 +23,38 @@ from vision_analysis_pro.edge_agent.sources import create_source
 from vision_analysis_pro.edge_agent.sources.folder import FolderSource
 from vision_analysis_pro.edge_agent.sources.video import VideoSource
 
+EDGE_AGENT_ENV_KEYS = [
+    "EDGE_AGENT_DEVICE_ID",
+    "EDGE_AGENT_LOG_LEVEL",
+    "EDGE_AGENT_REPORT_ONLY_DETECTIONS",
+    "EDGE_AGENT_SOURCE_TYPE",
+    "EDGE_AGENT_SOURCE_PATH",
+    "EDGE_AGENT_SOURCE_FPS_LIMIT",
+    "EDGE_AGENT_SOURCE_LOOP",
+    "EDGE_AGENT_SOURCE_SKIP_FRAMES",
+    "EDGE_AGENT_INFERENCE_ENGINE",
+    "EDGE_AGENT_INFERENCE_MODEL_PATH",
+    "EDGE_AGENT_INFERENCE_CONFIDENCE",
+    "EDGE_AGENT_INFERENCE_IOU",
+    "EDGE_AGENT_INFERENCE_DEVICE",
+    "EDGE_AGENT_REPORTER_TYPE",
+    "EDGE_AGENT_REPORTER_URL",
+    "EDGE_AGENT_REPORTER_API_KEY",
+    "EDGE_AGENT_REPORTER_TIMEOUT",
+    "EDGE_AGENT_REPORTER_RETRY_MAX",
+    "EDGE_AGENT_REPORTER_BATCH_SIZE",
+    "EDGE_AGENT_CACHE_ENABLED",
+    "EDGE_AGENT_CACHE_DB_PATH",
+    "EDGE_AGENT_CACHE_MAX_ENTRIES",
+]
+
+
+def _clear_edge_agent_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """清理测试会用到的 Edge Agent 环境变量。"""
+    for key in EDGE_AGENT_ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
 # ============================================================================
 # 数据模型测试
 # ============================================================================
@@ -330,6 +362,107 @@ inference:
         assert config.log_level == "ERROR"
         assert config.source.type == SourceType.RTSP
         assert config.source.path == "rtsp://example.com/stream"
+
+    def test_load_preserves_yaml_values_without_env(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """测试无环境变量时 YAML 配置不会被默认值覆盖。"""
+        _clear_edge_agent_env(monkeypatch)
+        yaml_content = """
+device_id: "yaml-device"
+log_level: "WARNING"
+report_only_detections: false
+source:
+  type: folder
+  path: "/yaml/images"
+  fps_limit: 7.5
+  loop: true
+  skip_frames: 2
+inference:
+  engine: yolo
+  model_path: "/yaml/model.pt"
+  confidence: 0.7
+  iou: 0.4
+  device: cuda
+  warmup: false
+reporter:
+  url: "http://example.com/report"
+  batch_size: 3
+  batch_interval: 9.0
+cache:
+  enabled: false
+  db_path: "/tmp/yaml-edge.db"
+  max_entries: 42
+"""
+        config_file = tmp_path / "edge_agent.yaml"
+        config_file.write_text(yaml_content)
+
+        config = EdgeAgentConfig.load(config_file)
+
+        assert config.device_id == "yaml-device"
+        assert config.log_level == "WARNING"
+        assert config.report_only_detections is False
+        assert config.source.type == SourceType.FOLDER
+        assert config.source.path == "/yaml/images"
+        assert config.source.fps_limit == 7.5
+        assert config.source.loop is True
+        assert config.source.skip_frames == 2
+        assert config.inference.engine == "yolo"
+        assert config.inference.model_path == "/yaml/model.pt"
+        assert config.inference.confidence == 0.7
+        assert config.inference.iou == 0.4
+        assert config.inference.device == "cuda"
+        assert config.inference.warmup is False
+        assert config.reporter.url == "http://example.com/report"
+        assert config.reporter.batch_size == 3
+        assert config.reporter.batch_interval == 9.0
+        assert config.cache.enabled is False
+        assert config.cache.db_path == "/tmp/yaml-edge.db"
+        assert config.cache.max_entries == 42
+
+    def test_load_env_overrides_only_explicit_values(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """测试环境变量只覆盖显式设置的字段。"""
+        _clear_edge_agent_env(monkeypatch)
+        yaml_content = """
+device_id: "yaml-device"
+report_only_detections: false
+source:
+  type: folder
+  path: "/yaml/images"
+inference:
+  engine: yolo
+  model_path: "/yaml/model.pt"
+  confidence: 0.7
+reporter:
+  url: "http://example.com/report"
+  batch_size: 3
+cache:
+  enabled: false
+"""
+        config_file = tmp_path / "edge_agent.yaml"
+        config_file.write_text(yaml_content)
+        monkeypatch.setenv("EDGE_AGENT_DEVICE_ID", "env-device")
+        monkeypatch.setenv("EDGE_AGENT_INFERENCE_CONFIDENCE", "0.8")
+        monkeypatch.setenv("EDGE_AGENT_REPORTER_BATCH_SIZE", "11")
+
+        config = EdgeAgentConfig.load(config_file)
+
+        assert config.device_id == "env-device"
+        assert config.report_only_detections is False
+        assert config.source.type == SourceType.FOLDER
+        assert config.source.path == "/yaml/images"
+        assert config.inference.engine == "yolo"
+        assert config.inference.model_path == "/yaml/model.pt"
+        assert config.inference.confidence == 0.8
+        assert config.reporter.url == "http://example.com/report"
+        assert config.reporter.batch_size == 11
+        assert config.cache.enabled is False
 
     def test_validate_valid_config(self, tmp_path: Path) -> None:
         """测试验证有效配置"""

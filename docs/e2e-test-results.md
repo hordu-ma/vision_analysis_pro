@@ -300,20 +300,21 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. 浏览器级 E2E 自动化测试
-2. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
-3. docker-compose 与前后端统一部署说明
+1. Edge Agent 上报持久化、重复批次幂等与 API Key 校验
+2. 浏览器级 E2E 自动化测试
+3. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
+4. docker-compose 与前后端统一部署说明
 
 ### 中优先级
 
-4. MQTT 上报器实现
-5. Prometheus metrics 告警示例
-6. 结构化日志采集
+5. MQTT 上报器实现
+6. Prometheus metrics 告警示例
+7. 结构化日志采集
 
 ### 低优先级
 
-7. Rust/PyO3 性能优化
-8. 批量推理支持
+8. Rust/PyO3 性能优化
+9. 批量推理支持
 
 ---
 

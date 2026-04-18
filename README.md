@@ -96,6 +96,9 @@ edge-agent
 
 ```bash
 docker build -t vision-analysis-pro:latest .
+
+# 如需在容器内使用 ONNX Runtime
+docker build --build-arg INSTALL_ONNX=true -t vision-analysis-pro:onnx .
 ```
 
 #### 运行容器
@@ -122,7 +125,7 @@ docker run --rm -p 8000:8000 \
   -e INFERENCE_ENGINE=onnx \
   -e ONNX_MODEL_PATH=/app/models/best.onnx \
   -v ./models:/app/models \
-  vision-analysis-pro:latest
+  vision-analysis-pro:onnx
 ```
 
 ### 部署建议
@@ -152,7 +155,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前 157 collected）
+├── tests/                      # Python 测试（当前 162 collected）
 ├── docs/                       # 计划与进度文档
 ├── pyproject.toml              # Python 依赖与工具链
 └── ruff.toml                   # ruff 配置
@@ -177,7 +180,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 132 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 137 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（28 passed）
 
 ### 提交规范
@@ -227,14 +230,16 @@ vision_analysis_pro/
   - [x] SQLite 离线缓存
   - [x] YAML + ENV 配置
   - [x] 优雅关闭（信号处理）
-- [x] 单元测试（38 tests）
+- [x] 单元测试（40 tests）
 
 ### 📋 下一步计划
 
 - [x] CI/CD 与容器化（GitHub Actions + Dockerfile）
 - [x] API 与 Edge Agent 上报契约集成测试
-- [ ] 浏览器级端到端集成测试
+- [x] API CLI、Edge Agent 配置合并与 Docker ONNX 构建契约硬化
 - [x] 生产部署文档
+- [ ] Edge Agent 上报持久化、批次幂等与 API Key 校验
+- [ ] 浏览器级端到端集成测试
 - [ ] 可选：MQTT 上报器
 - [ ] 可选：Rust/PyO3 性能优化
 

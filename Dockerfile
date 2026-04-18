@@ -17,7 +17,12 @@ RUN pip install --no-cache-dir uv
 COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 
-RUN uv sync --frozen
+ARG INSTALL_ONNX=false
+RUN if [ "$INSTALL_ONNX" = "true" ]; then \
+        uv sync --frozen --extra onnx; \
+    else \
+        uv sync --frozen; \
+    fi
 
 COPY config ./config
 COPY scripts ./scripts

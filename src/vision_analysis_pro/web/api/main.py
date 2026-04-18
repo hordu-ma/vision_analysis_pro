@@ -1,5 +1,6 @@
 """FastAPI 应用主入口"""
 
+import argparse
 import logging
 import os
 import time
@@ -254,3 +255,49 @@ async def metrics() -> PlainTextResponse:
         f"vision_api_health_ready_checks_total {metrics_data['health_ready_checks_total']}",
     ]
     return PlainTextResponse("\n".join(lines) + "\n")
+
+
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """构造 API 服务命令行参数解析器。"""
+    settings = get_settings()
+    parser = argparse.ArgumentParser(
+        description="启动 Vision Analysis Pro API 服务",
+    )
+    parser.add_argument(
+        "--host",
+        default=settings.api_host,
+        help=f"API 监听地址，默认 {settings.api_host}",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=settings.api_port,
+        help=f"API 监听端口，默认 {settings.api_port}",
+    )
+    parser.add_argument(
+        "--reload",
+        action=argparse.BooleanOptionalAction,
+        default=settings.api_reload,
+        help=f"是否启用自动重载，默认 {settings.api_reload}",
+    )
+    parser.add_argument(
+        "--log-level",
+        default="info",
+        choices=["critical", "error", "warning", "info", "debug", "trace"],
+        help="Uvicorn 日志级别，默认 info",
+    )
+    return parser
+
+
+def main() -> None:
+    """控制台脚本入口。"""
+    import uvicorn
+
+    args = _build_arg_parser().parse_args()
+    uvicorn.run(
+        "vision_analysis_pro.web.api.main:app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        log_level=args.log_level,
+    )

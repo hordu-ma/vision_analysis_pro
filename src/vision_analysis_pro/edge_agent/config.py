@@ -232,74 +232,7 @@ class EdgeAgentConfig:
         Returns:
             EdgeAgentConfig 实例
         """
-        data: dict[str, Any] = {}
-
-        # 顶层配置
-        if env_val := os.getenv(f"{prefix}_DEVICE_ID"):
-            data["device_id"] = env_val
-        if env_val := os.getenv(f"{prefix}_LOG_LEVEL"):
-            data["log_level"] = env_val
-        if env_val := os.getenv(f"{prefix}_REPORT_ONLY_DETECTIONS"):
-            data["report_only_detections"] = env_val.lower() in ("true", "1", "yes")
-
-        # 数据源配置
-        source_data: dict[str, Any] = {}
-        if env_val := os.getenv(f"{prefix}_SOURCE_TYPE"):
-            source_data["type"] = env_val
-        if env_val := os.getenv(f"{prefix}_SOURCE_PATH"):
-            source_data["path"] = env_val
-        if env_val := os.getenv(f"{prefix}_SOURCE_FPS_LIMIT"):
-            source_data["fps_limit"] = float(env_val)
-        if env_val := os.getenv(f"{prefix}_SOURCE_LOOP"):
-            source_data["loop"] = env_val.lower() in ("true", "1", "yes")
-        if env_val := os.getenv(f"{prefix}_SOURCE_SKIP_FRAMES"):
-            source_data["skip_frames"] = int(env_val)
-        if source_data:
-            data["source"] = source_data
-
-        # 推理配置
-        inference_data: dict[str, Any] = {}
-        if env_val := os.getenv(f"{prefix}_INFERENCE_ENGINE"):
-            inference_data["engine"] = env_val
-        if env_val := os.getenv(f"{prefix}_INFERENCE_MODEL_PATH"):
-            inference_data["model_path"] = env_val
-        if env_val := os.getenv(f"{prefix}_INFERENCE_CONFIDENCE"):
-            inference_data["confidence"] = float(env_val)
-        if env_val := os.getenv(f"{prefix}_INFERENCE_IOU"):
-            inference_data["iou"] = float(env_val)
-        if env_val := os.getenv(f"{prefix}_INFERENCE_DEVICE"):
-            inference_data["device"] = env_val
-        if inference_data:
-            data["inference"] = inference_data
-
-        # 上报器配置
-        reporter_data: dict[str, Any] = {}
-        if env_val := os.getenv(f"{prefix}_REPORTER_TYPE"):
-            reporter_data["type"] = env_val
-        if env_val := os.getenv(f"{prefix}_REPORTER_URL"):
-            reporter_data["url"] = env_val
-        if env_val := os.getenv(f"{prefix}_REPORTER_API_KEY"):
-            reporter_data["api_key"] = env_val
-        if env_val := os.getenv(f"{prefix}_REPORTER_TIMEOUT"):
-            reporter_data["timeout"] = float(env_val)
-        if env_val := os.getenv(f"{prefix}_REPORTER_RETRY_MAX"):
-            reporter_data["retry_max"] = int(env_val)
-        if env_val := os.getenv(f"{prefix}_REPORTER_BATCH_SIZE"):
-            reporter_data["batch_size"] = int(env_val)
-        if reporter_data:
-            data["reporter"] = reporter_data
-
-        # 缓存配置
-        cache_data: dict[str, Any] = {}
-        if env_val := os.getenv(f"{prefix}_CACHE_ENABLED"):
-            cache_data["enabled"] = env_val.lower() in ("true", "1", "yes")
-        if env_val := os.getenv(f"{prefix}_CACHE_DB_PATH"):
-            cache_data["db_path"] = env_val
-        if env_val := os.getenv(f"{prefix}_CACHE_MAX_ENTRIES"):
-            cache_data["max_entries"] = int(env_val)
-        if cache_data:
-            data["cache"] = cache_data
-
+        data = _env_to_dict(prefix)
         logger.info(f"从环境变量加载配置 (前缀: {prefix})")
         return cls.from_dict(data)
 
@@ -327,9 +260,8 @@ class EdgeAgentConfig:
         else:
             base_data = {}
 
-        # 从环境变量加载覆盖配置
-        env_config = cls.from_env(env_prefix)
-        env_data = _config_to_dict(env_config)
+        # 从环境变量加载覆盖配置；只合并显式设置的环境变量。
+        env_data = _env_to_dict(env_prefix)
 
         # 深度合并配置 (环境变量覆盖 YAML)
         merged_data = _deep_merge(base_data, env_data)
@@ -374,6 +306,74 @@ class EdgeAgentConfig:
             errors.append(f"请求超时必须大于 0: {self.reporter.timeout}")
 
         return errors
+
+
+def _env_to_dict(prefix: str = "EDGE_AGENT") -> dict[str, Any]:
+    """读取环境变量覆盖项，只返回显式设置的键。"""
+    data: dict[str, Any] = {}
+
+    if env_val := os.getenv(f"{prefix}_DEVICE_ID"):
+        data["device_id"] = env_val
+    if env_val := os.getenv(f"{prefix}_LOG_LEVEL"):
+        data["log_level"] = env_val
+    if env_val := os.getenv(f"{prefix}_REPORT_ONLY_DETECTIONS"):
+        data["report_only_detections"] = env_val.lower() in ("true", "1", "yes")
+
+    source_data: dict[str, Any] = {}
+    if env_val := os.getenv(f"{prefix}_SOURCE_TYPE"):
+        source_data["type"] = env_val
+    if env_val := os.getenv(f"{prefix}_SOURCE_PATH"):
+        source_data["path"] = env_val
+    if env_val := os.getenv(f"{prefix}_SOURCE_FPS_LIMIT"):
+        source_data["fps_limit"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_SOURCE_LOOP"):
+        source_data["loop"] = env_val.lower() in ("true", "1", "yes")
+    if env_val := os.getenv(f"{prefix}_SOURCE_SKIP_FRAMES"):
+        source_data["skip_frames"] = int(env_val)
+    if source_data:
+        data["source"] = source_data
+
+    inference_data: dict[str, Any] = {}
+    if env_val := os.getenv(f"{prefix}_INFERENCE_ENGINE"):
+        inference_data["engine"] = env_val
+    if env_val := os.getenv(f"{prefix}_INFERENCE_MODEL_PATH"):
+        inference_data["model_path"] = env_val
+    if env_val := os.getenv(f"{prefix}_INFERENCE_CONFIDENCE"):
+        inference_data["confidence"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_INFERENCE_IOU"):
+        inference_data["iou"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_INFERENCE_DEVICE"):
+        inference_data["device"] = env_val
+    if inference_data:
+        data["inference"] = inference_data
+
+    reporter_data: dict[str, Any] = {}
+    if env_val := os.getenv(f"{prefix}_REPORTER_TYPE"):
+        reporter_data["type"] = env_val
+    if env_val := os.getenv(f"{prefix}_REPORTER_URL"):
+        reporter_data["url"] = env_val
+    if env_val := os.getenv(f"{prefix}_REPORTER_API_KEY"):
+        reporter_data["api_key"] = env_val
+    if env_val := os.getenv(f"{prefix}_REPORTER_TIMEOUT"):
+        reporter_data["timeout"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_REPORTER_RETRY_MAX"):
+        reporter_data["retry_max"] = int(env_val)
+    if env_val := os.getenv(f"{prefix}_REPORTER_BATCH_SIZE"):
+        reporter_data["batch_size"] = int(env_val)
+    if reporter_data:
+        data["reporter"] = reporter_data
+
+    cache_data: dict[str, Any] = {}
+    if env_val := os.getenv(f"{prefix}_CACHE_ENABLED"):
+        cache_data["enabled"] = env_val.lower() in ("true", "1", "yes")
+    if env_val := os.getenv(f"{prefix}_CACHE_DB_PATH"):
+        cache_data["db_path"] = env_val
+    if env_val := os.getenv(f"{prefix}_CACHE_MAX_ENTRIES"):
+        cache_data["max_entries"] = int(env_val)
+    if cache_data:
+        data["cache"] = cache_data
+
+    return data
 
 
 def _config_to_dict(config: EdgeAgentConfig) -> dict[str, Any]:
