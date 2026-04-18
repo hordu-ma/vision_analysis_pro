@@ -74,6 +74,61 @@ EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
 edge-agent
 ```
 
+## 工程化与部署
+
+### 持续集成（CI）
+
+仓库已补充最小 CI 流水线，覆盖以下检查：
+
+- 后端：`uv run ruff check .`、`uv run pytest`
+- 前端：`npm run lint`、`npm run test -- --run`、`npm run build`
+
+建议在每次提交前，本地至少执行与改动面对应的最小检查。
+
+### Docker 部署（API）
+
+项目提供最小 API 服务镜像构建能力，推荐通过环境变量注入运行参数。
+
+#### 构建镜像
+
+```bash
+docker build -t vision-analysis-pro:latest .
+```
+
+#### 运行容器
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e INFERENCE_ENGINE=stub \
+  -e API_HOST=0.0.0.0 \
+  -e API_PORT=8000 \
+  vision-analysis-pro:latest
+```
+
+启动后可访问：
+
+- OpenAPI: `http://localhost:8000/docs`
+- 健康检查: `http://localhost:8000/api/v1/health`
+
+#### 挂载模型文件运行
+
+如果你要使用 YOLO 或 ONNX 推理，而不是 `stub`，需要把模型文件挂载进容器，并传入对应环境变量。例如：
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e INFERENCE_ENGINE=onnx \
+  -e ONNX_MODEL_PATH=/app/models/best.onnx \
+  -v ./models:/app/models \
+  vision-analysis-pro:latest
+```
+
+### 部署建议
+
+- 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
+- 生产环境不要使用 `allow_origins=["*"]`，应限制为明确域名
+- 模型文件、数据目录、日志目录建议通过挂载卷管理
+- 密钥类配置统一通过环境变量注入，不要写入镜像
+
 ## 项目结构
 
 ```
@@ -172,9 +227,9 @@ vision_analysis_pro/
 
 ### 📋 下一步计划
 
-- [ ] CI/CD 与容器化（GitHub Actions + Dockerfile）
+- [x] CI/CD 与容器化（GitHub Actions + Dockerfile）
 - [ ] 端到端集成测试
-- [ ] 生产部署文档
+- [x] 生产部署文档
 - [ ] 可选：MQTT 上报器
 - [ ] 可选：Rust/PyO3 性能优化
 

@@ -26,19 +26,25 @@ class ImageTransform:
         new_h, new_w = int(h * scale), int(w * scale)
 
         # 缩放
-        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        resized = np.asarray(
+            cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_LINEAR),
+            dtype=np.uint8,
+        )
 
         # 填充
         pad_h = (target_size - new_h) // 2
         pad_w = (target_size - new_w) // 2
-        padded = cv2.copyMakeBorder(
-            resized,
-            pad_h,
-            target_size - new_h - pad_h,
-            pad_w,
-            target_size - new_w - pad_w,
-            cv2.BORDER_CONSTANT,
-            value=(114, 114, 114),
+        padded = np.asarray(
+            cv2.copyMakeBorder(
+                resized,
+                pad_h,
+                target_size - new_h - pad_h,
+                pad_w,
+                target_size - new_w - pad_w,
+                cv2.BORDER_CONSTANT,
+                value=(114, 114, 114),
+            ),
+            dtype=np.uint8,
         )
 
         return padded, (scale, scale, pad_w, pad_h)

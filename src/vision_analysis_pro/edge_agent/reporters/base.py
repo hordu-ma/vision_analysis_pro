@@ -106,6 +106,22 @@ class BaseReporter(ABC):
         self.connect()
         return self
 
+    def flush_cache_sync(self) -> int:
+        """同步刷新缓存
+
+        默认实现为 no-op，返回 0。
+        支持缓存能力的子类可覆盖此方法。
+        """
+        return 0
+
+    def cleanup_cache(self) -> int:
+        """清理缓存
+
+        默认实现为 no-op，返回 0。
+        支持缓存能力的子类可覆盖此方法。
+        """
+        return 0
+
     def __exit__(
         self,
         exc_type: type[BaseException] | None,

@@ -1,0 +1,41 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    PATH="/app/.venv/bin:/root/.local/bin:${PATH}"
+
+WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock README.md ./
+COPY src ./src
+
+RUN uv sync --frozen
+
+COPY config ./config
+COPY scripts ./scripts
+COPY examples ./examples
+COPY tests ./tests
+COPY ruff.toml pytest.ini ./
+
+EXPOSE 8000
+
+ENV API_HOST=0.0.0.0 \
+    API_PORT=8000 \
+    INFERENCE_ENGINE=stub \
+    YOLO_MODEL_PATH=/app/models/best.pt \
+    ONNX_MODEL_PATH=/app/models/best.onnx
+
+RUN mkdir -p /app/models /app/data /app/runs
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl --fail http://127.0.0.1:8000/api/v1/health || exit 1
+
+CMD ["sh", "-c", "uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000"]

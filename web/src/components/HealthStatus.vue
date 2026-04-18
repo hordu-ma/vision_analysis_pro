@@ -23,7 +23,7 @@
         :loading="loading"
         :disabled="loading"
         class="refresh-button"
-        @click="checkHealth"
+        @click="handleRefreshClick"
       >
         <el-icon v-if="!loading"><Refresh /></el-icon>
       </el-button>
@@ -225,8 +225,12 @@ const cleanup = (): void => {
 }
 
 // 生命周期
+const handleRefreshClick = (): void => {
+  void checkHealth()
+}
+
 onMounted(() => {
-  checkHealth()
+  void checkHealth()
   startAutoRefresh()
 })
 
