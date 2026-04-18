@@ -1,9 +1,20 @@
 """推理相关 API"""
 
 import base64
+import logging
+import time
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 
 from vision_analysis_pro.core.preprocessing.visualization import draw_detections
 from vision_analysis_pro.settings import Settings, get_settings
@@ -11,6 +22,11 @@ from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.deps import get_inference_engine
 
 router = APIRouter(prefix="/api/v1/inference", tags=["inference"])
+logger = logging.getLogger(__name__)
+
+# 文件校验常量
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
 
 def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
@@ -23,10 +39,8 @@ def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
 
     if isinstance(result, list) and result and isinstance(result[0], dict):
         for item in result:
-            # 统一 bbox 格式（支持 box/bbox 两种 key）
             bbox_data = item.get("bbox") or item.get("box")
             if bbox_data:
-                # 确保 bbox 是列表格式
                 bbox_list = (
                     list(bbox_data)
                     if isinstance(bbox_data, (tuple, list))
@@ -41,13 +55,7 @@ def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
                 )
         return detections
 
-    # 兜底：直接返回空列表，等待后续集成 YOLO 结构化输出
     return detections
-
-
-# 文件校验常量
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
 
 @router.post(
@@ -59,13 +67,24 @@ ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
     },
 )
 async def inference_image(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     engine: Annotated[Any, Depends(get_inference_engine)],
     file: UploadFile = File(...),
     visualize: bool = Query(False, description="是否返回可视化图像"),
 ) -> schemas.InferenceResponse:
     """图像推理接口"""
-    # 文件校验：空文件
+    request_id = getattr(request.state, "request_id", "unknown")
+    start_time = time.perf_counter()
+
+    logger.info(
+        "收到推理请求 request_id=%s filename=%s content_type=%s visualize=%s",
+        request_id,
+        file.filename,
+        file.content_type,
+        visualize,
+    )
+
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(
@@ -77,35 +96,48 @@ async def inference_image(
             },
         )
 
-    # 文件校验：大小限制
     if len(file_bytes) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "FILE_TOO_LARGE",
                 "message": "文件大小超过限制",
-                "detail": f"文件大小: {len(file_bytes)} bytes, 最大允许: {MAX_FILE_SIZE} bytes",
+                "detail": (
+                    f"文件大小: {len(file_bytes)} bytes, "
+                    f"最大允许: {MAX_FILE_SIZE} bytes"
+                ),
             },
         )
 
-    # 文件校验：MIME 类型
     if file.content_type and file.content_type not in ALLOWED_MIME_TYPES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "INVALID_FORMAT",
                 "message": "不支持的文件格式",
-                "detail": f"当前格式: {file.content_type}, 支持格式: {', '.join(ALLOWED_MIME_TYPES)}",
+                "detail": (
+                    f"当前格式: {file.content_type}, "
+                    f"支持格式: {', '.join(ALLOWED_MIME_TYPES)}"
+                ),
             },
         )
 
-    # 调用推理引擎
+    request.app.state.metrics["inference_requests_total"] += 1
     try:
         raw_result = engine.predict(
-            file_bytes, conf=settings.confidence_threshold, iou=settings.iou_threshold
+            file_bytes,
+            conf=settings.confidence_threshold,
+            iou=settings.iou_threshold,
         )  # type: ignore[arg-type]
         detections = _serialize_detections(raw_result)
     except RuntimeError as e:
+        request.app.state.metrics["inference_failures_total"] += 1
+        logger.exception(
+            "推理失败 request_id=%s filename=%s engine=%s",
+            request_id,
+            file.filename,
+            engine.__class__.__name__,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
@@ -115,11 +147,9 @@ async def inference_image(
             },
         ) from e
 
-    # 生成可视化图像（可选）
     visualization_data = None
     if visualize and detections:
         try:
-            # 转换 DetectionBox 为字典格式
             detection_dicts = [
                 {
                     "label": det.label,
@@ -129,16 +159,31 @@ async def inference_image(
                 for det in detections
             ]
             vis_bytes = draw_detections(file_bytes, detection_dicts)
-            # 转换为 base64 Data URI
             vis_base64 = base64.b64encode(vis_bytes).decode("utf-8")
             visualization_data = f"data:image/jpeg;base64,{vis_base64}"
         except Exception:
-            # 可视化失败不影响推理结果返回
             visualization_data = None
+
+    inference_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+    detection_count = len(detections)
+
+    logger.info(
+        "推理完成 request_id=%s filename=%s engine=%s detections=%s inference_time_ms=%.2f",
+        request_id,
+        file.filename,
+        engine.__class__.__name__,
+        detection_count,
+        inference_time_ms,
+    )
 
     return schemas.InferenceResponse(
         filename=file.filename or "unknown",
         detections=detections,
-        metadata={"engine": engine.__class__.__name__},
+        metadata={
+            "engine": engine.__class__.__name__,
+            "request_id": request_id,
+            "inference_time_ms": inference_time_ms,
+            "detection_count": detection_count,
+        },
         visualization=visualization_data,
     )

@@ -22,6 +22,8 @@ class HealthResponse(BaseModel):
                 "version": "0.1.0",
                 "model_loaded": True,
                 "engine": "YOLOInferenceEngine",
+                "check": "ready",
+                "request_id": "req-1234567890abcdef",
             }
         }
     )
@@ -33,6 +35,38 @@ class HealthResponse(BaseModel):
         None,
         description="当前推理引擎类型（仅用于展示与排障）",
     )
+    check: str | None = Field(
+        None,
+        description="健康检查类型（如 live / ready）",
+    )
+    request_id: str | None = Field(
+        None,
+        description="请求 ID，用于日志关联与排障",
+    )
+
+
+class MetricsResponse(BaseModel):
+    """最小指标响应"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "ok",
+                "request_count": 128,
+                "inference_requests": 32,
+                "inference_failures": 1,
+                "ready_checks": 12,
+                "live_checks": 20,
+            }
+        }
+    )
+
+    status: str = Field(..., description="指标状态")
+    request_count: int = Field(..., ge=0, description="累计请求数")
+    inference_requests: int = Field(..., ge=0, description="累计推理请求数")
+    inference_failures: int = Field(..., ge=0, description="累计推理失败数")
+    ready_checks: int = Field(..., ge=0, description="累计就绪检查次数")
+    live_checks: int = Field(..., ge=0, description="累计存活检查次数")
 
 
 class DetectionBox(BaseModel):
@@ -82,6 +116,8 @@ class InferenceResponse(BaseModel):
                 "metadata": {
                     "inference_time_ms": 45.2,
                     "model_version": "v1.0",
+                    "engine": "YOLOInferenceEngine",
+                    "request_id": "req-1234567890abcdef",
                 },
                 "visualization": None,
             }
@@ -92,7 +128,7 @@ class InferenceResponse(BaseModel):
     detections: list[DetectionBox] = Field(..., description="检测结果列表")
     metadata: dict[str, Any] = Field(
         default_factory=dict,
-        description="元信息（如推理耗时、模型版本等）",
+        description="元信息（如推理耗时、模型版本、请求 ID 等）",
     )
     visualization: str | None = Field(
         None,
