@@ -11,7 +11,7 @@
 - 🚁 **无人机巡检**：支持图片/视频输入链路设计
 - 🤖 **AI 检测**：YOLOv8 推理 + ONNX Runtime 高性能推理
 - 🔧 **边缘计算**：完整的边缘 Agent（采集/推理/上报/离线缓存）
-- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传 → 推理 → 展示）
+- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传 → 推理 → 展示）+ 边缘上报接收
 - ⚡ **高性能**：ONNX 推理相比 YOLO 提升 7.25x（基准测试）
 
 ## 快速开始
@@ -38,6 +38,7 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 
 # 运行测试
 uv run pytest
+# 注：缺少 models/best.onnx 或 data/images/* 时，对应模型/数据测试会按预期跳过
 ```
 
 ### 前端（web/）
@@ -74,6 +75,8 @@ EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
 edge-agent
 ```
 
+默认上报地址为 `http://localhost:8000/api/v1/report`，API 会接收 Edge Agent 的批量推理结果并返回接收确认。
+
 ## 工程化与部署
 
 ### 持续集成（CI）
@@ -81,7 +84,7 @@ edge-agent
 仓库已补充最小 CI 流水线，覆盖以下检查：
 
 - 后端：`uv run ruff check .`、`uv run pytest`
-- 前端：`npm run lint`、`npm run test -- --run`、`npm run build`
+- 前端：`npm run lint`（只检查）、`npm run test -- --run`、`npm run build`
 
 建议在每次提交前，本地至少执行与改动面对应的最小检查。
 
@@ -149,7 +152,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（138 tests）
+├── tests/                      # Python 测试（当前 157 collected）
 ├── docs/                       # 计划与进度文档
 ├── pyproject.toml              # Python 依赖与工具链
 └── ruff.toml                   # ruff 配置
@@ -165,15 +168,16 @@ vision_analysis_pro/
   - `.github/prompts/plan-visionAnalysisPro.prompt.md`
   - `.github/prompts/implement-change.prompt.md`
   - `.github/prompts/debug-failure.prompt.md`
+  - `.github/prompts/repo-health-check.prompt.md`
 
 ### 代码规范
 
 - Python：`uv run ruff check .`；格式化 `uv run ruff format .`
-- 前端：`npm run lint`（ESLint + TypeScript）
+- 前端：`npm run lint`（ESLint 只检查）；自动修复使用 `npm run lint:fix`
 
 ### 测试
 
-- 后端：`uv run pytest`（138 passed, 2 skipped）
+- 后端：`uv run pytest`（当前本地轻量环境为 132 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（28 passed）
 
 ### 提交规范
@@ -228,7 +232,8 @@ vision_analysis_pro/
 ### 📋 下一步计划
 
 - [x] CI/CD 与容器化（GitHub Actions + Dockerfile）
-- [ ] 端到端集成测试
+- [x] API 与 Edge Agent 上报契约集成测试
+- [ ] 浏览器级端到端集成测试
 - [x] 生产部署文档
 - [ ] 可选：MQTT 上报器
 - [ ] 可选：Rust/PyO3 性能优化

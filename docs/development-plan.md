@@ -4,18 +4,18 @@
 
 本文档只回答“要做什么、何时做、做到什么算完成”；项目当前进度与变更记录请参见 `docs/progress.md`。
 
-**当前进度快照（截至 2025-12-24）**
+**当前进度快照（截至 2026-04-18）**
 
 | 里程碑 | 状态 | 说明 |
 |--------|------|------|
 | M1: MVP 闭环 | ✅ 完成 | YOLO 训练、推理引擎、API 闭环 |
 | M2: 性能与可视化 | ✅ 完成 | ONNX 导出（7.25x 加速）、前端 UX 优化 |
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
-| M4: 生产化 | 📋 待开始 | CI/CD、容器化、监控 |
+| M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、最小 metrics、边缘上报接收已落地 |
 
-- **后端测试**：138 passed, 2 skipped，ruff 全绿
+- **后端测试**：132 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
 - **前端测试**：28 passed（vitest），ESLint 全绿
-- **下一步**：CI/CD 与容器化、端到端集成测试、生产部署文档
+- **下一步**：浏览器级端到端验证、边缘 Agent 上报稳态测试、部署补充
 
 ---
 
@@ -75,7 +75,7 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health` 与 `/api/v1/inference/image` 闭环，138 个后端测试通过
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report` 闭环，当前后端测试基线为 157 collected
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
 - ✅ 前端 Web：Vue3 + TS 页面闭环，28 个前端测试通过
@@ -83,7 +83,7 @@
 ### 4.2 剩余差距
 
 - 数据与训练：需要规模化数据集、评估报告（mAP/PR）
-- 生产化：容器化、CI/CD、观测性仍需体系化落地
+- 生产化：CI/Docker/最小 metrics 已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
 - 可选优化：MQTT 上报器、Rust/PyO3 加速
 
 ---
@@ -159,12 +159,13 @@
   - ✅ 配置：YAML + ENV（优先级：ENV > YAML > 默认值）
   - ✅ 优雅关闭（SIGINT/SIGTERM 信号处理）
   - ✅ 38 个单元测试全部通过
-- 📋 工程化（待完成）：
-  - [ ] CI（lint + test）
-  - [ ] Dockerfile（API 服务镜像）
-  - [ ] 观测性（Prometheus metrics）
+- ✅ 工程化基础：
+  - [x] CI（ruff + pytest，frontend lint/test/build）
+  - [x] Dockerfile（API 服务镜像）
+  - [x] 最小观测性（request_id、live/ready、Prometheus 风格 metrics）
+  - [x] 云端 `POST /api/v1/report` 接收 Edge Agent 上报
 
-**验收结果**：Agent 功能 ✅ 完成，工程化 📋 待后续迭代
+**验收结果**：Agent 功能 ✅ 完成，工程化基础 ✅ 完成，稳态运营能力 🚧 继续迭代
 
 ### M4（第 9-12 周）：Rust/加速与稳态运营 📋 待开始
 
@@ -412,7 +413,7 @@
 
 - 人为断网 10 分钟后恢复网络：缓存可回放，上报恢复正常，Agent 不崩溃。
 
-### Week 7：CI 与容器化（最小可部署）
+### Week 7：CI 与容器化（最小可部署）✅ 已完成基础版
 
 **目标**：API 服务可 Docker 构建；CI 自动跑 lint + test。
 
@@ -426,7 +427,7 @@
 - CI 在主分支每次 push 可通过。
 - `docker build` 与容器启动说明可复现。
 
-### Week 8：观测性与版本策略
+### Week 8：观测性与版本策略 🚧 已完成最小观测，版本策略待补
 
 **目标**：能看到关键指标；模型与配置版本可追踪。
 
@@ -508,7 +509,7 @@
 ### 12.2 脚本
 
 - `scripts/train.py`：训练入口（记录超参与输出目录）。
-- （待实现）导出入口（ONNX）：可用 `scripts/export.py` 或等价命令，需明确输入/输出与验证方式。
+- `scripts/export_onnx.py`：ONNX 导出入口，需明确输入/输出与验证方式。
 - `scripts/benchmark.py`（建议）：基准测试入口。
 
 ### 12.3 API 契约
@@ -518,8 +519,8 @@
 
 ### 12.4 边缘 Agent
 
-- `edge_agent` 配置样例（建议：`config/edge_config.yaml`）。
-- 离线缓存目录与数据格式约定（文件名/内容结构）。
+- `config/edge_agent.example.yaml`：Edge Agent 配置样例，默认上报到 `POST /api/v1/report`。
+- `cache/edge_agent.db`：默认 SQLite 离线缓存路径，缓存内容为批量上报 payload。
 
 ---
 

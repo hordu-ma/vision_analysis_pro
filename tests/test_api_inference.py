@@ -9,6 +9,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from vision_analysis_pro.core.inference.stub_engine import StubInferenceEngine
+from vision_analysis_pro.edge_agent import Detection, InferenceResult, ReportPayload
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api.deps import get_inference_engine
 from vision_analysis_pro.web.api.main import app
@@ -21,6 +22,32 @@ def _create_test_image() -> bytes:
     success, encoded = cv2.imencode(".jpg", img)
     assert success
     return encoded.tobytes()
+
+
+def _create_report_payload() -> dict:
+    """创建与 Edge Agent 实际序列化格式一致的上报载荷。"""
+    payload = ReportPayload(
+        device_id="edge-agent-001",
+        batch_id="edge-agent-001-test-batch",
+        report_time=1700000000.0,
+        results=[
+            InferenceResult(
+                frame_id=1,
+                timestamp=1700000000.0,
+                source_id="edge-agent-001",
+                detections=[
+                    Detection(
+                        label="crack",
+                        confidence=0.95,
+                        bbox=[100.0, 150.0, 300.0, 400.0],
+                    )
+                ],
+                inference_time_ms=12.4,
+                metadata={"image_name": "tower_001.jpg"},
+            )
+        ],
+    )
+    return payload.to_dict()
 
 
 @pytest.fixture(autouse=True)
@@ -255,6 +282,64 @@ async def test_metrics_endpoint() -> None:
     assert "vision_api_requests_total" in body
     assert "vision_api_inference_requests_total" in body
     assert "vision_api_inference_failures_total" in body
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_accepts_edge_agent_payload() -> None:
+    """测试 report 端点接收 Edge Agent 实际上报载荷"""
+    request_id = "req-test-report-001"
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/report",
+            headers={"x-request-id": request_id},
+            json=_create_report_payload(),
+        )
+
+    assert resp.status_code == 202
+    assert resp.headers["x-request-id"] == request_id
+    data = resp.json()
+    assert data["status"] == "accepted"
+    assert data["batch_id"] == "edge-agent-001-test-batch"
+    assert data["result_count"] == 1
+    assert data["total_detections"] == 1
+    assert data["request_id"] == request_id
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_accepts_empty_result_batch() -> None:
+    """测试 report 端点允许空批次，便于心跳或空检测批次扩展"""
+    payload = {
+        "device_id": "edge-agent-001",
+        "batch_id": "edge-agent-001-empty-batch",
+        "report_time": 1700000000.0,
+        "results": [],
+    }
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post("/api/v1/report", json=payload)
+
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["batch_id"] == "edge-agent-001-empty-batch"
+    assert data["result_count"] == 0
+    assert data["total_detections"] == 0
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exposes_report_counters() -> None:
+    """测试 metrics 端点暴露边缘上报计数器"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/v1/report", json=_create_report_payload())
+        resp = await client.get("/api/v1/metrics")
+
+    assert resp.status_code == 200
+    body = resp.text
+    assert "vision_api_report_requests_total" in body
+    assert "vision_api_report_results_total" in body
+    assert "vision_api_report_detections_total" in body
 
 
 @pytest.mark.asyncio

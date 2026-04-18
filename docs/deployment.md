@@ -1,12 +1,13 @@
 # Vision Analysis Pro 部署说明（最小可部署版）
 
-本文档提供 `Vision Analysis Pro` 的最小部署说明，目标是让你可以在本地或单机环境中快速启动后端 API，并为后续容器化与 CI/CD 接入提供统一口径。
+本文档提供 `Vision Analysis Pro` 的最小部署说明，目标是让你可以在本地或单机环境中快速启动后端 API，并与当前 Dockerfile、CI 和边缘 Agent 上报约定保持一致。
 
 ## 1. 适用范围
 
 当前文档覆盖：
 
 - 后端 API 服务部署
+- 边缘 Agent 上报接收端
 - 模型文件准备
 - 环境变量配置
 - 本地直接运行
@@ -86,6 +87,12 @@
   - 默认值：`true`
   - 生产环境建议：`false`
 
+### 边缘上报相关
+
+- `EDGE_AGENT_REPORTER_URL`
+  - Edge Agent 上报地址
+  - 默认值：`http://localhost:8000/api/v1/report`
+
 ### 其他配置
 
 项目中还存在 `Settings` 配置项，例如：
@@ -138,6 +145,9 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 
 - OpenAPI 文档：`http://localhost:8000/docs`
 - 健康检查：`http://localhost:8000/api/v1/health`
+- 存活检查：`http://localhost:8000/api/v1/health/live`
+- 就绪检查：`http://localhost:8000/api/v1/health/ready`
+- 指标端点：`http://localhost:8000/api/v1/metrics`
 
 ---
 
@@ -310,6 +320,27 @@ http://localhost:8000/docs
 
 如果使用真实模型，请确认模型路径存在且依赖已安装完整。
 
+### 9.4 Edge Agent 上报接口
+
+Edge Agent 默认向以下接口上报批量推理结果：
+
+- `POST /api/v1/report`
+
+最小验证请求：
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/report" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-smoke",
+    "report_time": 1700000000.0,
+    "results": []
+  }'
+```
+
+预期返回 `202 Accepted`，并包含 `batch_id`、`result_count`、`total_detections` 与 `request_id`。
+
 ---
 
 ## 10. 常见问题
@@ -380,12 +411,11 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 
 当前最小部署完成后，建议继续推进：
 
-1. GitHub Actions 持续集成
-2. API Dockerfile 与镜像发布流程
-3. `docker-compose` 示例
-4. 生产环境反向代理配置
-5. 监控与可观测性（metrics / structured logging）
-6. 前后端统一部署说明
+1. `docker-compose` 示例
+2. 生产环境反向代理配置
+3. CORS allowlist 生产配置
+4. metrics 告警示例与结构化日志采集
+5. 前后端统一部署说明
 
 ---
 

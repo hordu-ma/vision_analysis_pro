@@ -6,6 +6,8 @@
 - 先读取 `AGENTS.md`、`README.md`，再读取目标模块和对应测试。
 - 结合仓库现状规划：项目已经包含后端、前端、推理引擎、边缘 Agent，不要重复提出“初始化项目结构”这类过时步骤。
 - 如果任务涉及前后端接口、边缘上报或推理配置，明确受影响的双边文件。
+- 当前 API 已包含 `/api/v1/report`、live/ready 和 metrics；不要把这些能力当作未实现项。
+- 当前轻量后端测试基线允许 `models/best.onnx` 和 `data/images/*` 缺失导致的 skipped。
 
 ## Input
 请基于以下需求生成计划：
@@ -42,6 +44,8 @@
   - `cd web && npm run lint`
   - `cd web && npm run test -- --run`
   - `cd web && npm run build`
+- Edge Agent 上报/API 契约优先使用：
+  - `uv run pytest tests/test_api_inference.py tests/test_edge_agent.py`
 
 ## Constraints
 - 不写空泛路线图，不写周计划，不写“后续可以考虑”的泛建议，除非它直接影响本次实现。

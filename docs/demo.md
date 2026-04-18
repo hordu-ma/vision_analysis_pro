@@ -111,7 +111,7 @@ cat response.json | jq -r '.visualization' | sed 's/^data:image\/jpeg;base64,//'
 ### 场景 3：使用 Python 脚本
 
 ```bash
-python examples/demo_request.py test_image.jpg
+uv run python examples/demo_request.py test_image.jpg
 ```
 
 ---
@@ -205,10 +205,25 @@ cache:
 
 - ✅ **多数据源**：视频、图像文件夹、摄像头、RTSP 流
 - ✅ **高性能推理**：ONNX Runtime（7.25x 加速）
-- ✅ **可靠上报**：指数退避重试
+- ✅ **可靠上报**：默认上报到 `POST /api/v1/report`，支持指数退避重试
 - ✅ **离线缓存**：网络不可用时本地缓存
 - ✅ **优雅关闭**：Ctrl+C 安全退出
 - ✅ **灵活配置**：YAML + 环境变量
+
+### 上报接口 Smoke Test
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/report" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-demo",
+    "report_time": 1700000000.0,
+    "results": []
+  }'
+```
+
+预期返回 `202 Accepted`，并包含 `status=accepted`、`batch_id` 和 `request_id`。
 
 ---
 
@@ -273,7 +288,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：138 passed, 2 skipped ✅
+- 后端：132 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：28 passed ✅
 
 ---

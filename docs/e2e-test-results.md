@@ -1,7 +1,7 @@
 # 端到端集成测试结果
 
-**测试时间**: 2025-12-24  
-**测试人员**: AI Assistant  
+**测试时间**: 2026-04-18
+**测试人员**: AI Assistant
 **环境**: macOS, Python 3.12.11, Node.js 20+
 
 ---
@@ -31,17 +31,11 @@
 
 | 模块 | 测试数 | 通过 | 跳过 | 状态 |
 |------|--------|------|------|------|
-| API 推理 | 14 | 14 | 0 | ✅ |
-| Stub 引擎 | 6 | 6 | 0 | ✅ |
-| YOLO 引擎 | 9 | 9 | 0 | ✅ |
-| ONNX 引擎 | 22 | 22 | 0 | ✅ |
-| 可视化 | 8 | 8 | 0 | ✅ |
-| 边界案例 | 11 | 11 | 0 | ✅ |
-| E2E 集成 | 11 | 9 | 2 | ✅ |
-| 训练脚本 | 9 | 9 | 0 | ✅ |
-| 边缘 Agent | 38 | 38 | 0 | ✅ |
-| 前端组件 | 28 | 28 | 0 | ✅ |
-| **总计** | **156** | **154** | **2** | **✅** |
+| 后端自动化测试（pytest） | 157 | 132 | 25 | ✅ |
+| 前端单元测试（vitest） | 28 | 28 | 0 | ✅ |
+| **总计** | **185** | **160** | **25** | **✅** |
+
+说明：当前轻量环境未提供 `models/best.onnx` 与 `data/images/*`，ONNX 模型测试和数据集测试按预期跳过。
 
 ---
 
@@ -89,6 +83,23 @@ curl -X POST "http://localhost:8000/api/v1/inference/image?visualize=true" \
 ```
 
 **结果**: ✅ 通过 - 返回 base64 编码的可视化图像
+
+### ✅ 1.4 Edge Agent 上报接口
+
+**请求**:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/report" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-smoke",
+    "report_time": 1700000000.0,
+    "results": []
+  }'
+```
+
+**结果**: ✅ 通过 - API 返回 `202 Accepted`，并带有 `batch_id`、统计数量和 `request_id`
 
 ---
 
@@ -289,15 +300,15 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. CI/CD 流水线（GitHub Actions）
-2. Docker 容器化
-3. 生产部署文档
+1. 浏览器级 E2E 自动化测试
+2. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
+3. docker-compose 与前后端统一部署说明
 
 ### 中优先级
 
 4. MQTT 上报器实现
-5. Prometheus metrics 集成
-6. 端到端自动化测试
+5. Prometheus metrics 告警示例
+6. 结构化日志采集
 
 ### 低优先级
 
@@ -306,5 +317,5 @@ cd web && npm run lint
 
 ---
 
-**测试完成**: 2025-12-24  
-**结论**: ✅ 所有核心功能测试通过，系统可用于 MVP 演示和边缘部署
+**测试完成**: 2026-04-18
+**结论**: ✅ 核心 API、前端单元测试与 Edge Agent 上报契约通过；模型/数据相关测试在当前轻量环境中按预期跳过

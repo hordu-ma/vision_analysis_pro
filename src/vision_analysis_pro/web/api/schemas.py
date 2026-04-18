@@ -136,6 +136,101 @@ class InferenceResponse(BaseModel):
     )
 
 
+class ReportInferenceResult(BaseModel):
+    """边缘 Agent 单帧推理结果上报结构"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "frame_id": 1,
+                "timestamp": 1700000000.0,
+                "source_id": "edge-agent-001",
+                "detections": [
+                    {
+                        "label": "crack",
+                        "confidence": 0.95,
+                        "bbox": [100.0, 150.0, 300.0, 400.0],
+                    }
+                ],
+                "inference_time_ms": 12.4,
+                "metadata": {"image_name": "tower_001.jpg"},
+            }
+        }
+    )
+
+    frame_id: int = Field(..., ge=0, description="帧序号")
+    timestamp: float = Field(..., description="采集时间戳")
+    source_id: str = Field(..., min_length=1, description="数据源标识")
+    detections: list[DetectionBox] = Field(
+        default_factory=list,
+        description="该帧检测结果",
+    )
+    inference_time_ms: float = Field(0.0, ge=0.0, description="推理耗时（毫秒）")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="帧元信息")
+
+
+class ReportPayloadRequest(BaseModel):
+    """边缘 Agent 批量上报请求"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "device_id": "edge-agent-001",
+                "batch_id": "edge-agent-001-1700000000000",
+                "report_time": 1700000000.0,
+                "results": [
+                    {
+                        "frame_id": 1,
+                        "timestamp": 1700000000.0,
+                        "source_id": "edge-agent-001",
+                        "detections": [
+                            {
+                                "label": "crack",
+                                "confidence": 0.95,
+                                "bbox": [100.0, 150.0, 300.0, 400.0],
+                            }
+                        ],
+                        "inference_time_ms": 12.4,
+                        "metadata": {"image_name": "tower_001.jpg"},
+                    }
+                ],
+            }
+        }
+    )
+
+    device_id: str = Field(..., min_length=1, description="边缘设备标识")
+    batch_id: str = Field(..., min_length=1, description="批次 ID")
+    report_time: float = Field(..., description="上报时间戳")
+    results: list[ReportInferenceResult] = Field(
+        default_factory=list,
+        description="批次内推理结果列表",
+    )
+
+
+class ReportResponse(BaseModel):
+    """边缘 Agent 上报响应"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "accepted",
+                "message": "上报已接收",
+                "batch_id": "edge-agent-001-1700000000000",
+                "result_count": 1,
+                "total_detections": 1,
+                "request_id": "req-1234567890abcdef",
+            }
+        }
+    )
+
+    status: str = Field(..., description="上报处理状态")
+    message: str = Field(..., description="响应消息")
+    batch_id: str = Field(..., description="批次 ID")
+    result_count: int = Field(..., ge=0, description="接收的结果数量")
+    total_detections: int = Field(..., ge=0, description="接收的检测结果总数")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
 class ErrorResponse(BaseModel):
     """统一错误响应结构"""
 
@@ -145,6 +240,7 @@ class ErrorResponse(BaseModel):
                 "code": "MODEL_NOT_LOADED",
                 "message": "模型未加载",
                 "detail": "模型文件不存在: models/best.pt",
+                "request_id": "req-1234567890abcdef",
             }
         }
     )
@@ -154,4 +250,8 @@ class ErrorResponse(BaseModel):
     detail: str | None = Field(
         None,
         description="详细错误信息（可选）",
+    )
+    request_id: str | None = Field(
+        None,
+        description="请求 ID，用于日志关联与排障",
     )

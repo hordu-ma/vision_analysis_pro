@@ -90,6 +90,9 @@ npm test
 # ESLint 检查
 npm run lint
 
+# 自动修复 ESLint 问题
+npm run lint:fix
+
 # 代码格式化
 npm run format
 ```
@@ -243,23 +246,25 @@ export interface InferenceResponse {
 
 ### 错误处理
 
-当前错误处理在组件层实现，使用 `try-catch` 捕获异常：
+当前错误处理由 API 服务层和组件层共同完成：
+
+- `src/services/api.ts` 使用 axios interceptor 将后端错误统一转换为 `ApiError`
+- `ImageUpload.vue` 捕获 `ApiError`，展示页面内错误提示与 Element Plus 消息
+- `HealthStatus.vue` 独立处理健康检查失败和自动重试
 
 ```typescript
 try {
   const result = await apiService.analyze(file)
   ElMessage.success('分析完成')
-} catch (error: unknown) {
-  const errorMessage =
-    (error as { response?: { data?: { message?: string } } }).response?.data?.message ||
-    '分析失败，请重试'
-  ElMessage.error(errorMessage)
+} catch (error) {
+  if (error instanceof ApiError) {
+    apiService.showError(error)
+  }
 }
 ```
 
 后续计划（与总体进度对齐）：
 
-- 补充全局错误拦截器（axios 拦截器 + 统一提示）与错误边界
 - 体验优化：加载/骨架、上传进度、缩放与快捷键
 - 评估 Pinia：保留或移除，或用于历史记录/设置
 - 构建与性能：Element Plus 按需、代码分割、生产构建与预览
@@ -269,9 +274,9 @@ try {
 ### 测试覆盖
 
 - **DetectionResult**: 6 个测试用例
-- **HealthStatus**: 7 个测试用例
-- **API Service**: 6 个测试用例
-- **总计**: 19 个测试用例 ✅
+- **HealthStatus**: 9 个测试用例
+- **API Service**: 13 个测试用例
+- **总计**: 28 个测试用例 ✅
 
 ### 测试命令
 
@@ -305,12 +310,7 @@ dist/
 
 ### 环境变量
 
-创建 `.env.production` 配置生产环境变量：
-
-```bash
-# API 基础路径（如果需要）
-VITE_API_BASE_URL=https://api.example.com
-```
+当前 API 客户端默认使用相对路径 `/api/v1`，生产部署时建议通过 Nginx 或其他反向代理把 `/api` 转发到后端服务。
 
 ### Nginx 配置示例
 

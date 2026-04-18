@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse
 
 from vision_analysis_pro.settings import get_settings
 from vision_analysis_pro.web.api import schemas
-from vision_analysis_pro.web.api.routers import inference
+from vision_analysis_pro.web.api.routers import inference, reports
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +38,9 @@ app.state.metrics = {
     "inference_requests_total": 0,
     "inference_failures_total": 0,
     "inference_success_total": 0,
+    "report_requests_total": 0,
+    "report_results_total": 0,
+    "report_detections_total": 0,
     "health_live_checks_total": 0,
     "health_ready_checks_total": 0,
 }
@@ -101,6 +104,7 @@ async def request_context_middleware(
 
 # 路由注册
 app.include_router(inference.router)
+app.include_router(reports.router)
 
 
 def _get_health_payload() -> dict[str, Any]:
@@ -233,6 +237,15 @@ async def metrics() -> PlainTextResponse:
         "# HELP vision_api_inference_failures_total Total failed inference requests.",
         "# TYPE vision_api_inference_failures_total counter",
         f"vision_api_inference_failures_total {metrics_data['inference_failures_total']}",
+        "# HELP vision_api_report_requests_total Total edge report requests.",
+        "# TYPE vision_api_report_requests_total counter",
+        f"vision_api_report_requests_total {metrics_data['report_requests_total']}",
+        "# HELP vision_api_report_results_total Total edge inference results received.",
+        "# TYPE vision_api_report_results_total counter",
+        f"vision_api_report_results_total {metrics_data['report_results_total']}",
+        "# HELP vision_api_report_detections_total Total edge detections received.",
+        "# TYPE vision_api_report_detections_total counter",
+        f"vision_api_report_detections_total {metrics_data['report_detections_total']}",
         "# HELP vision_api_health_live_checks_total Total live health checks.",
         "# TYPE vision_api_health_live_checks_total counter",
         f"vision_api_health_live_checks_total {metrics_data['health_live_checks_total']}",

@@ -5,6 +5,14 @@
 - Frontend resides in `web/` (Vue 3 + Vite).  
 - Shared resources: `config/` for YAML examples, `data/` and `models/` for datasets/artifacts, `scripts/` for training/export/benchmark helpers, `tests/` for Python test suites, `docs/` for plans and progress notes, `examples/` for edge-agent entry points.
 
+## Current System Snapshot
+- Main API endpoints: `GET /api/v1/health`, `GET /api/v1/health/live`, `GET /api/v1/health/ready`, `GET /api/v1/metrics`, `POST /api/v1/inference/image`, `POST /api/v1/report`.
+- `POST /api/v1/report` is the cloud-side receiver for Edge Agent `ReportPayload.to_dict()` batches; it returns `202 Accepted` with batch and count metadata.
+- Minimal observability is already present: request ID propagation, process-time response header, live/ready health checks, and Prometheus-style metrics.
+- Current lightweight local backend baseline is `132 passed, 25 skipped`; skips are expected when `models/best.onnx` and `data/images/*` are absent.
+- Frontend baseline is `28 passed`; `npm run lint` is read-only, and `npm run lint:fix` performs automatic fixes.
+- `ruff.toml` is the authoritative Ruff config; do not duplicate Ruff settings in `pyproject.toml`.
+
 ## Build, Test, and Development Commands
 - Install deps: `uv sync` (base), `uv sync --extra dev`, `uv sync --extra onnx` (ONNX runtime).  
 - Run API (dev): `uv run uvicorn vision_analysis_pro.web.api.main:app --reload` (OpenAPI at http://localhost:8000).  
@@ -52,6 +60,7 @@
   - Backend: `uv run ruff check .` and `uv run pytest`
   - Frontend: `cd web && npm run lint && npm run test -- --run && npm run build`
 - If a task changes shared contracts between backend and frontend, validate both sides.
+- If a task changes Edge Agent reporting or cloud API contracts, validate `tests/test_api_inference.py` and `tests/test_edge_agent.py`.
 - Do not invent new architecture documents or planning files inside the repo unless explicitly requested.
 
 ### Completion Checklist

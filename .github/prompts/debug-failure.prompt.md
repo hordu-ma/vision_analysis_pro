@@ -13,6 +13,11 @@
 4. 先提出根因判断，再实施修复
 5. 修复后说明如何验证不回归
 
+## Repository Notes
+- Edge Agent 上报链路默认使用 `POST /api/v1/report`；排查上报失败时同时检查 API router、`ReporterConfig.url`、`config/edge_agent.example.yaml` 和 `HTTPReporter`。
+- `models/best.onnx` 与 `data/images/*` 缺失会导致对应 pytest 用例 skipped，这是当前轻量环境的预期现象。
+- 前端 lint 只读命令是 `cd web && npm run lint`；自动修复命令是 `cd web && npm run lint:fix`。
+
 ## Output Format
 
 ### Symptom
