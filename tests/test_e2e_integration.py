@@ -20,9 +20,9 @@ from httpx import ASGITransport, AsyncClient
 from vision_analysis_pro.web.api.deps import clear_inference_engine_caches
 from vision_analysis_pro.web.api.main import app
 
-pytestmark = [pytest.mark.integration, pytest.mark.e2e]
 
-
+@pytest.mark.integration
+@pytest.mark.e2e
 @pytest.mark.model
 class TestE2EWithYOLOEngine:
     """YOLO 引擎的端到端测试"""
@@ -95,6 +95,8 @@ class TestE2EWithYOLOEngine:
             assert "model_loaded" in data
 
 
+@pytest.mark.integration
+@pytest.mark.e2e
 @pytest.mark.unit
 class TestE2EWithStubEngine:
     """Stub 引擎的端到端测试"""
@@ -181,6 +183,7 @@ class TestEngineSwitching:
 
 
 @pytest.mark.integration
+@pytest.mark.e2e
 class TestDemoScriptCompatibility:
     """验证 demo 脚本的兼容性"""
 
@@ -228,6 +231,7 @@ class TestDemoScriptCompatibility:
 
 
 @pytest.mark.integration
+@pytest.mark.e2e
 class TestErrorHandlingE2E:
     """端到端错误处理测试"""
 
@@ -280,6 +284,8 @@ class TestErrorHandlingE2E:
             assert "large" in detail_str or "大" in detail_str or "size" in detail_str
 
 
+@pytest.mark.integration
+@pytest.mark.e2e
 @pytest.mark.model
 class TestModelFilesExistence:
     """验证模型文件存在性（保证 demo 可运行）"""

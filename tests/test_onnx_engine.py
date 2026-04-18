@@ -11,8 +11,6 @@ import pytest
 
 from vision_analysis_pro.core.inference import ONNXInferenceEngine
 
-pytestmark = [pytest.mark.model]
-
 # 测试用 ONNX 模型路径
 ONNX_MODEL_PATH = Path("models/best.onnx")
 
@@ -40,6 +38,7 @@ def dummy_image_bytes(dummy_image: np.ndarray) -> bytes:
     return buffer.tobytes()
 
 
+@pytest.mark.model
 class TestONNXInferenceEngine:
     """ONNX 推理引擎测试类"""
 
@@ -193,6 +192,7 @@ class TestONNXInferenceEngine:
         assert any("CPU" in p for p in onnx_engine.providers)
 
 
+@pytest.mark.model
 class TestONNXEnginePreprocessing:
     """ONNX 引擎预处理测试"""
 
@@ -220,6 +220,7 @@ class TestONNXEnginePreprocessing:
             assert blob.min() >= 0.0
 
 
+@pytest.mark.model
 class TestONNXEngineNMS:
     """ONNX 引擎 NMS 测试"""
 
@@ -271,6 +272,7 @@ class TestONNXEngineNMS:
         assert len(result) == 2
 
 
+@pytest.mark.model
 class TestONNXEngineCustomClassNames:
     """ONNX 引擎自定义类别名称测试"""
 

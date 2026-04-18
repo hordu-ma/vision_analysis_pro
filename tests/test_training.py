@@ -5,9 +5,9 @@ from pathlib import Path
 
 import pytest
 
-pytestmark = [pytest.mark.integration, pytest.mark.model]
 
-
+@pytest.mark.integration
+@pytest.mark.model
 class TestTrainingScripts:
     """测试训练脚本功能"""
 
@@ -87,6 +87,8 @@ class TestTrainingScripts:
         assert args["deterministic"] is True, "deterministic 应为 True"
 
 
+@pytest.mark.integration
+@pytest.mark.model
 class TestTrainingData:
     """测试训练数据"""
 
@@ -155,6 +157,8 @@ class TestTrainingData:
                         assert 0 <= class_id < 5, f"类别 ID 超出范围: {class_id}"
 
 
+@pytest.mark.integration
+@pytest.mark.model
 class TestModelLoading:
     """测试模型加载"""
 
