@@ -2,6 +2,7 @@
 
 import base64
 import re
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -13,6 +14,7 @@ from vision_analysis_pro.edge_agent import Detection, InferenceResult, ReportPay
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api.deps import get_inference_engine
 from vision_analysis_pro.web.api.main import app
+from vision_analysis_pro.web.api.report_store import clear_report_store_cache
 
 
 def _create_test_image() -> bytes:
@@ -51,9 +53,10 @@ def _create_report_payload() -> dict:
 
 
 @pytest.fixture(autouse=True)
-def override_dependencies():
+def override_dependencies(tmp_path: Path):
     """在测试期间覆盖依赖（使用 stub 引擎）"""
     original_overrides = app.dependency_overrides.copy()
+    clear_report_store_cache()
 
     def _fake_settings() -> Settings:
         return Settings.model_validate(
@@ -61,6 +64,8 @@ def override_dependencies():
                 "model_path": "models/fake.pt",
                 "confidence_threshold": 0.5,
                 "iou_threshold": 0.5,
+                "cloud_api_key": "",
+                "report_store_db_path": str(tmp_path / "reports.db"),
             }
         )
 
@@ -71,6 +76,7 @@ def override_dependencies():
 
     yield
     app.dependency_overrides = original_overrides
+    clear_report_store_cache()
 
 
 @pytest.mark.asyncio
@@ -325,6 +331,109 @@ async def test_report_endpoint_accepts_empty_result_batch() -> None:
     assert data["batch_id"] == "edge-agent-001-empty-batch"
     assert data["result_count"] == 0
     assert data["total_detections"] == 0
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_persists_payload() -> None:
+    """测试 report 端点持久化 Edge Agent 上报载荷"""
+    payload = _create_report_payload()
+    request_id = "req-test-report-get-001"
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        post_resp = await client.post("/api/v1/report", json=payload)
+        get_resp = await client.get(
+            f"/api/v1/report/{payload['batch_id']}",
+            headers={"x-request-id": request_id},
+        )
+
+    assert post_resp.status_code == 202
+    assert get_resp.status_code == 200
+    assert get_resp.headers["x-request-id"] == request_id
+    data = get_resp.json()
+    assert data["status"] == "found"
+    assert data["batch_id"] == payload["batch_id"]
+    assert data["device_id"] == payload["device_id"]
+    assert data["result_count"] == 1
+    assert data["total_detections"] == 1
+    assert data["payload"] == payload
+    assert data["request_id"] == request_id
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_returns_duplicate_for_existing_batch() -> None:
+    """测试重复 batch_id 按幂等重复请求处理"""
+    payload = _create_report_payload()
+    start_requests = app.state.metrics["report_requests_total"]
+    start_results = app.state.metrics["report_results_total"]
+    start_detections = app.state.metrics["report_detections_total"]
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        first_resp = await client.post("/api/v1/report", json=payload)
+        second_resp = await client.post("/api/v1/report", json=payload)
+
+    assert first_resp.status_code == 202
+    assert first_resp.json()["status"] == "accepted"
+    assert second_resp.status_code == 202
+    second_data = second_resp.json()
+    assert second_data["status"] == "duplicate"
+    assert second_data["message"] == "重复批次已忽略"
+    assert second_data["result_count"] == 1
+    assert second_data["total_detections"] == 1
+    assert app.state.metrics["report_requests_total"] == start_requests + 2
+    assert app.state.metrics["report_results_total"] == start_results + 1
+    assert app.state.metrics["report_detections_total"] == start_detections + 1
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_requires_api_key_when_configured(
+    tmp_path: Path,
+) -> None:
+    """测试配置 CLOUD_API_KEY 后 report 端点要求鉴权"""
+    payload = _create_report_payload()
+
+    def _secure_settings() -> Settings:
+        return Settings.model_validate(
+            {
+                "model_path": "models/fake.pt",
+                "confidence_threshold": 0.5,
+                "iou_threshold": 0.5,
+                "cloud_api_key": "secret",
+                "report_store_db_path": str(tmp_path / "secure-reports.db"),
+            }
+        )
+
+    app.dependency_overrides[get_settings] = _secure_settings
+    clear_report_store_cache()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        unauthorized_resp = await client.post("/api/v1/report", json=payload)
+        authorized_resp = await client.post(
+            "/api/v1/report",
+            headers={"authorization": "Bearer secret"},
+            json=payload,
+        )
+
+    assert unauthorized_resp.status_code == 401
+    unauthorized_data = unauthorized_resp.json()
+    assert unauthorized_data["code"] == "UNAUTHORIZED"
+    assert unauthorized_data["message"] == "未授权上报"
+    assert authorized_resp.status_code == 202
+    assert authorized_resp.json()["status"] == "accepted"
+
+
+@pytest.mark.asyncio
+async def test_report_endpoint_returns_not_found_for_missing_batch() -> None:
+    """测试查询不存在的上报批次返回统一 404 错误"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/report/missing-batch")
+
+    assert resp.status_code == 404
+    data = resp.json()
+    assert data["code"] == "REPORT_NOT_FOUND"
+    assert data["message"] == "上报批次不存在"
 
 
 @pytest.mark.asyncio

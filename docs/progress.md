@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：M3 边缘 Agent 核心功能 ✅ 完成；M4 基础工程化进行中
 **最后更新**：2026-04-18
-**后端测试**：137 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：141 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：28 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿
 
@@ -21,7 +21,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 | M1: MVP 闭环打通 | ✅ 完成 | Week 1-2 |
 | M2: 性能与可视化 | ✅ 完成 | Week 3-4 |
 | M3: 边缘 Agent | ✅ 完成 | Week 5 |
-| M4: 生产化与运营 | 🚧 进行中 | CI/Docker/metrics/report API 已落地 |
+| M4: 生产化与运营 | 🚧 进行中 | CI/Docker/metrics/report 持久化已落地 |
 
 ---
 
@@ -206,7 +206,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ### 质量指标
 
-- ✅ 测试通过率：137 passed, 25 skipped（当前轻量环境）
+- ✅ 测试通过率：141 passed, 25 skipped（当前轻量环境）
 - ✅ 代码质量：ruff 0 错误
 - ✅ 类型注解：完整
 
@@ -233,7 +233,17 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - ✅ 修复 Edge Agent `YAML + ENV` 配置合并逻辑，确保只用显式环境变量覆盖 YAML
 - ✅ Dockerfile 增加 `INSTALL_ONNX` 构建参数，ONNX 容器运行说明与镜像依赖保持一致
 - ✅ 补充部署/配置回归测试：API CLI、Docker ONNX 构建参数、Edge Agent 配置优先级
-- ✅ 当前轻量后端基线更新为 `137 passed, 25 skipped`
+- ✅ 当前轻量后端基线更新为 `141 passed, 25 skipped`
+
+## 🗓️ 2026-04-18：边缘上报持久化与鉴权 ✅
+
+### 核心成果
+
+- ✅ API 侧使用 SQLite 保存 Edge Agent 上报批次，默认路径 `data/reports.db`
+- ✅ `POST /api/v1/report` 按 `batch_id` 幂等处理重复上报，重复批次不会重复累加结果/检测数量指标
+- ✅ 新增 `GET /api/v1/report/{batch_id}` 查询已保存批次
+- ✅ 支持可选 `CLOUD_API_KEY` 鉴权，兼容 `Authorization: Bearer <key>` 与 `X-API-Key`
+- ✅ 补充持久化、重复批次、鉴权与缺失批次回归测试
 
 ### 相关文件结构
 
@@ -281,7 +291,7 @@ tests/
 
 | 模块 | 测试数 | 状态 |
 |------|--------|------|
-| API 推理 | 14 | ✅ |
+| API/上报 | 26 | ✅ |
 | Stub 引擎 | 6 | ✅ |
 | YOLO 引擎 | 9 | ✅ |
 | ONNX 引擎 | 22 | ✅ |
@@ -322,9 +332,11 @@ vision_analysis_pro/
 │   ├── web/api/                    # FastAPI 应用
 │   │   ├── main.py                 # 主应用
 │   │   ├── schemas.py              # API Schema
+│   │   ├── report_store.py         # Edge Agent 上报持久化
 │   │   ├── deps.py                 # 依赖注入
 │   │   └── routers/
-│   │       └── inference.py        # 推理路由
+│   │       ├── inference.py        # 推理路由
+│   │       └── reports.py          # 上报路由
 │   └── edge_agent/                 # 边缘 Agent ✅
 │       ├── agent.py                # 主程序
 │       ├── config.py               # 配置管理
@@ -352,7 +364,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── best.onnx                   # 导出的 ONNX 模型 ✅
-├── tests/                          # 测试 (当前 162 collected) ✅
+├── tests/                          # 测试 (当前 166 collected) ✅
 ├── docs/                           # 文档
 └── examples/                       # 示例脚本
 ```
@@ -420,41 +432,36 @@ uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-repor
 
 ### 高优先级（推荐）
 
-1. **Edge Agent 上报持久化、幂等与鉴权**
-   - 云端保存 `POST /api/v1/report` 批次结果
-   - 重复 `batch_id` 幂等处理
-   - Edge Agent API Key 校验
-
-2. **浏览器级端到端验证**
+1. **浏览器级端到端验证**
    - 前端上传 → API 推理 → 结果展示的真实浏览器流程
    - 可选接入 Playwright smoke test
 
-3. **边缘 Agent 上报稳态测试**
+2. **边缘 Agent 上报稳态测试**
    - Agent 完整流程测试
    - 网络异常、缓存回放、重复 batch 场景测试
 
-4. **部署补充**
+3. **部署补充**
    - docker-compose 示例
    - 前后端统一部署说明
    - 反向代理与 CORS 生产配置示例
 
 ### 中优先级（可选）
 
-5. **MQTT 上报器**
+4. **MQTT 上报器**
    - 实现 MQTTReporter
    - 支持 QoS 配置
 
-6. **监控与可观测性**
+5. **监控与可观测性**
    - Prometheus metrics 已有最小端点，后续补指标维度与告警示例
    - 结构化日志与集中采集
 
 ### 低优先级（后续迭代）
 
-7. **Rust/PyO3 加速**
+6. **Rust/PyO3 加速**
    - 预处理/后处理优化
    - 性能关键路径迁移
 
-8. **批量推理优化**
+7. **批量推理优化**
    - 支持批量输入
    - 动态批处理
 
@@ -462,4 +469,4 @@ uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-repor
 
 **文档维护者**：Vision Analysis Pro Team  
 **最后更新**：2026-04-18
-**下次更新**：完成 Edge Agent 上报持久化后
+**下次更新**：完成浏览器级端到端验证后

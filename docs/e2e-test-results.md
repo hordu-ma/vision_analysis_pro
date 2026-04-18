@@ -300,10 +300,10 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. Edge Agent 上报持久化、重复批次幂等与 API Key 校验
-2. 浏览器级 E2E 自动化测试
-3. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
-4. docker-compose 与前后端统一部署说明
+1. 浏览器级 E2E 自动化测试
+2. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
+3. docker-compose 与前后端统一部署说明
+4. metrics 告警示例与结构化日志采集
 
 ### 中优先级
 

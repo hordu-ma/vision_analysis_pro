@@ -33,6 +33,10 @@ class Settings(BaseSettings):
         description="云端 API 地址",
     )
     cloud_api_key: str = Field("", description="云端 API Key（通过环境变量注入）")
+    report_store_db_path: Path = Field(
+        Path("data/reports.db"),
+        description="边缘上报批次持久化 SQLite 路径",
+    )
 
 
 @lru_cache(maxsize=1)

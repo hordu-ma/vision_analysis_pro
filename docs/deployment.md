@@ -93,6 +93,14 @@
   - Edge Agent 上报地址
   - 默认值：`http://localhost:8000/api/v1/report`
 
+- `REPORT_STORE_DB_PATH`
+  - API 侧保存 Edge Agent 上报批次的 SQLite 路径
+  - 默认值：`data/reports.db`
+
+- `CLOUD_API_KEY`
+  - API 侧上报鉴权密钥；为空时不启用鉴权
+  - 启用后请求需携带 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`
+
 ### 其他配置
 
 项目中还存在 `Settings` 配置项，例如：
@@ -101,7 +109,6 @@
 - `CONFIDENCE_THRESHOLD`
 - `IOU_THRESHOLD`
 - `CLOUD_API_URL`
-- `CLOUD_API_KEY`
 
 如果你在生产环境中使用这些配置，建议统一通过环境变量注入，不要硬编码到代码中。
 
@@ -337,6 +344,7 @@ http://localhost:8000/docs
 Edge Agent 默认向以下接口上报批量推理结果：
 
 - `POST /api/v1/report`
+- `GET /api/v1/report/{batch_id}`
 
 最小验证请求：
 
@@ -351,7 +359,27 @@ curl -X POST "http://localhost:8000/api/v1/report" \
   }'
 ```
 
-预期返回 `202 Accepted`，并包含 `batch_id`、`result_count`、`total_detections` 与 `request_id`。
+预期返回 `202 Accepted`，并包含 `batch_id`、`result_count`、`total_detections` 与 `request_id`。首次接收返回 `status=accepted`；重复 `batch_id` 返回 `status=duplicate`，不会重复累加结果/检测数量指标。
+
+查询已保存批次：
+
+```bash
+curl "http://localhost:8000/api/v1/report/edge-agent-001-smoke"
+```
+
+如果配置了 `CLOUD_API_KEY`，上报与查询请求都需要携带密钥，例如：
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/report" \
+  -H "Authorization: Bearer ${CLOUD_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-secure-smoke",
+    "report_time": 1700000000.0,
+    "results": []
+  }'
+```
 
 ---
 

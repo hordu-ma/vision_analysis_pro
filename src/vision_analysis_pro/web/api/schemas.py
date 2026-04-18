@@ -231,6 +231,41 @@ class ReportResponse(BaseModel):
     request_id: str | None = Field(None, description="请求 ID")
 
 
+class ReportRecordResponse(BaseModel):
+    """边缘 Agent 上报批次查询响应"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "found",
+                "batch_id": "edge-agent-001-1700000000000",
+                "device_id": "edge-agent-001",
+                "report_time": 1700000000.0,
+                "result_count": 1,
+                "total_detections": 1,
+                "created_at": 1700000001.0,
+                "payload": {
+                    "device_id": "edge-agent-001",
+                    "batch_id": "edge-agent-001-1700000000000",
+                    "report_time": 1700000000.0,
+                    "results": [],
+                },
+                "request_id": "req-1234567890abcdef",
+            }
+        }
+    )
+
+    status: str = Field(..., description="查询状态")
+    batch_id: str = Field(..., description="批次 ID")
+    device_id: str = Field(..., description="边缘设备标识")
+    report_time: float = Field(..., description="上报时间戳")
+    result_count: int = Field(..., ge=0, description="接收的结果数量")
+    total_detections: int = Field(..., ge=0, description="接收的检测结果总数")
+    created_at: float = Field(..., description="服务端接收时间戳")
+    payload: dict[str, Any] = Field(..., description="原始上报载荷")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
 class ErrorResponse(BaseModel):
     """统一错误响应结构"""
 

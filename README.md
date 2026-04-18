@@ -75,7 +75,7 @@ EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
 edge-agent
 ```
 
-默认上报地址为 `http://localhost:8000/api/v1/report`，API 会接收 Edge Agent 的批量推理结果并返回接收确认。
+默认上报地址为 `http://localhost:8000/api/v1/report`，API 会接收 Edge Agent 的批量推理结果、按 `batch_id` 幂等持久化，并返回接收确认。配置 `CLOUD_API_KEY` 后，上报请求需要携带 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
 
 ## 工程化与部署
 
@@ -155,7 +155,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前 162 collected）
+├── tests/                      # Python 测试（当前 166 collected）
 ├── docs/                       # 计划与进度文档
 ├── pyproject.toml              # Python 依赖与工具链
 └── ruff.toml                   # ruff 配置
@@ -180,7 +180,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 137 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 141 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（28 passed）
 
 ### 提交规范
@@ -237,8 +237,8 @@ vision_analysis_pro/
 - [x] CI/CD 与容器化（GitHub Actions + Dockerfile）
 - [x] API 与 Edge Agent 上报契约集成测试
 - [x] API CLI、Edge Agent 配置合并与 Docker ONNX 构建契约硬化
+- [x] Edge Agent 上报持久化、批次幂等与 API Key 校验
 - [x] 生产部署文档
-- [ ] Edge Agent 上报持久化、批次幂等与 API Key 校验
 - [ ] 浏览器级端到端集成测试
 - [ ] 可选：MQTT 上报器
 - [ ] 可选：Rust/PyO3 性能优化

@@ -205,7 +205,7 @@ cache:
 
 - ✅ **多数据源**：视频、图像文件夹、摄像头、RTSP 流
 - ✅ **高性能推理**：ONNX Runtime（7.25x 加速）
-- ✅ **可靠上报**：默认上报到 `POST /api/v1/report`，支持指数退避重试
+- ✅ **可靠上报**：默认上报到 `POST /api/v1/report`，支持指数退避重试、云端批次持久化、重复批次幂等与可选 API Key
 - ✅ **离线缓存**：网络不可用时本地缓存
 - ✅ **优雅关闭**：Ctrl+C 安全退出
 - ✅ **灵活配置**：YAML + 环境变量
@@ -288,7 +288,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：137 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：141 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：28 passed ✅
 
 ---
