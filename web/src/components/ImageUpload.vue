@@ -6,7 +6,8 @@
         class="upload-area"
         drag
         :auto-upload="false"
-        :limit="1"
+        :limit="uploadMode === 'single' ? 1 : 20"
+        :multiple="uploadMode === 'batch'"
         :accept="acceptedFormats"
         :on-change="handleFileChange"
         :on-exceed="handleExceed"
@@ -30,7 +31,15 @@
       </el-button>
     </div>
 
+    <div v-if="uploadMode === 'batch' && batchFileNames.length" class="batch-preview-section">
+      <el-tag v-for="name in batchFileNames" :key="name" class="batch-file-tag">{{ name }}</el-tag>
+    </div>
+
     <div class="upload-options">
+      <el-radio-group v-model="uploadMode" :disabled="analyzing">
+        <el-radio-button label="single">单图模式</el-radio-button>
+        <el-radio-button label="batch">批量模式</el-radio-button>
+      </el-radio-group>
       <el-checkbox v-model="visualize" label="生成可视化结果" :disabled="analyzing" />
     </div>
 
@@ -93,25 +102,32 @@ import {
   ElImage,
   ElMessage,
   ElProgress,
+  ElRadioButton,
+  ElRadioGroup,
+  ElTag,
   ElUpload
 } from 'element-plus'
 import { computed, ref } from 'vue'
-import type { UploadFile, UploadFiles, UploadInstance } from 'element-plus'
+import type { UploadFile, UploadFiles, UploadInstance, UploadRawFile } from 'element-plus'
 import { apiService, ApiError } from '@/services/api'
-import type { InferenceResponse } from '@/types/api'
+import type { BatchInferenceResponse, InferenceTaskResponse, InferenceResponse } from '@/types/api'
 
 const emit = defineEmits<{
   result: [data: InferenceResponse]
+  batchResult: [data: BatchInferenceResponse]
+  batchTask: [data: InferenceTaskResponse]
 }>()
 
 const uploadRef = ref<UploadInstance>()
 const selectedFile = ref<File | null>(null)
+const selectedFiles = ref<File[]>([])
 const fileList = ref<UploadFiles>([])
 const previewUrl = ref<string>('')
 const visualize = ref(true)
 const analyzing = ref(false)
 const uploadProgress = ref(0)
 const lastError = ref<{ message: string; detail?: string } | null>(null)
+const uploadMode = ref<'single' | 'batch'>('single')
 
 const acceptedFormats = 'image/jpeg,image/png,image/jpg,image/webp'
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
@@ -128,9 +144,18 @@ const formatProgress = (percentage: number): string => {
   return `${percentage}%`
 }
 
+const batchFileNames = computed(() => selectedFiles.value.map(file => file.name))
+
 // 清除错误
 const clearError = () => {
   lastError.value = null
+}
+
+const toNativeFiles = (files: UploadFiles): File[] => {
+  return files.flatMap(item => {
+    const raw = item.raw as UploadRawFile | undefined
+    return raw ? [raw as File] : []
+  })
 }
 
 const handleFileChange = (file: UploadFile) => {
@@ -159,16 +184,28 @@ const handleFileChange = (file: UploadFile) => {
     return
   }
 
-  selectedFile.value = file.raw
-  previewUrl.value = URL.createObjectURL(file.raw)
+  if (uploadMode.value === 'single') {
+    selectedFile.value = file.raw
+    selectedFiles.value = [file.raw]
+    previewUrl.value = URL.createObjectURL(file.raw)
+  } else {
+    selectedFiles.value = toNativeFiles(fileList.value)
+    selectedFile.value = selectedFiles.value[0] ?? null
+    previewUrl.value = selectedFile.value ? URL.createObjectURL(selectedFile.value) : ''
+  }
 }
 
 const handleExceed = () => {
-  ElMessage.warning('一次只能上传一个文件，请先清除当前文件')
+  if (uploadMode.value === 'single') {
+    ElMessage.warning('一次只能上传一个文件，请先清除当前文件')
+  } else {
+    ElMessage.warning('单次最多上传 20 个文件')
+  }
 }
 
 const clearFile = () => {
   selectedFile.value = null
+  selectedFiles.value = []
   previewUrl.value = ''
   fileList.value = []
   uploadProgress.value = 0
@@ -177,7 +214,12 @@ const clearFile = () => {
 }
 
 const handleAnalyze = async () => {
-  if (!selectedFile.value) {
+  if (uploadMode.value === 'single' && !selectedFile.value) {
+    ElMessage.warning('请先选择图片')
+    return
+  }
+
+  if (uploadMode.value === 'batch' && selectedFiles.value.length === 0) {
     ElMessage.warning('请先选择图片')
     return
   }
@@ -188,20 +230,35 @@ const handleAnalyze = async () => {
   clearError()
 
   try {
-    const result = await apiService.analyze(
-      selectedFile.value,
-      visualize.value,
-      // 进度回调
-      (progress: number) => {
-        uploadProgress.value = progress
-      }
-    )
+    if (uploadMode.value === 'single' && selectedFile.value) {
+      const result = await apiService.analyze(
+        selectedFile.value,
+        visualize.value,
+        (progress: number) => {
+          uploadProgress.value = progress
+        }
+      )
 
-    ElMessage.success({
-      message: '分析完成',
-      duration: 2000
-    })
-    emit('result', result)
+      ElMessage.success({
+        message: '分析完成',
+        duration: 2000
+      })
+      emit('result', result)
+    } else {
+      const result = await apiService.createBatchTask(
+        selectedFiles.value,
+        visualize.value,
+        (progress: number) => {
+          uploadProgress.value = progress
+        }
+      )
+
+      ElMessage.success({
+        message: `批量任务已创建，共 ${result.file_count} 张图片`,
+        duration: 2000
+      })
+      emit('batchTask', result)
+    }
   } catch (error: unknown) {
     console.error('Analysis failed:', error)
 
@@ -297,6 +354,21 @@ const handleAnalyze = async () => {
 
 .upload-options {
   margin: 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.batch-preview-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.batch-file-tag {
+  max-width: 100%;
 }
 
 .progress-section {

@@ -1,12 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
-import type { HealthResponse, InferenceResponse } from '@/types/api'
+import type {
+  HealthResponse,
+  InferenceResponse,
+  BatchInferenceResponse,
+  InferenceTaskResponse,
+  ReportBatchListResponse,
+  ReportDeviceListResponse,
+  ReportRecordResponse,
+  ReportReviewResponse
+} from '@/types/api'
 
 // Mock axios
 vi.mock('axios')
 
 const mockGet = vi.fn()
 const mockPost = vi.fn()
+const mockPut = vi.fn()
 const mockInterceptors = {
   request: { use: vi.fn() },
   response: { use: vi.fn() }
@@ -15,6 +25,7 @@ const mockInterceptors = {
 vi.mocked(axios.create).mockReturnValue({
   get: mockGet,
   post: mockPost,
+  put: mockPut,
   interceptors: mockInterceptors
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any)
@@ -145,6 +156,107 @@ describe('API Service', () => {
       expect(progressCallback).toHaveBeenCalledWith(50)
       expect(progressCallback).toHaveBeenCalledWith(100)
     })
+
+    it('应该支持批量上传并返回结果', async () => {
+      const files = [
+        new File(['a'], 'first.jpg', { type: 'image/jpeg' }),
+        new File(['b'], 'second.jpg', { type: 'image/jpeg' })
+      ]
+      const mockResponse: BatchInferenceResponse = {
+        files: [
+          { filename: 'first.jpg', detections: [], metadata: { engine: 'Test' } },
+          { filename: 'second.jpg', detections: [], metadata: { engine: 'Test' } }
+        ],
+        metadata: { file_count: 2, total_detections: 0 }
+      }
+
+      mockPost.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.analyzeBatch(files, true)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPost).toHaveBeenCalledWith(
+        '/inference/images?visualize=true',
+        expect.any(FormData),
+        expect.objectContaining({
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          timeout: 120000,
+          onUploadProgress: expect.any(Function)
+        })
+      )
+    })
+
+    it('应该创建批量任务', async () => {
+      const files = [new File(['a'], 'first.jpg', { type: 'image/jpeg' })]
+      const mockResponse: InferenceTaskResponse = {
+        task_id: 'task-001',
+        status: 'pending',
+        created_at: 1700000000,
+        updated_at: 1700000000,
+        file_count: 1,
+        completed_files: 0,
+        progress: 0,
+        results: [],
+        metadata: {}
+      }
+
+      mockPost.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.createBatchTask(files, true)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPost).toHaveBeenCalledWith(
+        '/inference/images/tasks?visualize=true',
+        expect.any(FormData),
+        expect.any(Object)
+      )
+    })
+
+    it('应该查询批量任务', async () => {
+      const mockResponse: InferenceTaskResponse = {
+        task_id: 'task-001',
+        status: 'completed',
+        created_at: 1700000000,
+        updated_at: 1700000001,
+        file_count: 1,
+        completed_files: 1,
+        progress: 100,
+        results: [],
+        metadata: {}
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.getBatchTask('task-001')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-001')
+    })
+
+    it('应该获取批量任务列表', async () => {
+      const mockResponse: InferenceTaskResponse[] = [
+        {
+          task_id: 'task-002',
+          status: 'completed',
+          created_at: 1700000002,
+          updated_at: 1700000003,
+          file_count: 2,
+          completed_files: 2,
+          progress: 100,
+          results: [],
+          metadata: {}
+        }
+      ]
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.listBatchTasks(10)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10')
+    })
   })
 
   describe('isServiceAvailable()', () => {
@@ -187,12 +299,134 @@ describe('API Service', () => {
     })
   })
 
+  describe('report queries', () => {
+    it('应该获取最近批次列表', async () => {
+      const mockResponse: ReportBatchListResponse = {
+        status: 'ok',
+        count: 1,
+        items: [
+          {
+            batch_id: 'batch-001',
+            device_id: 'device-a',
+            report_time: 1700000000,
+            result_count: 1,
+            total_detections: 2,
+            created_at: 1700000001
+          }
+        ]
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.listReportBatches(20, 'device-a')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/reports/batches?limit=20&device_id=device-a')
+    })
+
+    it('应该获取设备概览列表', async () => {
+      const mockResponse: ReportDeviceListResponse = {
+        status: 'ok',
+        count: 1,
+        items: [
+          {
+            device_id: 'device-a',
+            batch_count: 2,
+            result_count: 4,
+            total_detections: 5,
+            last_report_time: 1700000000,
+            last_batch_id: 'batch-002',
+            last_created_at: 1700000001
+          }
+        ]
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.listReportDevices(10)
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/reports/devices?limit=10')
+    })
+
+    it('应该获取批次详情', async () => {
+      const mockResponse: ReportRecordResponse = {
+        status: 'found',
+        batch_id: 'batch-001',
+        device_id: 'device-a',
+        report_time: 1700000000,
+        result_count: 1,
+        total_detections: 2,
+        created_at: 1700000001,
+        results: [],
+        payload: {}
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.getReport('batch-001')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/report/batch-001')
+    })
+
+    it('应该更新人工复核结果', async () => {
+      const mockResponse: ReportReviewResponse = {
+        status: 'updated',
+        batch_id: 'batch-001',
+        review: {
+          frame_id: 1,
+          status: 'confirmed',
+          note: '人工确认',
+          reviewer: 'alice',
+          updated_at: 1700000002
+        }
+      }
+
+      mockPut.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.updateReportReview('batch-001', 1, {
+        status: 'confirmed',
+        note: '人工确认',
+        reviewer: 'alice'
+      })
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPut).toHaveBeenCalledWith('/report/batch-001/reviews/1', {
+        status: 'confirmed',
+        note: '人工确认',
+        reviewer: 'alice'
+      })
+    })
+
+    it('应该导出批次 CSV', async () => {
+      const blob = new Blob(['a,b'], { type: 'text/csv' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportReportCsv('batch-001')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/report/batch-001/export.csv', {
+        responseType: 'blob'
+      })
+    })
+  })
+
   describe('Client Configuration', () => {
     it('apiService 实例应该存在', () => {
       expect(apiService).toBeDefined()
       expect(apiService.health).toBeDefined()
       expect(apiService.analyze).toBeDefined()
+      expect(apiService.analyzeBatch).toBeDefined()
+      expect(apiService.createBatchTask).toBeDefined()
+      expect(apiService.getBatchTask).toBeDefined()
+      expect(apiService.listBatchTasks).toBeDefined()
       expect(apiService.isServiceAvailable).toBeDefined()
+      expect(apiService.listReportBatches).toBeDefined()
+      expect(apiService.listReportDevices).toBeDefined()
+      expect(apiService.getReport).toBeDefined()
+      expect(apiService.updateReportReview).toBeDefined()
+      expect(apiService.exportReportCsv).toBeDefined()
       expect(apiService.showError).toBeDefined()
     })
   })

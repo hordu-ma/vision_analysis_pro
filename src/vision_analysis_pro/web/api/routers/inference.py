@@ -20,6 +20,7 @@ from vision_analysis_pro.core.preprocessing.visualization import draw_detections
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.deps import get_inference_engine
+from vision_analysis_pro.web.api.inference_tasks import get_inference_task_manager
 
 router = APIRouter(prefix="/api/v1/inference", tags=["inference"])
 logger = logging.getLogger(__name__)
@@ -78,35 +79,8 @@ def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
     return detections
 
 
-@router.post(
-    "/image",
-    response_model=schemas.InferenceResponse,
-    responses={
-        400: {"model": schemas.ErrorResponse},
-        500: {"model": schemas.ErrorResponse},
-    },
-)
-async def inference_image(
-    request: Request,
-    settings: Annotated[Settings, Depends(get_settings)],
-    engine: Annotated[Any, Depends(get_inference_engine)],
-    file: UploadFile = File(...),
-    visualize: bool = Query(False, description="是否返回可视化图像"),
-) -> schemas.InferenceResponse:
-    """图像推理接口"""
-    request_id = getattr(request.state, "request_id", "unknown")
-    start_time = time.perf_counter()
-
-    logger.info(
-        "inference_request_received",
-        extra={
-            "request_id": request_id,
-            "upload_filename": file.filename,
-            "content_type": file.content_type,
-            "visualize": visualize,
-        },
-    )
-
+async def _read_and_validate_upload(file: UploadFile) -> bytes:
+    """读取并校验上传文件。"""
     file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(
@@ -144,8 +118,21 @@ async def inference_image(
             },
         )
 
-    metrics: dict[str, Any] = request.app.state.metrics
-    metrics["inference_requests_total"] += 1
+    return file_bytes
+
+
+def _run_inference(
+    *,
+    request_id: str,
+    file: UploadFile,
+    file_bytes: bytes,
+    settings: Settings,
+    engine: Any,
+    metrics: dict[str, Any],
+    visualize: bool,
+) -> schemas.InferenceResponse:
+    """执行单文件推理并更新指标。"""
+    start_time = time.perf_counter()
     try:
         raw_result = engine.predict(
             file_bytes,
@@ -233,4 +220,249 @@ async def inference_image(
             "detection_count": detection_count,
         },
         visualization=visualization_data,
+    )
+
+
+@router.post(
+    "/image",
+    response_model=schemas.InferenceResponse,
+    responses={
+        400: {"model": schemas.ErrorResponse},
+        500: {"model": schemas.ErrorResponse},
+    },
+)
+async def inference_image(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+    file: UploadFile = File(...),
+    visualize: bool = Query(False, description="是否返回可视化图像"),
+) -> schemas.InferenceResponse:
+    """图像推理接口"""
+    request_id = getattr(request.state, "request_id", "unknown")
+
+    logger.info(
+        "inference_request_received",
+        extra={
+            "request_id": request_id,
+            "upload_filename": file.filename,
+            "content_type": file.content_type,
+            "visualize": visualize,
+        },
+    )
+
+    file_bytes = await _read_and_validate_upload(file)
+
+    metrics: dict[str, Any] = request.app.state.metrics
+    metrics["inference_requests_total"] += 1
+    return _run_inference(
+        request_id=request_id,
+        file=file,
+        file_bytes=file_bytes,
+        settings=settings,
+        engine=engine,
+        metrics=metrics,
+        visualize=visualize,
+    )
+
+
+@router.post(
+    "/images",
+    response_model=schemas.BatchInferenceResponse,
+    responses={
+        400: {"model": schemas.ErrorResponse},
+        500: {"model": schemas.ErrorResponse},
+    },
+)
+async def inference_images(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+    files: list[UploadFile] = File(...),
+    visualize: bool = Query(False, description="是否返回可视化图像"),
+) -> schemas.BatchInferenceResponse:
+    """批量图像推理接口。"""
+    request_id = getattr(request.state, "request_id", "unknown")
+    batch_start_time = time.perf_counter()
+
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "EMPTY_FILE",
+                "message": "至少上传一个文件",
+                "detail": "files 不能为空",
+            },
+        )
+
+    metrics: dict[str, Any] = request.app.state.metrics
+    results: list[schemas.InferenceResponse] = []
+
+    for file in files:
+        logger.info(
+            "inference_request_received",
+            extra={
+                "request_id": request_id,
+                "upload_filename": file.filename,
+                "content_type": file.content_type,
+                "visualize": visualize,
+                "batch_mode": True,
+            },
+        )
+        file_bytes = await _read_and_validate_upload(file)
+        metrics["inference_requests_total"] += 1
+        results.append(
+            _run_inference(
+                request_id=request_id,
+                file=file,
+                file_bytes=file_bytes,
+                settings=settings,
+                engine=engine,
+                metrics=metrics,
+                visualize=visualize,
+            )
+        )
+
+    batch_time_ms = round((time.perf_counter() - batch_start_time) * 1000, 2)
+    total_detections = sum(len(item.detections) for item in results)
+    return schemas.BatchInferenceResponse(
+        files=results,
+        metadata={
+            "request_id": request_id,
+            "engine": engine.__class__.__name__,
+            "file_count": len(results),
+            "total_detections": total_detections,
+            "batch_inference_time_ms": batch_time_ms,
+        },
+    )
+
+
+@router.post(
+    "/images/tasks",
+    response_model=schemas.InferenceTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={202: {"model": schemas.InferenceTaskResponse}},
+)
+async def create_inference_task(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+    files: list[UploadFile] = File(...),
+    visualize: bool = Query(False, description="是否返回可视化图像"),
+) -> schemas.InferenceTaskResponse:
+    """创建批量图像异步推理任务。"""
+    request_id = getattr(request.state, "request_id", "unknown")
+    if not files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "EMPTY_FILE",
+                "message": "至少上传一个文件",
+                "detail": "files 不能为空",
+            },
+        )
+
+    validated_files: list[tuple[UploadFile, bytes]] = []
+    for file in files:
+        logger.info(
+            "inference_request_received",
+            extra={
+                "request_id": request_id,
+                "upload_filename": file.filename,
+                "content_type": file.content_type,
+                "visualize": visualize,
+                "task_mode": True,
+            },
+        )
+        validated_files.append((file, await _read_and_validate_upload(file)))
+
+    metrics: dict[str, Any] = request.app.state.metrics
+    task_manager = get_inference_task_manager()
+
+    def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        batch_start_time = time.perf_counter()
+        results: list[schemas.InferenceResponse] = []
+        for index, (file, file_bytes) in enumerate(validated_files, start=1):
+            metrics["inference_requests_total"] += 1
+            result = _run_inference(
+                request_id=request_id,
+                file=file,
+                file_bytes=file_bytes,
+                settings=settings,
+                engine=engine,
+                metrics=metrics,
+                visualize=visualize,
+            )
+            results.append(result)
+            progress_callback(index, len(validated_files))
+
+        batch_time_ms = round((time.perf_counter() - batch_start_time) * 1000, 2)
+        total_detections = sum(len(item.detections) for item in results)
+        return (
+            [item.model_dump(mode="json") for item in results],
+            {
+                "request_id": request_id,
+                "engine": engine.__class__.__name__,
+                "file_count": len(results),
+                "total_detections": total_detections,
+                "batch_inference_time_ms": batch_time_ms,
+            },
+        )
+
+    record = task_manager.create_task(file_count=len(validated_files), worker=worker)
+    return _task_record_to_response(record)
+
+
+@router.get(
+    "/images/tasks",
+    response_model=list[schemas.InferenceTaskResponse],
+    responses={200: {"model": list[schemas.InferenceTaskResponse]}},
+)
+async def list_inference_tasks(
+    limit: int = Query(20, ge=1, le=100, description="返回任务数量上限"),
+) -> list[schemas.InferenceTaskResponse]:
+    """列出最近的批量推理任务。"""
+    task_manager = get_inference_task_manager()
+    records = task_manager.list_tasks(limit=limit)
+    return [_task_record_to_response(record) for record in records]
+
+
+@router.get(
+    "/images/tasks/{task_id}",
+    response_model=schemas.InferenceTaskResponse,
+    responses={
+        200: {"model": schemas.InferenceTaskResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def get_inference_task(task_id: str) -> schemas.InferenceTaskResponse:
+    """查询批量图像异步推理任务。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    return _task_record_to_response(record)
+
+
+def _task_record_to_response(record: Any) -> schemas.InferenceTaskResponse:
+    return schemas.InferenceTaskResponse(
+        task_id=record.task_id,
+        status=record.status,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        file_count=record.file_count,
+        completed_files=record.completed_files,
+        progress=record.progress,
+        results=[
+            schemas.InferenceResponse.model_validate(item) for item in record.results
+        ],
+        metadata=record.metadata,
+        error=record.error,
     )

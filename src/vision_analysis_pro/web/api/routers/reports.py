@@ -1,13 +1,17 @@
 """边缘 Agent 上报 API"""
 
+import csv
+import io
 import logging
 from secrets import compare_digest
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
 
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.report_store import (
+    ReportFrameReview,
     ReportStoreSaveResult,
     get_report_store,
 )
@@ -101,7 +105,208 @@ async def get_report(
             },
         )
 
-    return _record_to_response(record, request_id=request_id)
+    reviews = store.list_reviews(batch_id)
+    return _record_to_response(record, request_id=request_id, reviews=reviews)
+
+
+@router.put(
+    "/report/{batch_id}/reviews/{frame_id}",
+    response_model=schemas.ReportReviewResponse,
+    responses={
+        200: {"model": schemas.ReportReviewResponse},
+        401: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def upsert_report_review(
+    batch_id: str,
+    frame_id: int,
+    payload: schemas.ReportReviewRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> schemas.ReportReviewResponse:
+    """写入指定批次中某帧的人工复核信息。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics["report_query_requests_total"] += 1
+    store = get_report_store(str(settings.report_store_db_path))
+    review = store.upsert_review(
+        batch_id=batch_id,
+        frame_id=frame_id,
+        status=payload.status,
+        note=payload.note,
+        reviewer=payload.reviewer,
+    )
+    if review is None:
+        request.app.state.metrics["report_not_found_total"] += 1
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "REPORT_NOT_FOUND",
+                "message": "上报批次不存在",
+                "detail": batch_id,
+            },
+        )
+
+    return schemas.ReportReviewResponse(
+        status="updated",
+        batch_id=batch_id,
+        review=_review_to_response(review),
+        request_id=request_id,
+    )
+
+
+@router.get(
+    "/report/{batch_id}/export.csv",
+    responses={
+        200: {"content": {"text/csv": {}}},
+        401: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def export_report_csv(
+    batch_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> Response:
+    """导出指定批次的 CSV 报告。"""
+    _authorize_report_request(request, settings)
+    request.app.state.metrics["report_query_requests_total"] += 1
+    store = get_report_store(str(settings.report_store_db_path))
+    record = store.get(batch_id)
+    if record is None:
+        request.app.state.metrics["report_not_found_total"] += 1
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "REPORT_NOT_FOUND",
+                "message": "上报批次不存在",
+                "detail": batch_id,
+            },
+        )
+
+    reviews = store.list_reviews(batch_id)
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(
+        [
+            "batch_id",
+            "device_id",
+            "frame_id",
+            "timestamp",
+            "image_name",
+            "label",
+            "confidence",
+            "bbox",
+            "review_status",
+            "review_note",
+            "reviewer",
+            "review_updated_at",
+        ]
+    )
+
+    for result in record.payload.get("results", []):
+        frame_id = int(result.get("frame_id", 0))
+        review = reviews.get(frame_id)
+        detections = result.get("detections", [])
+        rows = detections or [{}]
+        for detection in rows:
+            writer.writerow(
+                [
+                    record.batch_id,
+                    record.device_id,
+                    frame_id,
+                    result.get("timestamp", 0),
+                    result.get("metadata", {}).get("image_name", ""),
+                    detection.get("label", ""),
+                    detection.get("confidence", ""),
+                    detection.get("bbox", ""),
+                    review.status if review else "",
+                    review.note if review else "",
+                    review.reviewer if review else "",
+                    review.updated_at if review else "",
+                ]
+            )
+
+    return Response(
+        content=csv_buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{batch_id}.csv"',
+        },
+    )
+
+
+@router.get(
+    "/reports/batches",
+    response_model=schemas.ReportBatchListResponse,
+    responses={200: {"model": schemas.ReportBatchListResponse}},
+)
+async def list_report_batches(
+    request: Request,
+    limit: int = Query(20, ge=1, le=100, description="返回批次数量上限"),
+    device_id: str | None = Query(None, description="按设备 ID 过滤"),
+    settings: Settings = Depends(get_settings),
+) -> schemas.ReportBatchListResponse:
+    """列出最近接收的上报批次。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics["report_query_requests_total"] += 1
+    store = get_report_store(str(settings.report_store_db_path))
+    items = store.list_batches(limit=limit, device_id=device_id)
+
+    return schemas.ReportBatchListResponse(
+        status="ok",
+        count=len(items),
+        items=[
+            schemas.ReportBatchSummaryResponse(
+                batch_id=item.batch_id,
+                device_id=item.device_id,
+                report_time=item.report_time,
+                result_count=item.result_count,
+                total_detections=item.total_detections,
+                created_at=item.created_at,
+            )
+            for item in items
+        ],
+        request_id=request_id,
+    )
+
+
+@router.get(
+    "/reports/devices",
+    response_model=schemas.ReportDeviceListResponse,
+    responses={200: {"model": schemas.ReportDeviceListResponse}},
+)
+async def list_report_devices(
+    request: Request,
+    limit: int = Query(20, ge=1, le=100, description="返回设备数量上限"),
+    settings: Settings = Depends(get_settings),
+) -> schemas.ReportDeviceListResponse:
+    """列出最近有上报的设备聚合概览。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics["report_query_requests_total"] += 1
+    store = get_report_store(str(settings.report_store_db_path))
+    items = store.list_devices(limit=limit)
+
+    return schemas.ReportDeviceListResponse(
+        status="ok",
+        count=len(items),
+        items=[
+            schemas.ReportDeviceSummaryResponse(
+                device_id=item.device_id,
+                batch_count=item.batch_count,
+                result_count=item.result_count,
+                total_detections=item.total_detections,
+                last_report_time=item.last_report_time,
+                last_batch_id=item.last_batch_id,
+                last_created_at=item.last_created_at,
+            )
+            for item in items
+        ],
+        request_id=request_id,
+    )
 
 
 def _authorize_report_request(request: Request, settings: Settings) -> None:
@@ -138,7 +343,9 @@ def _record_to_response(
     record: ReportStoreSaveResult,
     *,
     request_id: str | None,
+    reviews: dict[int, ReportFrameReview] | None = None,
 ) -> schemas.ReportRecordResponse:
+    review_map = reviews or {}
     return schemas.ReportRecordResponse(
         status="found",
         batch_id=record.batch_id,
@@ -147,6 +354,35 @@ def _record_to_response(
         result_count=record.result_count,
         total_detections=record.total_detections,
         created_at=record.created_at,
+        results=[
+            schemas.ReportFrameResultResponse(
+                frame_id=int(item.get("frame_id", 0)),
+                timestamp=float(item.get("timestamp", 0)),
+                source_id=str(item.get("source_id", "")),
+                detections=[
+                    schemas.DetectionBox.model_validate(detection)
+                    for detection in item.get("detections", [])
+                ],
+                inference_time_ms=float(item.get("inference_time_ms", 0.0)),
+                metadata=dict(item.get("metadata", {})),
+                review=(
+                    _review_to_response(review_map[int(item.get("frame_id", 0))])
+                    if int(item.get("frame_id", 0)) in review_map
+                    else None
+                ),
+            )
+            for item in record.payload.get("results", [])
+        ],
         payload=record.payload,
         request_id=request_id,
+    )
+
+
+def _review_to_response(review: ReportFrameReview) -> schemas.ReportFrameReviewResponse:
+    return schemas.ReportFrameReviewResponse(
+        frame_id=review.frame_id,
+        status=review.status,
+        note=review.note,
+        reviewer=review.reviewer,
+        updated_at=review.updated_at,
     )

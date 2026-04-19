@@ -7,7 +7,7 @@
 - 错误响应：统一结构 {code, message, detail?}
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -136,6 +136,36 @@ class InferenceResponse(BaseModel):
     )
 
 
+class BatchInferenceResponse(BaseModel):
+    """批量推理响应。"""
+
+    files: list[InferenceResponse] = Field(
+        default_factory=list,
+        description="逐文件推理结果列表",
+    )
+    metadata: dict[str, Any] = Field(
+        default_factory=dict,
+        description="批量推理元信息（请求 ID、总耗时、文件数等）",
+    )
+
+
+class InferenceTaskResponse(BaseModel):
+    """批量推理异步任务响应。"""
+
+    task_id: str = Field(..., description="任务 ID")
+    status: str = Field(..., description="任务状态")
+    created_at: float = Field(..., description="任务创建时间")
+    updated_at: float = Field(..., description="任务更新时间")
+    file_count: int = Field(..., ge=0, description="任务文件数")
+    completed_files: int = Field(..., ge=0, description="已完成文件数")
+    progress: int = Field(..., ge=0, le=100, description="任务进度")
+    results: list[InferenceResponse] = Field(
+        default_factory=list, description="已完成结果"
+    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="任务元信息")
+    error: dict[str, str] | None = Field(None, description="失败信息")
+
+
 class ReportInferenceResult(BaseModel):
     """边缘 Agent 单帧推理结果上报结构"""
 
@@ -207,6 +237,48 @@ class ReportPayloadRequest(BaseModel):
     )
 
 
+ReviewStatus = Literal["pending", "confirmed", "false_positive", "ignored"]
+
+
+class ReportFrameReviewResponse(BaseModel):
+    """单帧人工复核响应。"""
+
+    frame_id: int = Field(..., ge=0, description="帧序号")
+    status: ReviewStatus = Field(..., description="人工复核状态")
+    note: str = Field("", description="人工备注")
+    reviewer: str = Field("", description="复核人")
+    updated_at: float = Field(..., description="复核更新时间戳")
+
+
+class ReportReviewRequest(BaseModel):
+    """人工复核写入请求。"""
+
+    status: ReviewStatus = Field(..., description="人工复核状态")
+    note: str = Field("", max_length=500, description="人工备注")
+    reviewer: str = Field("", max_length=100, description="复核人")
+
+
+class ReportReviewResponse(BaseModel):
+    """人工复核写入响应。"""
+
+    status: str = Field(..., description="写入状态")
+    batch_id: str = Field(..., description="批次 ID")
+    review: ReportFrameReviewResponse = Field(..., description="复核结果")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
+class ReportFrameResultResponse(BaseModel):
+    """带复核信息的单帧详情。"""
+
+    frame_id: int = Field(..., ge=0, description="帧序号")
+    timestamp: float = Field(..., description="采集时间戳")
+    source_id: str = Field(..., description="数据源标识")
+    detections: list[DetectionBox] = Field(default_factory=list, description="检测结果")
+    inference_time_ms: float = Field(..., ge=0.0, description="推理耗时（毫秒）")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="帧元信息")
+    review: ReportFrameReviewResponse | None = Field(None, description="人工复核信息")
+
+
 class ReportResponse(BaseModel):
     """边缘 Agent 上报响应"""
 
@@ -262,7 +334,58 @@ class ReportRecordResponse(BaseModel):
     result_count: int = Field(..., ge=0, description="接收的结果数量")
     total_detections: int = Field(..., ge=0, description="接收的检测结果总数")
     created_at: float = Field(..., description="服务端接收时间戳")
+    results: list[ReportFrameResultResponse] = Field(
+        default_factory=list,
+        description="带复核信息的单帧详情",
+    )
     payload: dict[str, Any] = Field(..., description="原始上报载荷")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
+class ReportBatchSummaryResponse(BaseModel):
+    """边缘上报批次摘要。"""
+
+    batch_id: str = Field(..., description="批次 ID")
+    device_id: str = Field(..., description="边缘设备标识")
+    report_time: float = Field(..., description="上报时间戳")
+    result_count: int = Field(..., ge=0, description="批次结果数量")
+    total_detections: int = Field(..., ge=0, description="批次检测总数")
+    created_at: float = Field(..., description="服务端接收时间戳")
+
+
+class ReportBatchListResponse(BaseModel):
+    """边缘上报批次列表响应。"""
+
+    status: str = Field(..., description="查询状态")
+    count: int = Field(..., ge=0, description="返回条数")
+    items: list[ReportBatchSummaryResponse] = Field(
+        default_factory=list,
+        description="批次摘要列表",
+    )
+    request_id: str | None = Field(None, description="请求 ID")
+
+
+class ReportDeviceSummaryResponse(BaseModel):
+    """设备聚合摘要。"""
+
+    device_id: str = Field(..., description="边缘设备标识")
+    batch_count: int = Field(..., ge=0, description="累计批次数")
+    result_count: int = Field(..., ge=0, description="累计结果数")
+    total_detections: int = Field(..., ge=0, description="累计检测总数")
+    last_report_time: float = Field(..., description="最近上报时间")
+    last_batch_id: str = Field(..., description="最近批次 ID")
+    last_created_at: float = Field(..., description="最近服务端接收时间")
+
+
+class ReportDeviceListResponse(BaseModel):
+    """设备聚合列表响应。"""
+
+    status: str = Field(..., description="查询状态")
+    count: int = Field(..., ge=0, description="返回条数")
+    items: list[ReportDeviceSummaryResponse] = Field(
+        default_factory=list,
+        description="设备聚合摘要列表",
+    )
     request_id: str | None = Field(None, description="请求 ID")
 
 

@@ -28,6 +28,43 @@ class ReportStoreSaveResult:
     created_at: float
 
 
+@dataclass(frozen=True)
+class ReportBatchSummary:
+    """上报批次摘要。"""
+
+    batch_id: str
+    device_id: str
+    report_time: float
+    result_count: int
+    total_detections: int
+    created_at: float
+
+
+@dataclass(frozen=True)
+class ReportDeviceSummary:
+    """设备聚合摘要。"""
+
+    device_id: str
+    batch_count: int
+    result_count: int
+    total_detections: int
+    last_report_time: float
+    last_batch_id: str
+    last_created_at: float
+
+
+@dataclass(frozen=True)
+class ReportFrameReview:
+    """单帧人工复核信息。"""
+
+    batch_id: str
+    frame_id: int
+    status: str
+    note: str
+    reviewer: str
+    updated_at: float
+
+
 class SQLiteReportStore:
     """基于 SQLite 的边缘上报批次存储。"""
 
@@ -97,6 +134,165 @@ class SQLiteReportStore:
             return None
         return _row_to_result(row, created=False)
 
+    def list_batches(
+        self,
+        *,
+        limit: int = 20,
+        device_id: str | None = None,
+    ) -> list[ReportBatchSummary]:
+        """列出最近接收的上报批次。"""
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                if device_id:
+                    rows = conn.execute(
+                        """
+                        SELECT
+                            batch_id,
+                            device_id,
+                            report_time,
+                            result_count,
+                            total_detections,
+                            created_at
+                        FROM edge_report_batches
+                        WHERE device_id = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (device_id, limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT
+                            batch_id,
+                            device_id,
+                            report_time,
+                            result_count,
+                            total_detections,
+                            created_at
+                        FROM edge_report_batches
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    ).fetchall()
+
+        return [_row_to_batch_summary(row) for row in rows]
+
+    def list_devices(self, *, limit: int = 20) -> list[ReportDeviceSummary]:
+        """按设备聚合最近上报情况。"""
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        b.device_id AS device_id,
+                        COUNT(*) AS batch_count,
+                        SUM(b.result_count) AS result_count,
+                        SUM(b.total_detections) AS total_detections,
+                        MAX(b.report_time) AS last_report_time,
+                        latest.batch_id AS last_batch_id,
+                        latest.created_at AS last_created_at
+                    FROM edge_report_batches AS b
+                    JOIN edge_report_batches AS latest
+                      ON latest.batch_id = (
+                          SELECT inner_b.batch_id
+                          FROM edge_report_batches AS inner_b
+                          WHERE inner_b.device_id = b.device_id
+                          ORDER BY inner_b.created_at DESC
+                          LIMIT 1
+                      )
+                    GROUP BY b.device_id
+                    ORDER BY latest.created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+
+        return [_row_to_device_summary(row) for row in rows]
+
+    def list_reviews(self, batch_id: str) -> dict[int, ReportFrameReview]:
+        """读取指定批次的人工复核信息。"""
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        batch_id,
+                        frame_id,
+                        status,
+                        note,
+                        reviewer,
+                        updated_at
+                    FROM edge_report_reviews
+                    WHERE batch_id = ?
+                    ORDER BY frame_id ASC
+                    """,
+                    (batch_id,),
+                ).fetchall()
+
+        return {int(row["frame_id"]): _row_to_frame_review(row) for row in rows}
+
+    def upsert_review(
+        self,
+        *,
+        batch_id: str,
+        frame_id: int,
+        status: str,
+        note: str,
+        reviewer: str,
+    ) -> ReportFrameReview | None:
+        """写入或更新指定批次的单帧复核信息。"""
+        updated_at = time.time()
+
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                if self._get_row(conn, batch_id) is None:
+                    return None
+
+                conn.execute(
+                    """
+                    INSERT INTO edge_report_reviews (
+                        batch_id,
+                        frame_id,
+                        status,
+                        note,
+                        reviewer,
+                        updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(batch_id, frame_id) DO UPDATE SET
+                        status = excluded.status,
+                        note = excluded.note,
+                        reviewer = excluded.reviewer,
+                        updated_at = excluded.updated_at
+                    """,
+                    (batch_id, frame_id, status, note, reviewer, updated_at),
+                )
+                conn.commit()
+                row = conn.execute(
+                    """
+                    SELECT
+                        batch_id,
+                        frame_id,
+                        status,
+                        note,
+                        reviewer,
+                        updated_at
+                    FROM edge_report_reviews
+                    WHERE batch_id = ? AND frame_id = ?
+                    """,
+                    (batch_id, frame_id),
+                ).fetchone()
+
+        if row is None:
+            return None
+        return _row_to_frame_review(row)
+
     def _ensure_schema(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
@@ -110,6 +306,20 @@ class SQLiteReportStore:
                     total_detections INTEGER NOT NULL,
                     payload_json TEXT NOT NULL,
                     created_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS edge_report_reviews (
+                    batch_id TEXT NOT NULL,
+                    frame_id INTEGER NOT NULL,
+                    status TEXT NOT NULL,
+                    note TEXT NOT NULL,
+                    reviewer TEXT NOT NULL,
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (batch_id, frame_id),
+                    FOREIGN KEY (batch_id) REFERENCES edge_report_batches(batch_id)
                 )
                 """
             )
@@ -149,6 +359,40 @@ def _row_to_result(row: sqlite3.Row, *, created: bool) -> ReportStoreSaveResult:
         total_detections=int(row["total_detections"]),
         payload=json.loads(str(row["payload_json"])),
         created_at=float(row["created_at"]),
+    )
+
+
+def _row_to_batch_summary(row: sqlite3.Row) -> ReportBatchSummary:
+    return ReportBatchSummary(
+        batch_id=str(row["batch_id"]),
+        device_id=str(row["device_id"]),
+        report_time=float(row["report_time"]),
+        result_count=int(row["result_count"]),
+        total_detections=int(row["total_detections"]),
+        created_at=float(row["created_at"]),
+    )
+
+
+def _row_to_device_summary(row: sqlite3.Row) -> ReportDeviceSummary:
+    return ReportDeviceSummary(
+        device_id=str(row["device_id"]),
+        batch_count=int(row["batch_count"]),
+        result_count=int(row["result_count"]),
+        total_detections=int(row["total_detections"]),
+        last_report_time=float(row["last_report_time"]),
+        last_batch_id=str(row["last_batch_id"]),
+        last_created_at=float(row["last_created_at"]),
+    )
+
+
+def _row_to_frame_review(row: sqlite3.Row) -> ReportFrameReview:
+    return ReportFrameReview(
+        batch_id=str(row["batch_id"]),
+        frame_id=int(row["frame_id"]),
+        status=str(row["status"]),
+        note=str(row["note"]),
+        reviewer=str(row["reviewer"]),
+        updated_at=float(row["updated_at"]),
     )
 
 

@@ -11,8 +11,44 @@ export interface InferenceResponse {
     inference_time_ms?: number
     model_version?: string
     engine?: string
+    request_id?: string
+    detection_count?: number
   }
   visualization?: string
+}
+
+export interface BatchInferenceResponse {
+  files: InferenceResponse[]
+  metadata: {
+    request_id?: string
+    engine?: string
+    file_count?: number
+    total_detections?: number
+    batch_inference_time_ms?: number
+  }
+}
+
+export interface InferenceTaskResponse {
+  task_id: string
+  status: string
+  created_at: number
+  updated_at: number
+  file_count: number
+  completed_files: number
+  progress: number
+  results: InferenceResponse[]
+  metadata: {
+    request_id?: string
+    engine?: string
+    file_count?: number
+    total_detections?: number
+    batch_inference_time_ms?: number
+  }
+  error?: {
+    code: string
+    message: string
+    detail?: string
+  } | null
 }
 
 export interface HealthResponse {
@@ -20,10 +56,92 @@ export interface HealthResponse {
   version?: string
   model_loaded?: boolean
   engine?: string
+  check?: string
+  request_id?: string
+}
+
+export interface ReportBatchSummary {
+  batch_id: string
+  device_id: string
+  report_time: number
+  result_count: number
+  total_detections: number
+  created_at: number
+}
+
+export type ReviewStatus = 'pending' | 'confirmed' | 'false_positive' | 'ignored'
+
+export interface ReportFrameReview {
+  frame_id: number
+  status: ReviewStatus
+  note: string
+  reviewer: string
+  updated_at: number
+}
+
+export interface ReportFrameResult {
+  frame_id: number
+  timestamp: number
+  source_id: string
+  detections: DetectionBox[]
+  inference_time_ms: number
+  metadata: Record<string, unknown>
+  review?: ReportFrameReview | null
+}
+
+export interface ReportRecordResponse {
+  status: string
+  batch_id: string
+  device_id: string
+  report_time: number
+  result_count: number
+  total_detections: number
+  created_at: number
+  results: ReportFrameResult[]
+  payload: Record<string, unknown>
+  request_id?: string
+}
+
+export interface ReportBatchListResponse {
+  status: string
+  count: number
+  items: ReportBatchSummary[]
+  request_id?: string
+}
+
+export interface ReportDeviceSummary {
+  device_id: string
+  batch_count: number
+  result_count: number
+  total_detections: number
+  last_report_time: number
+  last_batch_id: string
+  last_created_at: number
+}
+
+export interface ReportDeviceListResponse {
+  status: string
+  count: number
+  items: ReportDeviceSummary[]
+  request_id?: string
+}
+
+export interface ReportReviewRequest {
+  status: ReviewStatus
+  note: string
+  reviewer: string
+}
+
+export interface ReportReviewResponse {
+  status: string
+  batch_id: string
+  review: ReportFrameReview
+  request_id?: string
 }
 
 export interface ErrorResponse {
   code: string
   message: string
   detail?: string
+  request_id?: string
 }

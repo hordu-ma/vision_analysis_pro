@@ -1,6 +1,17 @@
 import axios, { type AxiosInstance, type AxiosError, type AxiosProgressEvent } from 'axios'
 import { ElMessage } from 'element-plus'
-import type { HealthResponse, InferenceResponse, ErrorResponse } from '@/types/api'
+import type {
+  HealthResponse,
+  InferenceResponse,
+  BatchInferenceResponse,
+  InferenceTaskResponse,
+  ErrorResponse,
+  ReportBatchListResponse,
+  ReportDeviceListResponse,
+  ReportRecordResponse,
+  ReportReviewRequest,
+  ReportReviewResponse
+} from '@/types/api'
 
 /**
  * API 错误类
@@ -232,6 +243,74 @@ class ApiService {
     return response.data
   }
 
+  async analyzeBatch(
+    files: File[],
+    visualize = true,
+    onProgress?: UploadProgressCallback
+  ): Promise<BatchInferenceResponse> {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    const response = await this.client.post<BatchInferenceResponse>(
+      `/inference/images?visualize=${visualize}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 120000,
+        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            onProgress(progress)
+          }
+        }
+      }
+    )
+    return response.data
+  }
+
+  async createBatchTask(
+    files: File[],
+    visualize = true,
+    onProgress?: UploadProgressCallback
+  ): Promise<InferenceTaskResponse> {
+    const formData = new FormData()
+    files.forEach(file => formData.append('files', file))
+
+    const response = await this.client.post<InferenceTaskResponse>(
+      `/inference/images/tasks?visualize=${visualize}`,
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 120000,
+        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+            onProgress(progress)
+          }
+        }
+      }
+    )
+    return response.data
+  }
+
+  async getBatchTask(taskId: string): Promise<InferenceTaskResponse> {
+    const response = await this.client.get<InferenceTaskResponse>(
+      `/inference/images/tasks/${taskId}`
+    )
+    return response.data
+  }
+
+  async listBatchTasks(limit = 20): Promise<InferenceTaskResponse[]> {
+    const response = await this.client.get<InferenceTaskResponse[]>(
+      `/inference/images/tasks?limit=${limit}`
+    )
+    return response.data
+  }
+
   /**
    * 检查服务可用性
    */
@@ -242,6 +321,52 @@ class ApiService {
     } catch {
       return false
     }
+  }
+
+  /**
+   * 查询最近批次
+   */
+  async listReportBatches(limit = 20, deviceId?: string): Promise<ReportBatchListResponse> {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (deviceId) {
+      params.set('device_id', deviceId)
+    }
+    const response = await this.client.get<ReportBatchListResponse>(`/reports/batches?${params}`)
+    return response.data
+  }
+
+  /**
+   * 查询设备概览
+   */
+  async listReportDevices(limit = 20): Promise<ReportDeviceListResponse> {
+    const response = await this.client.get<ReportDeviceListResponse>(
+      `/reports/devices?limit=${limit}`
+    )
+    return response.data
+  }
+
+  async getReport(batchId: string): Promise<ReportRecordResponse> {
+    const response = await this.client.get<ReportRecordResponse>(`/report/${batchId}`)
+    return response.data
+  }
+
+  async updateReportReview(
+    batchId: string,
+    frameId: number,
+    payload: ReportReviewRequest
+  ): Promise<ReportReviewResponse> {
+    const response = await this.client.put<ReportReviewResponse>(
+      `/report/${batchId}/reviews/${frameId}`,
+      payload
+    )
+    return response.data
+  }
+
+  async exportReportCsv(batchId: string): Promise<Blob> {
+    const response = await this.client.get(`/report/${batchId}/export.csv`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
   }
 }
 
