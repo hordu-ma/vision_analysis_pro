@@ -15,13 +15,13 @@
 
 - **后端测试**：175 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
 - **前端测试**：53 passed（vitest），ESLint 全绿，生产构建通过
-- **下一步**：按 `tasks.md` 执行 HE-001 Stage A YOLO Baseline v0.1，然后推进浏览器 E2E 与关键帧接入 Edge Agent
+- **下一步**：按 `tasks.md` 执行 HE-001 Stage A YOLO Baseline v0.1；随后推进 Stage B Pilot Data Loop、浏览器 E2E、关键帧接入 Edge Agent 与完整工程流程硬化
 
 **路线决策（2026-04-19）**
 
 - 近期最佳实践不是串联 DeepLab、YOLO、Transformer、LLM 四段复杂链路，而是先收敛为“裂缝检测试点 + 目标检测工程闭环”。
 - `stub` 用于稳定验证前后端与边缘上报链路；`hf_crack` 用于公开裂缝模型联调；五类 YOLO/ONNX 必须等数据集、权重与评估报告补齐后再作为正式能力启用。
-- OpenCV 关键帧抽取进入数据层主线；公开 crack-only 数据集已完成本地 YOLO 转换和 1-epoch smoke training；语义分割、趋势 Transformer、LLM 报告都作为插件式后续能力，不能阻塞当前试点闭环。
+- OpenCV 关键帧抽取进入数据层主线；公开 crack-only 数据集已完成本地 YOLO 转换和 1-epoch smoke training；Stage B 明确为自有视频/图片抽帧、标注、训练和对比闭环；语义分割、趋势 Transformer、LLM 报告都作为插件式后续能力，不能阻塞当前试点闭环。
 
 ---
 
@@ -88,7 +88,7 @@
 
 ### 4.2 剩余差距
 
-- 数据与训练：公开 crack-only 数据集已能转换并训练；下一步需要正式 baseline 训练、评估报告（mAP/PR）、ONNX 导出与推理接入验证
+- 数据与训练：公开 crack-only 数据集已能转换并训练；下一步需要正式 Stage A baseline 训练、评估报告（mAP/PR）、ONNX 导出与推理接入验证；Stage B 负责自有数据集建设和模型对比
 - 生产化：CI/Docker/API CLI/最小 metrics/上报持久化与幂等已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
 - 可选优化：关键帧策略接入 Edge Agent、MQTT 上报器、Rust/PyO3 加速
 

@@ -496,8 +496,11 @@ uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-repor
 3. **HE-003 Keyframes Into Edge Agent**：将 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
 4. **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
 5. **HE-005 Pilot Deployment Runbook**：明确试点部署、模型挂载、观测与回滚步骤。
+6. **HE-006 Stage B Pilot Data Loop**：将自有视频/图片抽帧、标注、切分为独立 YOLO 数据集。
+7. **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型做同集对比。
+8. **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要和导出链路。
 
-非关键路径：MQTT、Rust/PyO3、DeepLab、Transformer 趋势分析、LLM 报告扩展均后置，除非 `tasks.md` 显式提升优先级。
+非关键路径：MQTT、Rust/PyO3、DeepLab、Transformer 趋势分析、LLM 报告扩展均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
 ---
 

@@ -360,6 +360,9 @@ vision_analysis_pro/
 - **HE-003 Keyframes Into Edge Agent**：把 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
 - **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
 - **HE-005 Pilot Deployment Runbook**：收敛试点部署路径、模型挂载和回滚说明。
+- **HE-006 Stage B Pilot Data Loop**：把自有视频/图片转成独立 YOLO 数据集，避免与 Stage A 和五分类配置混用。
+- **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
+- **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要、导出这一完整工程流程。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

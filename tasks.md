@@ -6,11 +6,68 @@ Last updated: 2026-04-19
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current focus is **Stage A crack-only YOLO baseline**.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-001 / Stage A crack-only YOLO baseline**; Stage B is already planned but starts after HE-001 acceptance.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
 - DeepLab, Transformer trend modeling, MQTT, Rust/PyO3, and LLM report generation are not on the critical path unless a task below explicitly promotes them.
+
+## Stage Definitions
+
+### Stage A Public-Data Crack Baseline
+
+Goal:
+- Use a public crack dataset to produce a reproducible single-class YOLO baseline.
+- Prove the current backend/frontend/Edge Agent architecture can consume a real model artifact.
+
+Status:
+- Data source selected and converted locally.
+- 1-epoch smoke training passed.
+- Formal baseline training, evaluation, ONNX export, and model note are still pending in HE-001.
+
+Exit criteria:
+- `runs/stage_a_crack/baseline_v0_1/weights/best.pt` exists locally.
+- `models/stage_a_crack/best.onnx` exists locally or export blocker is documented.
+- Evaluation note under `docs/` records dataset, command, precision, recall, mAP50, and mAP50-95.
+- API/YOLO inference smoke succeeds with the Stage A model.
+
+### Stage B Pilot/Self-Owned Data Loop
+
+Goal:
+- Turn the user's own videos/images into a maintainable YOLO dataset and compare it against the public-data baseline.
+- Use Stage B to reduce domain shift before claiming pilot readiness.
+
+Inputs:
+- Inspection videos or image folders from the target environment.
+- OpenCV keyframes from `scripts/extract_keyframes.py`.
+- Manual annotations or reviewed auto-labels.
+
+Exit criteria:
+- A versioned local dataset such as `data/stage_b_pilot_crack/data.yaml` exists locally.
+- Annotation guidelines and label QA are applied.
+- Stage B model is trained and compared against Stage A on a held-out pilot validation set.
+- Deployment docs identify whether Stage A or Stage B is the recommended demo/pilot model.
+
+### Stage C Engineering Pilot
+
+Goal:
+- Wire the selected model into API, frontend, Edge Agent, reporting, and deployment runbooks for an end-to-end pilot.
+
+Exit criteria:
+- Browser E2E and Edge Agent reporting steady-state tests pass.
+- Pilot deployment runbook is complete.
+- Rollback path to `stub` or `hf_crack` remains documented.
+
+## Original Direction Traceability
+
+The conversation started with four candidate directions. They map to the current task ledger as follows:
+
+| Direction | Current handling | Tasks |
+|-----------|------------------|-------|
+| Data layer: OpenCV keyframes from video | Mainline data ingestion path; CLI exists, Edge Agent integration pending | HE-003, HE-006 |
+| Vision recognition: DeepLab, YOLO, Transformer | YOLO is the active detector; segmentation and trend analysis are follow-up tasks gated by evidence | HE-001, HE-007, HE-010, HE-011 |
+| Language extension: LLM explanations/reports | Template report exists now; LLM is report-only and must not change detection decisions | HE-004, HE-009 |
+| Backend/frontend: full inspection flow | Current app already has API, frontend, batch tasks, report summary; browser/Edge steady-state checks remain | HE-002, HE-004, HE-008 |
 
 ## Current Decision
 
@@ -137,6 +194,50 @@ uv run pytest tests/test_keyframes.py tests/test_edge_agent.py -q
 uv run ruff check .
 ```
 
+### HE-006 Stage B Pilot Data Loop
+
+Status: Planned
+Priority: P0
+
+Scope:
+- Build a repeatable process for turning the user's own videos/images into a YOLO dataset.
+- Use keyframe extraction, annotation QA, train/val/test split, and dataset manifest generation.
+- Keep the output separate from Stage A and the legacy five-class `data/data.yaml`.
+
+Implementation notes:
+- Default target path: `data/stage_b_pilot_crack/`.
+- Start crack-only unless the pilot data clearly supports more classes.
+- Use the same class id as Stage A: `0 crack`.
+- Keep raw videos, extracted images, labels, and trained weights out of git.
+
+Acceptance criteria:
+- `data/stage_b_pilot_crack/data.yaml` is generated locally.
+- A manifest records source videos/images, extraction settings, split counts, and annotation status.
+- At least one validation command checks image/label pairing and YOLO label format.
+- Documentation explains how Stage B data is added without overwriting Stage A.
+
+Validation commands:
+
+```bash
+uv run python scripts/extract_keyframes.py path/to/pilot_video.mp4 \
+  --output-dir data/stage_b_pilot_crack/raw_keyframes \
+  --interval-seconds 1.0 \
+  --min-scene-delta 20 \
+  --blur-threshold 10
+
+uv run ruff check .
+uv run pytest tests/test_keyframes.py -q
+```
+
+Artifacts:
+- Local dataset: `data/stage_b_pilot_crack/`
+- Local manifest: `data/stage_b_pilot_crack/manifest.json`
+- Optional docs note after first pilot dataset: `docs/stage-b-pilot-data.md`
+
+Rollback:
+- Remove `data/stage_b_pilot_crack/` and any corresponding `runs/stage_b_pilot_crack/` outputs.
+- No tracked five-class config should be modified.
+
 ## P1 Queue
 
 ### HE-004 Edge Agent Reporting Steady State
@@ -181,9 +282,65 @@ docker compose config
 uv run ruff check .
 ```
 
+### HE-007 Stage B Model Comparison
+
+Status: Planned
+Priority: P1
+
+Scope:
+- Train a Stage B model on pilot/self-owned data and compare it against the Stage A public-data baseline.
+- Decide whether the demo/pilot should use Stage A, Stage B, or a merged dataset.
+
+Acceptance criteria:
+- Evaluation note compares Stage A and Stage B metrics on the same held-out pilot validation set.
+- Recommendation is explicit: keep Stage A, switch to Stage B, or train merged v0.3.
+- Any domain-shift issues are listed with examples.
+
+Validation commands:
+
+```bash
+uv run python scripts/train.py \
+  --data data/stage_b_pilot_crack/data.yaml \
+  --model yolov8n.pt \
+  --epochs 50 \
+  --batch 8 \
+  --imgsz 640 \
+  --project runs/stage_b_pilot_crack \
+  --name baseline_v0_1 \
+  --exist-ok
+
+INFERENCE_ENGINE=stub uv run pytest -q
+```
+
+Rollback:
+- Remove `runs/stage_b_pilot_crack/` and exported files under `models/stage_b_pilot_crack/`.
+
+### HE-008 Full Inspection Flow Hardening
+
+Status: Planned
+Priority: P1
+
+Scope:
+- Make the full flow explicit across backend and frontend: upload/batch task, inference, visualization, review, report summary, export.
+- This is the engineering counterpart to the original "backend and frontend complete inspection process" direction.
+
+Acceptance criteria:
+- README and demo docs describe a single happy path and one recovery path.
+- API schemas and frontend types remain aligned.
+- Browser smoke and backend task/report tests cover the main flow.
+
+Validation commands:
+
+```bash
+INFERENCE_ENGINE=stub uv run pytest tests/test_api_inference.py tests/test_reporting.py -q
+cd web
+npm run lint
+npm run test -- --run
+```
+
 ## P2 Backlog
 
-### HE-006 LLM Report Extension
+### HE-009 LLM Report Extension
 
 Status: Backlog
 Priority: P2
@@ -199,7 +356,7 @@ Acceptance criteria:
 - LLM prompt and output schema are versioned.
 - Tests cover missing metadata and low-confidence detections.
 
-### HE-007 Segmentation Refinement
+### HE-010 Segmentation Refinement
 
 Status: Backlog
 Priority: P2
@@ -209,8 +366,9 @@ Promote only if Stage A users need crack length/area estimates that bounding box
 Scope:
 - Evaluate segmentation for crack masks as a refinement step after object detection.
 - Do not replace the YOLO baseline unless evaluation justifies it.
+- Candidate models include DeepLab-style semantic segmentation or SAM/SAM2-style refinement, selected after Stage A/Stage B evidence.
 
-### HE-008 Trend Analysis
+### HE-011 Trend Analysis
 
 Status: Backlog
 Priority: P2
@@ -220,6 +378,7 @@ Promote only after repeated inspections exist for the same device/asset.
 Scope:
 - Build trend features from stored batch history before considering Transformer models.
 - Start with simple time-series summaries and thresholds.
+- Transformer-based trend modeling is only justified after repeated, timestamped, asset-linked inspection data exists.
 
 ## Explicit Non-Goals For The Next Sprint
 
