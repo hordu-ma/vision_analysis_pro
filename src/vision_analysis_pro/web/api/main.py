@@ -193,10 +193,17 @@ def _get_health_payload() -> dict[str, Any]:
         engine_name = "ONNXInferenceEngine"
         model_path = os.getenv("ONNX_MODEL_PATH", "models/best.onnx")
         model_loaded = Path(model_path).exists()
-    else:
+    elif engine_type == "hf_crack":
+        engine_name = "HFCrackInferenceEngine"
+        model_path = os.getenv("HF_CRACK_MODEL_PATH", "models/only-crack-I")
+        model_loaded = Path(model_path).exists()
+    elif engine_type == "yolo":
         engine_name = "YOLOInferenceEngine"
         model_path = os.getenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
         model_loaded = Path(model_path).exists() or settings.model_path.exists()
+    else:
+        engine_name = "UnknownInferenceEngine"
+        model_loaded = False
 
     return {
         "status": "healthy",

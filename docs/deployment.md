@@ -48,8 +48,9 @@
 
 常见模型路径约定：
 
-- YOLO：`runs/train/exp/weights/best.pt`
+- YOLO：`runs/train/exp/weights/custom.pt`
 - ONNX：`models/best.onnx`
+- HF 裂缝参考模型：`models/only-crack-I`
 
 如果你使用自定义模型路径，请通过环境变量覆盖。
 
@@ -62,12 +63,16 @@
 ### 推理相关
 
 - `INFERENCE_ENGINE`
-  - 可选值：`yolo`、`onnx`、`stub`
+  - 可选值：`yolo`、`hf_crack`、`onnx`、`stub`
   - 默认值：`yolo`
 
 - `YOLO_MODEL_PATH`
   - YOLO 模型路径
-  - 默认值：`runs/train/exp/weights/best.pt`
+  - 默认值：`runs/train/exp/weights/custom.pt`
+
+- `HF_CRACK_MODEL_PATH`
+  - Hugging Face 裂缝参考模型目录
+  - 默认值：`models/only-crack-I`
 
 - `ONNX_MODEL_PATH`
   - ONNX 模型路径
@@ -159,7 +164,7 @@ uv sync --extra onnx
 - `uv sync --extra dev`：安装开发/测试依赖
 - `uv sync --extra onnx`：安装 ONNX Runtime 相关依赖
 
-如果你只使用 YOLO 推理，可以不安装 `onnx` 扩展。
+如果你只使用 YOLO 或 HF 裂缝参考模型推理，可以不安装 `onnx` 扩展。
 
 ## 5.2 启动 API
 
@@ -192,17 +197,42 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 如果你使用 YOLO 推理，请确保模型文件存在，例如：
 
 ```/dev/null/text.txt#L1-1
-runs/train/exp/weights/best.pt
+runs/train/exp/weights/custom.pt
 ```
 
 启动前可设置：
 
 ```/dev/null/bash.sh#L1-2
 export INFERENCE_ENGINE=yolo
-export YOLO_MODEL_PATH=runs/train/exp/weights/best.pt
+export YOLO_MODEL_PATH=runs/train/exp/weights/custom.pt
 ```
 
-### 6.2 ONNX 模型
+说明：仓库历史中的 `runs/train/exp/weights/best.pt` / `last.pt` 已移除，因为当前训练产物不可用。如需继续使用 YOLO，请替换为新的自训练权重并更新 `YOLO_MODEL_PATH`。
+
+### 6.2 HF 裂缝参考模型
+
+如果你需要先接入一个公开可下载的同类参考模型，可使用：
+
+```/dev/null/text.txt#L1-1
+models/only-crack-I
+```
+
+启动前可设置：
+
+```/dev/null/bash.sh#L1-2
+export INFERENCE_ENGINE=hf_crack
+export HF_CRACK_MODEL_PATH=models/only-crack-I
+```
+
+首次下载可执行：
+
+```/dev/null/bash.sh#L1-1
+uv run python scripts/download_hf_crack_model.py
+```
+
+说明：该模型当前只检测 `crack`，适合演示链路和后续微调，不直接覆盖项目原始 5 类缺陷体系。
+
+### 6.3 ONNX 模型
 
 如果你使用 ONNX 推理，请确保模型文件存在，例如：
 
@@ -217,7 +247,7 @@ export INFERENCE_ENGINE=onnx
 export ONNX_MODEL_PATH=models/best.onnx
 ```
 
-### 6.3 Stub 模式
+### 6.4 Stub 模式
 
 如果你只是验证 API 链路，不依赖真实模型，可以使用：
 
@@ -272,7 +302,7 @@ docker build --build-arg INSTALL_ONNX=true -t vision-analysis-pro:onnx .
 至少注入：
 
 - `INFERENCE_ENGINE`
-- `YOLO_MODEL_PATH` 或 `ONNX_MODEL_PATH`
+- `YOLO_MODEL_PATH`、`HF_CRACK_MODEL_PATH` 或 `ONNX_MODEL_PATH`
 - `API_HOST=0.0.0.0`
 - `API_PORT=8000`
 - `API_RELOAD=false`
@@ -285,11 +315,25 @@ YOLO 模式示例：
 docker run --rm \
   -p 8000:8000 \
   -e INFERENCE_ENGINE=yolo \
-  -e YOLO_MODEL_PATH=/app/runs/train/exp/weights/best.pt \
+  -e YOLO_MODEL_PATH=/app/runs/train/exp/weights/custom.pt \
   -e API_HOST=0.0.0.0 \
   -e API_PORT=8000 \
   -e API_RELOAD=false \
   -v ./runs:/app/runs \
+  vision-analysis-pro:latest
+```
+
+HF 裂缝参考模型示例：
+
+```/dev/null/bash.sh#L1-8
+docker run --rm \
+  -p 8000:8000 \
+  -e INFERENCE_ENGINE=hf_crack \
+  -e HF_CRACK_MODEL_PATH=/app/models/only-crack-I \
+  -e API_HOST=0.0.0.0 \
+  -e API_PORT=8000 \
+  -e API_RELOAD=false \
+  -v ./models:/app/models \
   vision-analysis-pro:latest
 ```
 

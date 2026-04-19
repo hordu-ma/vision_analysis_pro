@@ -124,7 +124,7 @@ const emit = defineEmits<{
 .workspace-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .workspace-overview {
@@ -195,11 +195,22 @@ const emit = defineEmits<{
 .workspace-main {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+  padding: 0 0 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
 }
 
 .workspace-secondary {
-  margin-top: 2px;
+  margin-top: 0;
+}
+
+.workspace-secondary :deep(.el-col) {
+  display: flex;
+}
+
+.workspace-secondary :deep(.product-shell-card) {
+  width: 100%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.82));
 }
 
 @media (max-width: 960px) {

@@ -9,7 +9,7 @@
 ### 核心特性
 
 - 🚁 **无人机巡检**：支持图片/视频输入链路设计
-- 🤖 **AI 检测**：YOLOv8 推理 + ONNX Runtime 高性能推理
+- 🤖 **AI 检测**：YOLOv8 / Hugging Face 裂缝检测参考模型 / ONNX Runtime 推理
 - 🔧 **边缘计算**：完整的边缘 Agent（采集/推理/上报/离线缓存）
 - 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传 → 推理 → 展示）+ 边缘上报接收
 - ⚡ **高性能**：ONNX 推理相比 YOLO 提升 7.25x（基准测试）
@@ -195,6 +195,8 @@ docker run --rm -p 8000:8000 \
 ### 部署建议
 
 - 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
+- 若仓库内自训练 YOLO 权重不可用，可临时切换 `INFERENCE_ENGINE=hf_crack` 与 `HF_CRACK_MODEL_PATH=models/only-crack-I` 使用公开裂缝参考模型联调
+- 公开裂缝参考模型可通过 `uv run python scripts/download_hf_crack_model.py` 下载到 `models/only-crack-I`
 - 生产环境通过 `CORS_ALLOW_ORIGINS` 明确限制前端域名，避免使用通配符
 - 模型文件、数据目录、日志目录建议通过挂载卷管理
 - 密钥类配置统一通过环境变量注入，不要写入镜像
@@ -207,7 +209,7 @@ docker run --rm -p 8000:8000 \
 vision_analysis_pro/
 ├── src/vision_analysis_pro/
 │   ├── core/
-│   │   ├── inference/          # 推理引擎（stub/yolo/onnx）
+│   │   ├── inference/          # 推理引擎（stub/yolo/hf_crack/onnx）
 │   │   └── preprocessing/      # 预处理与可视化
 │   ├── web/api/                # FastAPI 路由与依赖
 │   └── edge_agent/             # 边缘 Agent 完整实现

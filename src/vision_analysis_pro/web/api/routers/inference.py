@@ -143,10 +143,14 @@ def _run_inference(
 ) -> schemas.InferenceResponse:
     """执行单文件推理并更新指标。"""
     start_time = time.perf_counter()
+    confidence_threshold = settings.confidence_threshold
+    if engine.__class__.__name__ == "HFCrackInferenceEngine":
+        confidence_threshold = min(confidence_threshold, 0.2)
+
     try:
         raw_result = engine.predict(
             file_bytes,
-            conf=settings.confidence_threshold,
+            conf=confidence_threshold,
             iou=settings.iou_threshold,
         )  # type: ignore[arg-type]
         detections = _serialize_detections(raw_result)

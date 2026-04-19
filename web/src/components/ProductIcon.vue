@@ -33,6 +33,17 @@
       <path d="M32 29v12" class="stroke-main" />
       <circle cx="32" cy="22" r="1.5" class="fill-main" />
     </svg>
+    <svg v-else-if="name === 'spark-refresh'" viewBox="0 0 64 64" fill="none">
+      <path d="M45 24a16 16 0 1 0 2 18" class="stroke-main" />
+      <path d="M46 16v12H34" class="stroke-main" />
+      <path d="m49 11 1.5 3.5L54 16l-3.5 1.5L49 21l-1.5-3.5L44 16l3.5-1.5z" class="stroke-main" />
+    </svg>
+    <svg v-else-if="name === 'archive-stack'" viewBox="0 0 64 64" fill="none">
+      <rect x="16" y="17" width="32" height="10" rx="4" class="stroke-main" />
+      <path d="M20 31h24" class="stroke-main" />
+      <path d="M22 39h20" class="stroke-main" />
+      <path d="M24 47h16" class="stroke-main" />
+    </svg>
   </span>
 </template>
 
@@ -46,6 +57,8 @@ defineProps<{
     | 'health-idle'
     | 'refresh'
     | 'info'
+    | 'spark-refresh'
+    | 'archive-stack'
   spinning?: boolean
 }>()
 </script>

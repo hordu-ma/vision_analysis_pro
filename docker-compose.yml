@@ -10,8 +10,9 @@ services:
       API_RELOAD: "false"
       LOG_FORMAT: ${LOG_FORMAT:-json}
       INFERENCE_ENGINE: ${INFERENCE_ENGINE:-stub}
-      YOLO_MODEL_PATH: /app/runs/train/exp/weights/best.pt
+      YOLO_MODEL_PATH: /app/runs/train/exp/weights/custom.pt
       ONNX_MODEL_PATH: /app/models/best.onnx
+      HF_CRACK_MODEL_PATH: /app/models/only-crack-I
       REPORT_STORE_DB_PATH: /app/data/reports.db
       CLOUD_API_KEY: ${CLOUD_API_KEY:-}
       CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:4173}

@@ -1,108 +1,81 @@
 <template>
-  <el-card class="task-history-card">
-    <template #header>
-      <div class="card-header">
-        <span>最近任务</span>
-        <div class="header-actions">
-          <el-select
-            :model-value="statusFilter"
-            placeholder="状态"
-            size="small"
-            clearable
-            class="status-filter"
-            @change="handleStatusChange"
-          >
-            <el-option label="待开始" value="pending" />
-            <el-option label="执行中" value="running" />
-            <el-option label="已完成" value="completed" />
-            <el-option label="失败" value="failed" />
-          </el-select>
-          <el-button text @click="emitCleanup">清理</el-button>
-          <el-button text @click="emit('refresh')">刷新</el-button>
+  <section class="task-history product-shell-card">
+    <WorkspaceSectionHeader
+      title="最近任务"
+      caption="保留执行状态、任务规模与可操作入口，不再使用后台式数据表。"
+    >
+      <template #actions>
+        <el-select
+          :model-value="statusFilter"
+          placeholder="状态"
+          size="small"
+          clearable
+          class="status-filter"
+          @change="handleStatusChange"
+        >
+          <el-option label="待开始" value="pending" />
+          <el-option label="执行中" value="running" />
+          <el-option label="已完成" value="completed" />
+          <el-option label="失败" value="failed" />
+        </el-select>
+        <div class="action-row">
+          <WorkspaceActionButton label="清理" icon="archive-stack" tone="subtle" compact @click="emitCleanup" />
+          <WorkspaceActionButton label="刷新" icon="spark-refresh" compact @click="emit('refresh')" />
         </div>
-      </div>
-    </template>
+      </template>
+    </WorkspaceSectionHeader>
 
     <div v-if="!tasks.length" class="empty-state">
       <div class="empty-icon">◌</div>
       <p>暂无批量任务</p>
     </div>
 
-    <el-table v-else :data="tasks" stripe>
-      <el-table-column label="任务 ID" min-width="180">
-        <template #default="scope">
-          <el-button link type="primary" @click="emit('select', scope.row.task_id)">
-            {{ scope.row.task_id }}
-          </el-button>
+    <div v-else class="task-list">
+      <WorkspaceRecordItem
+        v-for="task in tasks"
+        :key="task.task_id"
+        :title="task.task_id"
+        :description="taskSummary(task)"
+        :meta="taskMeta(task)"
+        @select="emit('select', task.task_id)"
+      >
+        <template #actions>
+          <span class="status-chip" :class="`status-${task.status}`">{{ statusText(task.status) }}</span>
+          <button class="inline-button" @click="emit('select', task.task_id)">查看</button>
+          <button v-if="task.status === 'failed'" class="inline-button danger" @click="emit('retry', task.task_id)">
+            重试
+          </button>
+          <button v-if="task.status === 'partial_failed'" class="inline-button danger" @click="emit('retry-failed', task.task_id)">
+            重试失败项
+          </button>
+          <button v-if="task.status === 'completed' || task.status === 'partial_failed'" class="inline-button success" @click="emit('rerun', task.task_id)">
+            复跑
+          </button>
+          <button
+            v-if="task.status === 'completed' || task.status === 'partial_failed'"
+            class="inline-button"
+            @click="emit('export', task.task_id)"
+          >
+            导出
+          </button>
+          <button
+            v-if="task.status === 'completed' || task.status === 'failed'"
+            class="inline-button subtle"
+            @click="emit('delete', task.task_id)"
+          >
+            删除
+          </button>
         </template>
-      </el-table-column>
-      <el-table-column label="状态" width="90">
-        <template #default="scope">
-          <el-tag :type="statusType(scope.row.status)">{{ statusText(scope.row.status) }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="file_count" label="图片数" width="80" />
-      <el-table-column prop="progress" label="进度" width="80" />
-      <el-table-column label="创建时间" min-width="160">
-        <template #default="scope">
-          {{ formatTime(scope.row.created_at) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" min-width="140">
-        <template #default="scope">
-          <div class="row-actions">
-            <el-button link type="primary" @click="emit('select', scope.row.task_id)"
-              >查看</el-button
-            >
-            <el-button
-              v-if="scope.row.status === 'failed'"
-              link
-              type="danger"
-              @click="emit('retry', scope.row.task_id)"
-            >
-              重试
-            </el-button>
-            <el-button
-              v-if="scope.row.status === 'partial_failed'"
-              link
-              type="danger"
-              @click="emit('retry-failed', scope.row.task_id)"
-            >
-              重试失败项
-            </el-button>
-            <el-button
-              v-else-if="scope.row.status === 'completed' || scope.row.status === 'partial_failed'"
-              link
-              type="success"
-              @click="emit('rerun', scope.row.task_id)"
-            >
-              复跑
-            </el-button>
-            <el-button
-              v-if="scope.row.status === 'completed' || scope.row.status === 'partial_failed'"
-              link
-              type="primary"
-              @click="emit('export', scope.row.task_id)"
-            >
-              导出
-            </el-button>
-            <el-button
-              v-if="scope.row.status === 'completed' || scope.row.status === 'failed'"
-              link
-              type="info"
-              @click="emit('delete', scope.row.task_id)"
-            >
-              删除
-            </el-button>
-          </div>
-        </template>
-      </el-table-column>
-    </el-table>
-  </el-card>
+      </WorkspaceRecordItem>
+    </div>
+  </section>
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElOption, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus'
+import { ElOption, ElSelect } from 'element-plus'
+import WorkspaceActionButton from '@/components/WorkspaceActionButton.vue'
+import WorkspaceRecordItem from '@/components/WorkspaceRecordItem.vue'
+import WorkspaceSectionHeader from '@/components/WorkspaceSectionHeader.vue'
 import type { InferenceTaskResponse, InferenceTaskStatus } from '@/types/api'
 
 const props = defineProps<{
@@ -139,7 +112,12 @@ const statusFilterValue = (): 'completed' | 'failed' | null => {
 }
 
 const formatTime = (timestamp: number): string => {
-  return new Date(timestamp * 1000).toLocaleString('zh-CN')
+  return new Date(timestamp * 1000).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }
 
 const statusText = (status: string): string => {
@@ -157,57 +135,100 @@ const statusText = (status: string): string => {
   }
 }
 
-const statusType = (status: string): 'info' | 'warning' | 'success' | 'danger' => {
-  switch (status) {
-    case 'running':
-      return 'warning'
-    case 'completed':
-      return 'success'
-    case 'failed':
-      return 'danger'
-    case 'partial_failed':
-      return 'warning'
-    default:
-      return 'info'
-  }
+const taskSummary = (task: InferenceTaskResponse): string => {
+  if (task.status === 'completed') return '任务已完成，可查看详情或直接导出结果。'
+  if (task.status === 'partial_failed') return '存在失败文件，建议优先重试失败项。'
+  if (task.status === 'failed') return '执行异常终止，建议查看详情后重试。'
+  if (task.status === 'running') return '任务仍在执行，页面会持续展示最新状态。'
+  return '任务已进入队列，等待开始处理。'
+}
+
+const taskMeta = (task: InferenceTaskResponse) => {
+  return [`${task.file_count} 张图片`, `进度 ${task.progress}%`, formatTime(task.created_at)]
 }
 </script>
 
 <style scoped>
-.task-history-card {
+.task-history {
   height: 100%;
-}
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  padding: 20px;
 }
 
 .status-filter {
   width: 120px;
 }
 
-.row-actions {
-  display: flex;
+.action-row {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.task-history-card :deep(.el-tag) {
+.task-history :deep(.workspace-action) {
+  min-height: 32px;
+}
+
+.inline-button,
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
   border-radius: 999px;
-  padding: 0 10px;
+  font-size: 12px;
 }
 
-.task-history-card :deep(.el-card__header) {
-  padding-bottom: 14px;
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.status-chip {
+  border: 1px solid transparent;
+}
+
+.status-pending {
+  background: rgba(148, 163, 184, 0.12);
+  color: #475569;
+}
+
+.status-running,
+.status-partial_failed {
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+}
+
+.status-completed {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.status-failed {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.inline-button {
+  border: 0;
+  background: rgba(29, 78, 216, 0.08);
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.inline-button.success {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.inline-button.danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.inline-button.subtle {
+  background: rgba(148, 163, 184, 0.14);
+  color: #475569;
 }
 
 .empty-state {
