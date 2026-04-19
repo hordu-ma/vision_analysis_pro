@@ -13,6 +13,7 @@ import type {
   ReportDeviceMetadataRequest,
   ReportDeviceMetadataResponse,
   AlertSummaryResponse,
+  DetectionReportResponse,
   AuditLogResponse,
   ReportRecordResponse,
   ReportReviewRequest,
@@ -465,6 +466,11 @@ class ApiService {
 
   async getReport(batchId: string): Promise<ReportRecordResponse> {
     const response = await this.client.get<ReportRecordResponse>(`/report/${batchId}`)
+    return response.data
+  }
+
+  async getReportSummary(batchId: string): Promise<DetectionReportResponse> {
+    const response = await this.client.get<DetectionReportResponse>(`/report/${batchId}/summary`)
     return response.data
   }
 

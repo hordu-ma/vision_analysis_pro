@@ -1,17 +1,26 @@
 # Vision Analysis Pro
 
-工程基础设施图像识别智能运维系统 - 基于 YOLO 的无人机巡检解决方案
+工程基础设施图像识别智能运维系统 - 面向无人机/边缘巡检的缺陷检测试点平台
 
 ## 项目简介
 
-针对输电塔等工程基础设施，使用人工智能图像识别技术（基于 YOLOv8/v11 框架），结合无人机巡检，识别地震、强风、雨雪等自然灾害导致的潜在安全隐患（裂缝、锈蚀、变形等），实现智能化运维。
+针对输电塔等工程基础设施，使用图像识别技术结合无人机巡检，识别自然灾害或长期服役导致的潜在安全隐患。当前项目已具备前后端、边缘 Agent、上报持久化、复核与导出等工程闭环；算法主线先以裂缝检测试点和目标检测闭环为主，五类缺陷模型需要在数据集与权重补齐后再作为正式能力启用。
+
+### 当前路线决策（2026-04-19）
+
+- **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 `hf_crack` 做公开裂缝模型联调。
+- **中期目标**：补齐真实数据集与评估报告后，再恢复五类缺陷 YOLO/ONNX 模型路线。
+- **数据层**：已提供 OpenCV 视频帧读取与关键帧抽取工具，先使用固定间隔、场景变化和模糊过滤等可解释规则。
+- **报告层**：已提供基于结构化检测结果的模板报告接口，LLM 后续只作为解释与报告生成层，不参与检测判定。
+- **暂不作为当前主线**：DeepLab 语义分割、Transformer 趋势分析、LLM 自动结论判定。
 
 ### 核心特性
 
-- 🚁 **无人机巡检**：支持图片/视频输入链路设计
-- 🤖 **AI 检测**：YOLOv8 / Hugging Face 裂缝检测参考模型 / ONNX Runtime 推理
+- 🚁 **无人机巡检**：支持图片上传、批量任务、边缘端视频/摄像头/RTSP 采集和关键帧抽取工具
+- 🤖 **AI 检测**：Stub / Hugging Face 裂缝检测参考模型 / YOLO / ONNX Runtime 推理
 - 🔧 **边缘计算**：完整的边缘 Agent（采集/推理/上报/离线缓存）
-- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传 → 推理 → 展示）+ 边缘上报接收
+- 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传/批量任务/复跑/导出/复核/设备视图）+ 边缘上报接收
+- 📝 **报告输出**：边缘批次模板报告摘要，预留 LLM 报告生成上下文
 - ⚡ **高性能**：ONNX 推理相比 YOLO 提升 7.25x（基准测试）
 
 ## 快速开始
@@ -40,7 +49,8 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 
 # 运行测试
 uv run pytest
-# 注：缺少 models/best.onnx 或 data/images/* 时，对应模型/数据测试会按预期跳过
+# 注：缺少 runs/train/exp/weights/best.pt、models/best.onnx 或 data/images/* 时，
+# 对应模型/数据测试会按预期跳过
 ```
 
 ### 前端（web/）
@@ -81,6 +91,44 @@ edge-agent
 ```
 
 默认上报地址为 `http://localhost:8000/api/v1/report`，API 会接收 Edge Agent 的批量推理结果、按 `batch_id` 幂等持久化，并返回接收确认。配置 `CLOUD_API_KEY` 后，上报请求需要携带 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
+
+### 关键帧抽取
+
+```bash
+uv run python scripts/extract_keyframes.py path/to/video.mp4 \
+  --output-dir data/keyframes \
+  --interval-seconds 1.0 \
+  --min-scene-delta 20 \
+  --blur-threshold 10
+```
+
+该工具使用 OpenCV 读取视频，按固定间隔、场景变化和清晰度规则抽取关键帧。它是当前数据层的最小稳定实现，后续可接入 Edge Agent 或标注工作流。
+
+### 阶段 A 公开裂缝数据集
+
+当前阶段 A 不覆盖原有五分类 `data/data.yaml`，而是生成独立的单类裂缝 YOLO 数据集：
+
+```bash
+uv run python scripts/prepare_stage_a_crack_dataset.py \
+  --download \
+  --source data/public/senthilsk_crack_detection_dataset \
+  --output data/stage_a_crack
+
+uv run python scripts/train.py \
+  --data data/stage_a_crack/data.yaml \
+  --model yolov8n.pt \
+  --epochs 1 \
+  --batch 8 \
+  --imgsz 320 \
+  --device mps \
+  --workers 0 \
+  --project runs/stage_a_crack \
+  --name smoke \
+  --exist-ok
+```
+
+默认数据源为 Hugging Face `senthilsk/crack_detection_dataset`，许可证为 CC BY 4.0，原始标注为 COCO 格式。准备脚本会将 `crack`、`stairstep_crack`、`cracked` 映射为目标类 `0 crack`，并保留少量空标签负样本用于降低误报风险。
+非 Apple Silicon 环境可将 `--device mps` 改为 `--device cpu` 或 CUDA 设备号。
 
 ## 工程化与部署
 
@@ -195,8 +243,9 @@ docker run --rm -p 8000:8000 \
 ### 部署建议
 
 - 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
-- 若仓库内自训练 YOLO 权重不可用，可临时切换 `INFERENCE_ENGINE=hf_crack` 与 `HF_CRACK_MODEL_PATH=models/only-crack-I` 使用公开裂缝参考模型联调
+- 若仓库内自训练 YOLO 权重不可用，可临时切换 API 的 `INFERENCE_ENGINE=hf_crack` 与 `HF_CRACK_MODEL_PATH=models/only-crack-I` 使用公开裂缝参考模型联调
 - 公开裂缝参考模型可通过 `uv run python scripts/download_hf_crack_model.py` 下载到 `models/only-crack-I`
+- Edge Agent 当前推理引擎仍只支持 `onnx` 与 `yolo`；`hf_crack` 先作为云端 API 联调路径
 - 生产环境通过 `CORS_ALLOW_ORIGINS` 明确限制前端域名，避免使用通配符
 - 模型文件、数据目录、日志目录建议通过挂载卷管理
 - 密钥类配置统一通过环境变量注入，不要写入镜像
@@ -210,7 +259,7 @@ vision_analysis_pro/
 ├── src/vision_analysis_pro/
 │   ├── core/
 │   │   ├── inference/          # 推理引擎（stub/yolo/hf_crack/onnx）
-│   │   └── preprocessing/      # 预处理与可视化
+│   │   └── preprocessing/      # 预处理、可视化、关键帧抽取
 │   ├── web/api/                # FastAPI 路由与依赖
 │   └── edge_agent/             # 边缘 Agent 完整实现
 │       ├── sources/            # 数据源（视频/图像/摄像头/RTSP）
@@ -218,13 +267,14 @@ vision_analysis_pro/
 │       ├── agent.py            # Agent 主程序
 │       ├── config.py           # 配置管理（YAML + ENV）
 │       └── models.py           # 数据模型
-├── scripts/                    # 训练/验证/评估/导出/基准测试脚本
+├── scripts/                    # 训练/验证/评估/导出/基准测试/关键帧/公开数据准备脚本
 ├── config/                     # 配置文件示例
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前 166 collected）
+├── tests/                      # Python 测试（当前轻量基线 175 passed, 43 skipped）
 ├── docs/                       # 计划与进度文档
+├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
 └── ruff.toml                   # ruff 配置
 ```
@@ -249,8 +299,8 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 141 passed, 25 skipped；ONNX 模型和数据目录缺失时会跳过对应测试）
-- 前端：`npm run test -- --run`（28 passed）
+- 后端：`uv run pytest`（当前本地轻量环境为 175 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 前端：`npm run test -- --run`（53 passed）
 
 ### 提交规范
 
@@ -282,6 +332,8 @@ vision_analysis_pro/
 
 ## 路线图
 
+当前执行入口以根目录 [`tasks.md`](tasks.md) 为准；`docs/development-plan.md` 保留系统级计划，`docs/progress.md` 记录已完成进度。下一步开发不再从分散 TODO 列表推进，而是按 `tasks.md` 的 Harness Engineering 任务台账逐项验收。
+
 ### ✅ MVP 阶段（已完成）
 
 - [x] YOLO 训练脚本与最小数据集
@@ -301,21 +353,15 @@ vision_analysis_pro/
   - [x] 优雅关闭（信号处理）
 - [x] 单元测试（40 tests）
 
-### 📋 下一步计划
+### 📋 当前任务队列
 
-- [x] CI/CD 与容器化（GitHub Actions + Dockerfile）
-- [x] API 与 Edge Agent 上报契约集成测试
-- [x] API CLI、Edge Agent 配置合并与 Docker ONNX 构建契约硬化
-- [x] Edge Agent 上报持久化、批次幂等与 API Key 校验
-- [x] 生产部署文档
-- [ ] 浏览器级端到端集成测试
-- [x] 批量任务持久化、文件级失败重试与多格式导出
-- [x] 设备元数据管理、告警摘要与审计日志查询
-- [x] 试点环境一键启动脚本
-- [ ] 可选：MQTT 上报器
-- [ ] 可选：Rust/PyO3 性能优化
+- **HE-001 Stage A YOLO Baseline v0.1**：训练可复现的 crack-only YOLO 基线，形成评估记录并导出 ONNX。
+- **HE-002 Browser E2E Smoke**：补浏览器级上传、推理、结果展示 smoke test。
+- **HE-003 Keyframes Into Edge Agent**：把 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
+- **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
+- **HE-005 Pilot Deployment Runbook**：收敛试点部署路径、模型挂载和回滚说明。
 
-更多细节参见 `docs/progress.md` 与 `docs/development-plan.md`。
+完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 
 ## 性能基准
 

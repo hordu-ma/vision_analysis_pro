@@ -225,6 +225,30 @@ curl -X POST "http://localhost:8000/api/v1/report" \
 
 预期返回 `202 Accepted`，并包含 `status=accepted`、`batch_id` 和 `request_id`。
 
+### 模板报告摘要
+
+完成上报后，可以基于已持久化批次生成确定性模板报告：
+
+```bash
+curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary"
+```
+
+该接口返回整体风险等级、缺陷发现项、建议动作和 `llm_context`。`llm_context` 是后续接入自然语言大模型生成正式报告的结构化输入。
+
+### 视频关键帧抽取
+
+如需先从巡检视频提取待检测图片，可使用 OpenCV 关键帧工具：
+
+```bash
+uv run python scripts/extract_keyframes.py path/to/video.mp4 \
+  --output-dir data/keyframes \
+  --interval-seconds 1.0 \
+  --min-scene-delta 20 \
+  --blur-threshold 10
+```
+
+当前策略是固定间隔 + 场景变化 + 模糊过滤，优先保证可解释和可复现。
+
 ---
 
 ## 🌐 前端演示
@@ -242,9 +266,13 @@ npm run dev
 ### 功能
 
 1. **图片上传**：拖拽或点击上传图片
-2. **实时推理**：自动调用后端 API
-3. **结果展示**：检测框、置信度、类别
+2. **单图/批量任务**：支持单图检测、批量任务、任务列表、复跑、删除与导出
+3. **结果展示**：检测框、置信度、类别、建议动作与模板报告摘要
 4. **健康状态**：实时显示后端服务状态
+
+### 当前工作台截图
+
+![Vision Analysis Pro workspace](workspace-hf-crack-validation.png)
 
 ---
 
@@ -288,8 +316,8 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：141 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
-- 前端：28 passed ✅
+- 后端：175 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 前端：53 passed ✅
 
 ---
 
@@ -300,8 +328,8 @@ cd web && npm run test -- --run
    - 支持格式：JPEG, PNG, JPG, WebP
 
 2. **边缘 Agent**：
-   - MQTT 上报器尚未实现（使用 HTTP）
-   - 批量推理尚未优化
+   - MQTT 上报器尚未实现（当前使用 HTTP）
+   - 关键帧抽取尚未接入视频源主流程，当前通过独立 CLI 验证
 
 3. **可视化**：
    - 当检测结果为空时不生成可视化图像
@@ -348,4 +376,4 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload --port 8001
 
 ---
 
-**最后更新**：2026-04-18
+**最后更新**：2026-04-19

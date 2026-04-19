@@ -15,7 +15,7 @@
           <span>最高风险</span>
           <strong>{{ topRiskLabel }}</strong>
         </div>
-        <div class="metric-chip" v-if="result.metadata.inference_time_ms">
+        <div v-if="result.metadata.inference_time_ms" class="metric-chip">
           <span>推理耗时</span>
           <strong>{{ formatInferenceTime(result.metadata.inference_time_ms) }} ms</strong>
         </div>
@@ -46,7 +46,7 @@
         </div>
       </div>
 
-      <div class="overview-panel product-shell-card" v-if="topDetection">
+      <div v-if="topDetection" class="overview-panel product-shell-card">
         <div class="panel-heading">
           <div>
             <p class="panel-title">首要缺陷</p>

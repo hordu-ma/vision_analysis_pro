@@ -48,7 +48,7 @@
 
 常见模型路径约定：
 
-- YOLO：`runs/train/exp/weights/custom.pt`
+- YOLO：`runs/train/exp/weights/best.pt`
 - ONNX：`models/best.onnx`
 - HF 裂缝参考模型：`models/only-crack-I`
 
@@ -68,7 +68,7 @@
 
 - `YOLO_MODEL_PATH`
   - YOLO 模型路径
-  - 默认值：`runs/train/exp/weights/custom.pt`
+  - 默认值：`runs/train/exp/weights/best.pt`
 
 - `HF_CRACK_MODEL_PATH`
   - Hugging Face 裂缝参考模型目录
@@ -197,17 +197,17 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 如果你使用 YOLO 推理，请确保模型文件存在，例如：
 
 ```/dev/null/text.txt#L1-1
-runs/train/exp/weights/custom.pt
+runs/train/exp/weights/best.pt
 ```
 
 启动前可设置：
 
 ```/dev/null/bash.sh#L1-2
 export INFERENCE_ENGINE=yolo
-export YOLO_MODEL_PATH=runs/train/exp/weights/custom.pt
+export YOLO_MODEL_PATH=runs/train/exp/weights/best.pt
 ```
 
-说明：仓库历史中的 `runs/train/exp/weights/best.pt` / `last.pt` 已移除，因为当前训练产物不可用。如需继续使用 YOLO，请替换为新的自训练权重并更新 `YOLO_MODEL_PATH`。
+说明：仓库历史中的 `runs/train/exp/weights/best.pt` / `last.pt` 当前不可用。如需继续使用 YOLO，请重新训练或替换为新的自训练权重并保持 `YOLO_MODEL_PATH` 指向有效文件。
 
 ### 6.2 HF 裂缝参考模型
 
@@ -315,7 +315,7 @@ YOLO 模式示例：
 docker run --rm \
   -p 8000:8000 \
   -e INFERENCE_ENGINE=yolo \
-  -e YOLO_MODEL_PATH=/app/runs/train/exp/weights/custom.pt \
+  -e YOLO_MODEL_PATH=/app/runs/train/exp/weights/best.pt \
   -e API_HOST=0.0.0.0 \
   -e API_PORT=8000 \
   -e API_RELOAD=false \

@@ -32,11 +32,10 @@ htmlcov/
 .mypy_cache/
 .dmypy.json
 
-# 模型文件
-models/*.pt
-models/*.onnx
-models/*.engine
+# 模型文件与本地模型目录
+models/*
 !models/.gitkeep
+runs/
 
 # 数据集
 data/

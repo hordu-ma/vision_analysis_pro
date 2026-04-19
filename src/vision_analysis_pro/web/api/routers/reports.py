@@ -17,6 +17,7 @@ from vision_analysis_pro.web.api.report_store import (
     ReportStoreSaveResult,
     get_report_store,
 )
+from vision_analysis_pro.web.api.reporting import build_detection_report
 
 router = APIRouter(prefix="/api/v1", tags=["reports"])
 logger = logging.getLogger(__name__)
@@ -178,6 +179,42 @@ async def get_report(
 
     reviews = store.list_reviews(batch_id)
     return _record_to_response(record, request_id=request_id, reviews=reviews)
+
+
+@router.get(
+    "/report/{batch_id}/summary",
+    response_model=schemas.DetectionReportResponse,
+    responses={
+        200: {"model": schemas.DetectionReportResponse},
+        401: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def get_report_summary(
+    batch_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> schemas.DetectionReportResponse:
+    """生成指定上报批次的模板报告摘要。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics["report_query_requests_total"] += 1
+    store = get_report_store(str(settings.report_store_db_path))
+    record = store.get(batch_id)
+    if record is None:
+        request.app.state.metrics["report_not_found_total"] += 1
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "REPORT_NOT_FOUND",
+                "message": "上报批次不存在",
+                "detail": batch_id,
+            },
+        )
+
+    report = build_detection_report(record, store.list_reviews(batch_id))
+    report["request_id"] = request_id
+    return schemas.DetectionReportResponse.model_validate(report)
 
 
 @router.put(

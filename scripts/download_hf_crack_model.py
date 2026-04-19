@@ -4,7 +4,6 @@ from pathlib import Path
 
 from huggingface_hub import hf_hub_download
 
-
 REPO_ID = "akar49/only-crack-I"
 FILES = ["config.json", "preprocessor_config.json", "pytorch_model.bin"]
 

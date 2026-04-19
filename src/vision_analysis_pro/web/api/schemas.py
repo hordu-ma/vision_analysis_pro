@@ -437,6 +437,38 @@ class AlertSummaryResponse(BaseModel):
     request_id: str | None = Field(None, description="请求 ID")
 
 
+class DetectionReportFindingResponse(BaseModel):
+    """模板报告中的单类缺陷发现。"""
+
+    label: str = Field(..., description="缺陷英文标签")
+    label_cn: str = Field(..., description="缺陷中文名称")
+    count: int = Field(..., ge=0, description="该类缺陷候选数量")
+    max_confidence: float = Field(..., ge=0.0, le=1.0, description="最高置信度")
+    risk_level: str = Field(..., description="风险等级")
+    action: str = Field(..., description="建议动作")
+
+
+class DetectionReportResponse(BaseModel):
+    """基于结构化检测结果生成的模板报告。"""
+
+    title: str = Field(..., description="报告标题")
+    summary: str = Field(..., description="报告摘要")
+    risk_level: str = Field(..., description="整体风险等级")
+    finding_count: int = Field(..., ge=0, description="发现类别数量")
+    total_detections: int = Field(..., ge=0, description="缺陷候选总数")
+    findings: list[DetectionReportFindingResponse] = Field(
+        default_factory=list,
+        description="按风险排序的发现项",
+    )
+    recommendations: list[str] = Field(default_factory=list, description="处置建议")
+    llm_context: dict[str, Any] = Field(
+        default_factory=dict,
+        description="后续接入大模型报告生成的结构化上下文",
+    )
+    generated_by: Literal["template", "llm"] = Field(..., description="生成方式")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
 class AuditLogResponse(BaseModel):
     """审计日志响应。"""
 

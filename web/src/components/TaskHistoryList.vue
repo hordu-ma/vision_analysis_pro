@@ -19,8 +19,19 @@
           <el-option label="失败" value="failed" />
         </el-select>
         <div class="action-row">
-          <WorkspaceActionButton label="清理" icon="archive-stack" tone="subtle" compact @click="emitCleanup" />
-          <WorkspaceActionButton label="刷新" icon="spark-refresh" compact @click="emit('refresh')" />
+          <WorkspaceActionButton
+            label="清理"
+            icon="archive-stack"
+            tone="subtle"
+            compact
+            @click="emitCleanup"
+          />
+          <WorkspaceActionButton
+            label="刷新"
+            icon="spark-refresh"
+            compact
+            @click="emit('refresh')"
+          />
         </div>
       </template>
     </WorkspaceSectionHeader>
@@ -40,15 +51,29 @@
         @select="emit('select', task.task_id)"
       >
         <template #actions>
-          <span class="status-chip" :class="`status-${task.status}`">{{ statusText(task.status) }}</span>
+          <span class="status-chip" :class="`status-${task.status}`">
+            {{ statusText(task.status) }}
+          </span>
           <button class="inline-button" @click="emit('select', task.task_id)">查看</button>
-          <button v-if="task.status === 'failed'" class="inline-button danger" @click="emit('retry', task.task_id)">
+          <button
+            v-if="task.status === 'failed'"
+            class="inline-button danger"
+            @click="emit('retry', task.task_id)"
+          >
             重试
           </button>
-          <button v-if="task.status === 'partial_failed'" class="inline-button danger" @click="emit('retry-failed', task.task_id)">
+          <button
+            v-if="task.status === 'partial_failed'"
+            class="inline-button danger"
+            @click="emit('retry-failed', task.task_id)"
+          >
             重试失败项
           </button>
-          <button v-if="task.status === 'completed' || task.status === 'partial_failed'" class="inline-button success" @click="emit('rerun', task.task_id)">
+          <button
+            v-if="task.status === 'completed' || task.status === 'partial_failed'"
+            class="inline-button success"
+            @click="emit('rerun', task.task_id)"
+          >
             复跑
           </button>
           <button

@@ -30,9 +30,13 @@ class TestE2EWithYOLOEngine:
     @pytest.fixture(autouse=True)
     def setup_yolo_engine(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """设置使用 YOLO 引擎"""
+        model_path = Path("runs/train/exp/weights/best.pt")
+        if not model_path.exists():
+            pytest.skip("best.pt 不存在，跳过 YOLO 引擎端到端测试")
+
         clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
-        monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
+        monkeypatch.setenv("YOLO_MODEL_PATH", str(model_path))
 
     @pytest.mark.asyncio
     async def test_full_workflow_with_yolo(self) -> None:
@@ -143,6 +147,10 @@ class TestEngineSwitching:
     @pytest.mark.asyncio
     async def test_yolo_engine_is_used(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """测试默认使用 YOLO 引擎"""
+        model_path = Path("runs/train/exp/weights/best.pt")
+        if not model_path.exists():
+            pytest.skip("best.pt 不存在，跳过 YOLO 引擎切换测试")
+
         # 创建测试图像
         test_image = np.zeros((100, 100, 3), dtype=np.uint8)
         success, encoded_image = cv2.imencode(".jpg", test_image)
@@ -152,7 +160,7 @@ class TestEngineSwitching:
         # 设置使用 YOLO 引擎（默认）
         clear_inference_engine_caches()
         monkeypatch.setenv("INFERENCE_ENGINE", "yolo")
-        monkeypatch.setenv("YOLO_MODEL_PATH", "runs/train/exp/weights/best.pt")
+        monkeypatch.setenv("YOLO_MODEL_PATH", str(model_path))
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

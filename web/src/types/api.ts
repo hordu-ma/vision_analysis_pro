@@ -187,6 +187,28 @@ export interface AlertSummaryResponse {
   request_id?: string
 }
 
+export interface DetectionReportFinding {
+  label: string
+  label_cn: string
+  count: number
+  max_confidence: number
+  risk_level: string
+  action: string
+}
+
+export interface DetectionReportResponse {
+  title: string
+  summary: string
+  risk_level: string
+  finding_count: number
+  total_detections: number
+  findings: DetectionReportFinding[]
+  recommendations: string[]
+  llm_context: Record<string, unknown>
+  generated_by: 'template' | 'llm'
+  request_id?: string
+}
+
 export interface AuditLogResponse {
   event_type: string
   resource_id: string

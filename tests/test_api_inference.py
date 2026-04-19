@@ -1637,6 +1637,30 @@ async def test_report_detail_endpoint_includes_frame_results_and_reviews() -> No
 
 
 @pytest.mark.asyncio
+async def test_report_summary_endpoint_returns_template_report() -> None:
+    """测试上报批次可生成模板报告摘要。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post(
+            "/api/v1/report",
+            json=_create_report_payload(
+                batch_id="summary-batch-001",
+                device_id="summary-device",
+                label="crack",
+            ),
+        )
+        resp = await client.get("/api/v1/report/summary-batch-001/summary")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["generated_by"] == "template"
+    assert data["risk_level"] == "high"
+    assert data["total_detections"] == 1
+    assert data["findings"][0]["label"] == "crack"
+    assert data["llm_context"]["batch_id"] == "summary-batch-001"
+
+
+@pytest.mark.asyncio
 async def test_report_review_endpoint_returns_not_found_for_missing_batch() -> None:
     """测试不存在的批次不能写入复核结果。"""
     transport = ASGITransport(app=app)

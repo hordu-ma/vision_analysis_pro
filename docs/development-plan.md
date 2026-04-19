@@ -2,20 +2,26 @@
 
 本计划面向“工程基础设施图像识别智能运维系统（无人机巡检 + YOLO 检测）”，以 12 周交付可试点的端到端方案为目标：从数据与训练、推理与 API、边缘 Agent，到性能优化与生产化能力。
 
-本文档只回答“要做什么、何时做、做到什么算完成”；项目当前进度与变更记录请参见 `docs/progress.md`。
+本文档保留系统级计划与里程碑背景。当前可执行任务、验收标准、验证命令与非目标以根目录 `tasks.md` 为准；项目进度与变更记录请参见 `docs/progress.md`。
 
-**当前进度快照（截至 2026-04-18）**
+**当前进度快照（截至 2026-04-19）**
 
 | 里程碑 | 状态 | 说明 |
 |--------|------|------|
 | M1: MVP 闭环 | ✅ 完成 | YOLO 训练、推理引擎、API 闭环 |
 | M2: 性能与可视化 | ✅ 完成 | ONNX 导出（7.25x 加速）、前端 UX 优化 |
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
-| M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地 |
+| M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
-- **后端测试**：141 passed, 25 skipped（当前轻量环境；缺少 `models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
-- **前端测试**：28 passed（vitest），ESLint 全绿
-- **下一步**：浏览器级端到端验证、边缘 Agent 上报稳态测试、部署编排与告警示例
+- **后端测试**：175 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
+- **前端测试**：53 passed（vitest），ESLint 全绿，生产构建通过
+- **下一步**：按 `tasks.md` 执行 HE-001 Stage A YOLO Baseline v0.1，然后推进浏览器 E2E 与关键帧接入 Edge Agent
+
+**路线决策（2026-04-19）**
+
+- 近期最佳实践不是串联 DeepLab、YOLO、Transformer、LLM 四段复杂链路，而是先收敛为“裂缝检测试点 + 目标检测工程闭环”。
+- `stub` 用于稳定验证前后端与边缘上报链路；`hf_crack` 用于公开裂缝模型联调；五类 YOLO/ONNX 必须等数据集、权重与评估报告补齐后再作为正式能力启用。
+- OpenCV 关键帧抽取进入数据层主线；公开 crack-only 数据集已完成本地 YOLO 转换和 1-epoch smoke training；语义分割、趋势 Transformer、LLM 报告都作为插件式后续能力，不能阻塞当前试点闭环。
 
 ---
 
@@ -75,16 +81,16 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report` 闭环，当前后端测试基线为 166 collected
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 175 passed, 43 skipped
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
-- ✅ 前端 Web：Vue3 + TS 页面闭环，28 个前端测试通过
+- ✅ 前端 Web：Vue3 + TS 页面闭环，53 个前端测试通过
 
 ### 4.2 剩余差距
 
-- 数据与训练：需要规模化数据集、评估报告（mAP/PR）
+- 数据与训练：公开 crack-only 数据集已能转换并训练；下一步需要正式 baseline 训练、评估报告（mAP/PR）、ONNX 导出与推理接入验证
 - 生产化：CI/Docker/API CLI/最小 metrics/上报持久化与幂等已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
-- 可选优化：MQTT 上报器、Rust/PyO3 加速
+- 可选优化：关键帧策略接入 Edge Agent、MQTT 上报器、Rust/PyO3 加速
 
 ---
 
@@ -142,7 +148,7 @@
   - ✅ 错误处理（axios 拦截器、ApiError 类）
   - ✅ 上传进度条
   - ✅ 健康状态自动刷新
-  - ✅ 28 个前端测试通过
+  - ✅ 前端测试持续覆盖上传、结果展示、健康状态与服务层
 
 **验收结果**：✅ 全部通过，性能报告见 `docs/benchmark-report.md`
 
@@ -213,6 +219,7 @@
 ### 7.4 边缘 Agent
 
 - 采集：视频帧抽取策略（帧率/抽帧/分辨率）。
+- 关键帧：先用 OpenCV 固定间隔、场景变化阈值、模糊过滤，输出可复核图片与元数据。
 - 编排：推理队列与背压；本地缓存与批量上报。
 - 可靠性：失败重试、断网缓存、健康自检与自恢复。
 
