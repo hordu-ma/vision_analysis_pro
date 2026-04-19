@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,6 +20,14 @@ class Settings(BaseSettings):
     api_host: str = Field("0.0.0.0", description="API 监听地址")
     api_port: int = Field(8000, description="API 监听端口")
     api_reload: bool = Field(True, description="开发模式下是否自动重载")
+    cors_allow_origins: str = Field(
+        "http://localhost:5173,http://localhost:4173",
+        description="允许跨域访问的前端来源，使用逗号分隔",
+    )
+    log_format: Literal["json", "text"] = Field(
+        "json",
+        description="日志输出格式",
+    )
 
     model_path: Path = Field(Path("models/best.pt"), description="模型文件路径")
     confidence_threshold: float = Field(0.5, ge=0, le=1, description="置信度阈值")

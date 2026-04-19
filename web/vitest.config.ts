@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     globals: true,
-    environment: 'jsdom'
+    environment: 'jsdom',
+    include: ['src/**/*.spec.ts'],
+    exclude: ['e2e/**', 'playwright.config.ts']
   },
   resolve: {
     alias: {

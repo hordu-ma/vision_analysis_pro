@@ -17,7 +17,6 @@
 
 - Kubernetes 部署
 - 多实例负载均衡
-- 前端静态站点独立部署
 - 边缘 Agent 大规模集群管理
 
 ---
@@ -86,6 +85,14 @@
   - 开发模式自动重载
   - 默认值：`true`
   - 生产环境建议：`false`
+
+- `CORS_ALLOW_ORIGINS`
+  - 允许访问 API 的前端来源，使用逗号分隔
+  - 示例：`http://localhost:4173,https://vision.example.com`
+
+- `LOG_FORMAT`
+  - 日志格式，可选 `json` 或 `text`
+  - 默认值：`json`
 
 ### 边缘上报相关
 
@@ -280,6 +287,67 @@ docker run --rm \
   vision-analysis-pro:onnx
 ```
 
+## 7.5 Docker Compose 统一部署
+
+仓库根目录已提供 `docker-compose.yml`，用于同时启动：
+
+- `api`：FastAPI 后端
+- `web`：前端静态站点（Nginx 托管，并将 `/api` 反向代理到后端）
+
+最小使用方式：
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+默认访问地址：
+
+- 前端：`http://localhost:4173`
+- 后端：`http://localhost:8000`
+
+常用变量：
+
+- `WEB_PORT`：前端对外端口，默认 `4173`
+- `COMPOSE_INSTALL_ONNX`：是否在 API 镜像中安装 ONNX 依赖，默认 `false`
+- `CORS_ALLOW_ORIGINS`：生产前端来源白名单
+- `LOG_FORMAT`：日志输出格式，默认 `json`
+
+## 7.6 本地监控栈（Prometheus + Grafana）
+
+仓库新增 `docker-compose.observability.yml`，用于在本地最小部署之上叠加：
+
+- `prometheus`：抓取 `api:8000/api/v1/metrics`
+- `grafana`：自动预置 Prometheus 数据源与基础仪表盘
+
+启动方式：
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
+```
+
+默认访问地址：
+
+- 前端：`http://localhost:4173`
+- API：`http://localhost:8000`
+- Prometheus：`http://localhost:9090`
+- Grafana：`http://localhost:3000`
+
+预置内容：
+
+- Prometheus 抓取配置：`config/monitoring/prometheus/prometheus.yml`
+- Grafana 数据源：`config/monitoring/grafana/provisioning/datasources/datasources.yml`
+- Grafana 仪表盘：`config/monitoring/grafana/dashboards/vision-api-overview.json`
+- 告警规则：`config/prometheus_alert_rules.example.yml`
+
+Grafana 默认管理员凭据来自 `.env`：
+
+- `GRAFANA_ADMIN_USER`
+- `GRAFANA_ADMIN_PASSWORD`
+
+这种方式适合本地调试、演示和试点环境预演；如果进入正式生产，可再将 Prometheus/Grafana 拆分为独立运维服务。
+
 ---
 
 ## 8. 前端联调说明
@@ -299,6 +367,8 @@ npm run dev
 ```
 
 如果你部署的是生产前端静态资源，请确保 `/api` 请求被反向代理到后端服务。
+
+仓库新增的 `web/Dockerfile` 已内置这一约定：容器内由 Nginx 托管前端静态资源，并将 `/api` 转发到 compose 中的 `api` 服务。
 
 ---
 
@@ -380,6 +450,28 @@ curl -X POST "http://localhost:8000/api/v1/report" \
     "results": []
   }'
 ```
+
+### 9.5 指标与告警
+
+当前 `metrics` 端点已包含以下新增指标：
+
+- `vision_api_request_status_total{method,path,status_code}`
+- `vision_api_request_duration_ms_sum|count|last`
+- `vision_api_inference_duration_ms_sum|count|last`
+- `vision_api_inference_detections_total`
+- `vision_api_inference_visualizations_total`
+- `vision_api_inference_input_bytes_total`
+- `vision_api_report_duplicates_total`
+- `vision_api_report_not_found_total`
+- `vision_api_health_ready_failures_total`
+
+Prometheus 告警规则示例见：
+
+- `config/prometheus_alert_rules.example.yml`
+
+本地最小监控栈默认会直接挂载该规则文件，无需额外复制。
+
+如果你已经接入 Prometheus，可直接把示例规则拷贝到规则目录后再按阈值微调。
 
 ---
 

@@ -286,8 +286,10 @@ async def test_metrics_endpoint() -> None:
     assert resp.headers["content-type"].startswith("text/plain")
     body = resp.text
     assert "vision_api_requests_total" in body
+    assert "vision_api_request_duration_ms_count" in body
     assert "vision_api_inference_requests_total" in body
     assert "vision_api_inference_failures_total" in body
+    assert "vision_api_request_status_total" in body
 
 
 @pytest.mark.asyncio
@@ -447,8 +449,10 @@ async def test_metrics_endpoint_exposes_report_counters() -> None:
     assert resp.status_code == 200
     body = resp.text
     assert "vision_api_report_requests_total" in body
+    assert "vision_api_report_query_requests_total" in body
     assert "vision_api_report_results_total" in body
     assert "vision_api_report_detections_total" in body
+    assert "vision_api_report_duplicates_total" in body
 
 
 @pytest.mark.asyncio
@@ -581,6 +585,8 @@ async def test_metrics_endpoint_exposes_non_negative_counter_values() -> None:
         "vision_api_requests_failed_total",
         "vision_api_inference_requests_total",
         "vision_api_inference_failures_total",
+        "vision_api_request_duration_ms_count",
+        "vision_api_inference_duration_ms_count",
     ]
     for metric_name in metric_names:
         match = re.search(rf"{metric_name} (\d+)", body)
@@ -606,3 +612,50 @@ async def test_inference_error_increments_failure_metric() -> None:
     assert error_resp.status_code == 500
     assert metrics_resp.status_code == 200
     assert "vision_api_inference_failures_total" in metrics_resp.text
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exposes_request_status_labels() -> None:
+    """测试 metrics 端点按 method/path/status_code 输出请求计数。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.get("/api/v1/health")
+        resp = await client.get("/api/v1/metrics")
+
+    assert resp.status_code == 200
+    assert (
+        'vision_api_request_status_total{method="GET",path="/api/v1/health",status_code="200"}'
+        in resp.text
+    )
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exposes_inference_observability_counters() -> None:
+    """测试推理请求会累加输入大小、耗时和检测数量指标。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post(
+            "/api/v1/inference/image?visualize=true",
+            files={"file": ("test.jpg", _create_test_image(), "image/jpeg")},
+        )
+        resp = await client.get("/api/v1/metrics")
+
+    body = resp.text
+    assert "vision_api_inference_duration_ms_sum" in body
+    assert "vision_api_inference_detections_total" in body
+    assert "vision_api_inference_visualizations_total" in body
+    assert "vision_api_inference_input_bytes_total" in body
+
+
+@pytest.mark.asyncio
+async def test_report_query_and_not_found_metrics_are_exposed() -> None:
+    """测试 report 查询与 miss 指标会在 metrics 中暴露。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.get("/api/v1/report/missing-batch")
+        resp = await client.get("/api/v1/metrics")
+
+    assert resp.status_code == 200
+    body = resp.text
+    assert "vision_api_report_query_requests_total" in body
+    assert "vision_api_report_not_found_total" in body

@@ -1,0 +1,35 @@
+services:
+  api:
+    build:
+      context: .
+      args:
+        INSTALL_ONNX: ${COMPOSE_INSTALL_ONNX:-false}
+    environment:
+      API_HOST: 0.0.0.0
+      API_PORT: 8000
+      API_RELOAD: "false"
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      INFERENCE_ENGINE: ${INFERENCE_ENGINE:-stub}
+      YOLO_MODEL_PATH: /app/runs/train/exp/weights/best.pt
+      ONNX_MODEL_PATH: /app/models/best.onnx
+      REPORT_STORE_DB_PATH: /app/data/reports.db
+      CLOUD_API_KEY: ${CLOUD_API_KEY:-}
+      CORS_ALLOW_ORIGINS: ${CORS_ALLOW_ORIGINS:-http://localhost:4173}
+    volumes:
+      - ./models:/app/models
+      - ./runs:/app/runs
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./web
+    depends_on:
+      - api
+    ports:
+      - "${WEB_PORT:-4173}:80"
+
+volumes:
+  grafana_data:
+  prometheus_data:

@@ -1,0 +1,46 @@
+groups:
+  - name: vision-analysis-pro
+    rules:
+      - alert: VisionApiHigh5xxRate
+        expr: |
+          sum(rate(vision_api_request_status_total{status_code=~"5.."}[5m]))
+            /
+          clamp_min(sum(rate(vision_api_requests_total[5m])), 1)
+            > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: API 5xx 错误率持续偏高
+          description: 最近 10 分钟 API 5xx 错误率超过 5%。
+
+      - alert: VisionApiInferenceLatencyHigh
+        expr: |
+          sum(rate(vision_api_inference_duration_ms_sum[5m]))
+            /
+          clamp_min(sum(rate(vision_api_inference_duration_ms_count[5m])), 1)
+            > 500
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: 推理平均耗时持续偏高
+          description: 最近 10 分钟平均推理耗时超过 500ms。
+
+      - alert: VisionApiReadyChecksFailing
+        expr: increase(vision_api_health_ready_failures_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: 就绪检查失败
+          description: 最近 10 分钟服务至少出现一次 ready 失败，请检查模型加载与依赖状态。
+
+      - alert: VisionApiDuplicateReportsSpike
+        expr: increase(vision_api_report_duplicates_total[15m]) > 20
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: 重复上报批次激增
+          description: 最近 15 分钟 duplicate 批次超过 20 次，可能存在边缘重放或幂等异常。

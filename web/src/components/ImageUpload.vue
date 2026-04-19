@@ -1,27 +1,29 @@
 <template>
   <div class="image-upload">
-    <el-upload
-      ref="uploadRef"
-      class="upload-area"
-      drag
-      :auto-upload="false"
-      :limit="1"
-      :accept="acceptedFormats"
-      :on-change="handleFileChange"
-      :on-exceed="handleExceed"
-      :file-list="fileList"
-      :disabled="analyzing"
-    >
-      <el-icon class="upload-icon">
-        <UploadFilled />
-      </el-icon>
-      <div class="upload-text">
-        <p>拖拽图片到此处或<em>点击上传</em></p>
-        <p class="upload-hint">支持 JPG/PNG/WEBP 格式，文件大小不超过 10MB</p>
-      </div>
-    </el-upload>
+    <div data-testid="upload-area">
+      <el-upload
+        ref="uploadRef"
+        class="upload-area"
+        drag
+        :auto-upload="false"
+        :limit="1"
+        :accept="acceptedFormats"
+        :on-change="handleFileChange"
+        :on-exceed="handleExceed"
+        :file-list="fileList"
+        :disabled="analyzing"
+      >
+        <el-icon class="upload-icon">
+          <UploadFilled />
+        </el-icon>
+        <div class="upload-text">
+          <p>拖拽图片到此处或<em>点击上传</em></p>
+          <p class="upload-hint">支持 JPG/PNG/WEBP 格式，文件大小不超过 10MB</p>
+        </div>
+      </el-upload>
+    </div>
 
-    <div v-if="previewUrl" class="preview-section">
+    <div v-if="previewUrl" class="preview-section" data-testid="image-preview">
       <el-image :src="previewUrl" fit="contain" class="preview-image" />
       <el-button type="danger" size="small" :disabled="analyzing" @click="clearFile">
         清除
@@ -53,6 +55,7 @@
     </div>
 
     <el-button
+      data-testid="analyze-button"
       type="primary"
       :loading="analyzing"
       :disabled="!selectedFile || analyzing"
@@ -68,6 +71,7 @@
     <!-- 错误提示卡片 -->
     <el-alert
       v-if="lastError"
+      data-testid="upload-error"
       :title="lastError.message"
       type="error"
       :description="lastError.detail"

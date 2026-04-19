@@ -40,11 +40,13 @@ async def receive_report(
     store = get_report_store(str(settings.report_store_db_path))
     save_result = store.save(payload)
 
-    metrics: dict[str, int] = request.app.state.metrics
+    metrics: dict[str, int | dict[str, int] | float] = request.app.state.metrics
     metrics["report_requests_total"] += 1
     if save_result.created:
         metrics["report_results_total"] += save_result.result_count
         metrics["report_detections_total"] += save_result.total_detections
+    else:
+        metrics["report_duplicates_total"] += 1
 
     logger.info(
         "edge_report_received",
@@ -85,9 +87,11 @@ async def get_report(
     """查询已持久化的边缘 Agent 上报批次。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics["report_query_requests_total"] += 1
     store = get_report_store(str(settings.report_store_db_path))
     record = store.get(batch_id)
     if record is None:
+        request.app.state.metrics["report_not_found_total"] += 1
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={

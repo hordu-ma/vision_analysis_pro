@@ -1,6 +1,7 @@
 """边缘 Agent 核心模块单元测试"""
 
 import time
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -18,6 +19,7 @@ from vision_analysis_pro.edge_agent import (
     SourceConfig,
     SourceType,
 )
+from vision_analysis_pro.edge_agent.agent import EdgeAgent
 from vision_analysis_pro.edge_agent.reporters.cache import CacheManager
 from vision_analysis_pro.edge_agent.sources import create_source
 from vision_analysis_pro.edge_agent.sources.folder import FolderSource
@@ -818,3 +820,35 @@ class TestEdgeAgentIntegration:
         assert config.device_id == "test-device"
         assert config.source.path == "/test/path"
         assert config.inference.confidence == 0.7
+
+
+class TestEdgeAgentStats:
+    """EdgeAgent 运行统计测试。"""
+
+    def test_get_stats_exposes_inference_and_reporter_metrics(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """测试 get_stats 会返回平均推理耗时和 reporter 统计。"""
+        monkeypatch.setattr(EdgeAgent, "_setup_signal_handlers", lambda self: None)
+        agent = EdgeAgent(config=EdgeAgentConfig())
+        agent._stats["start_time"] = datetime.now().isoformat()
+        agent._stats["frames_processed"] = 4
+        agent._stats["inference_count"] = 4
+        agent._stats["inference_time_ms_total"] = 100.0
+        agent._stats["last_inference_time_ms"] = 20.0
+        agent._stats["reporter_report_count"] = 3
+        agent._stats["reporter_failure_count"] = 1
+        agent._stats["reporter_success_rate"] = 0.6667
+        agent._stats["cache_entries"] = 2
+        agent._stats["report_queue_max"] = 5
+
+        stats = agent.get_stats()
+
+        assert stats["avg_inference_time_ms"] == 25.0
+        assert stats["last_inference_time_ms"] == 20.0
+        assert stats["reporter_report_count"] == 3
+        assert stats["reporter_failure_count"] == 1
+        assert stats["reporter_success_rate"] == 0.6667
+        assert stats["cache_entries"] == 2
+        assert stats["report_queue_max"] == 5

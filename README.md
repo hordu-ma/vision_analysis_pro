@@ -22,6 +22,8 @@
 - Node.js 20+（前端）
 - 可选：CUDA >= 11.8（GPU 推理）
 
+默认日志输出为结构化 JSON，可通过 `LOG_FORMAT=text` 切回传统文本日志。
+
 ### 后端（API + 模型）
 
 ```bash
@@ -57,6 +59,9 @@ npm run test -- --run
 # 生产构建与预览
 npm run build
 npm run preview
+
+# 浏览器级端到端测试（自动启动前后端）
+npm run test:e2e
 ```
 
 ### 边缘 Agent
@@ -116,6 +121,49 @@ docker run --rm -p 8000:8000 \
 - OpenAPI: `http://localhost:8000/docs`
 - 健康检查: `http://localhost:8000/api/v1/health`
 
+### Docker Compose（前后端统一部署）
+
+仓库现在提供最小 `docker-compose.yml`，可直接同时启动 API 与前端静态站点：
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+默认访问地址：
+
+- 前端：`http://localhost:4173`
+- 后端 API：`http://localhost:8000`
+
+如需启用 ONNX 容器构建，可在 `.env` 中设置 `COMPOSE_INSTALL_ONNX=true`。
+
+### 本地监控栈（Prometheus + Grafana）
+
+仓库额外提供一个可叠加的监控编排文件：`docker-compose.observability.yml`。
+
+启动业务服务和监控栈：
+
+```bash
+cp .env.example .env
+docker compose -f docker-compose.yml -f docker-compose.observability.yml up --build
+```
+
+默认访问地址：
+
+- Prometheus：`http://localhost:9090`
+- Grafana：`http://localhost:3000`
+
+Grafana 默认账号密码来自 `.env`：
+
+- 用户名：`GRAFANA_ADMIN_USER`
+- 密码：`GRAFANA_ADMIN_PASSWORD`
+
+首次启动后会自动预置：
+
+- Prometheus 数据源
+- `Vision API Overview` 仪表盘
+- `config/prometheus_alert_rules.example.yml` 告警规则
+
 #### 挂载模型文件运行
 
 如果你要使用 YOLO 或 ONNX 推理，而不是 `stub`，需要把模型文件挂载进容器，并传入对应环境变量。例如：
@@ -131,9 +179,11 @@ docker run --rm -p 8000:8000 \
 ### 部署建议
 
 - 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
-- 生产环境不要使用 `allow_origins=["*"]`，应限制为明确域名
+- 生产环境通过 `CORS_ALLOW_ORIGINS` 明确限制前端域名，避免使用通配符
 - 模型文件、数据目录、日志目录建议通过挂载卷管理
 - 密钥类配置统一通过环境变量注入，不要写入镜像
+- 告警规则示例见 `config/prometheus_alert_rules.example.yml`
+- 本地监控栈使用 `docker-compose.observability.yml` 叠加启动，不影响最小部署路径
 
 ## 项目结构
 
@@ -177,6 +227,7 @@ vision_analysis_pro/
 
 - Python：`uv run ruff check .`；格式化 `uv run ruff format .`
 - 前端：`npm run lint`（ESLint 只检查）；自动修复使用 `npm run lint:fix`
+- 浏览器级端到端：`cd web && npm run test:e2e`
 
 ### 测试
 

@@ -5,6 +5,7 @@
 """
 
 import logging
+import os
 import signal
 import sys
 import threading
@@ -15,6 +16,7 @@ from queue import Empty, Queue
 from typing import Any
 
 from ..core.inference import InferenceEngine, ONNXInferenceEngine, YOLOInferenceEngine
+from ..logging_utils import configure_logging
 from .config import EdgeAgentConfig
 from .models import Detection, FrameData, InferenceResult, ReportPayload, ReportStatus
 from .reporters import create_reporter
@@ -78,9 +80,18 @@ class EdgeAgent:
         self._stats = {
             "frames_processed": 0,
             "detections_total": 0,
+            "inference_count": 0,
+            "inference_time_ms_total": 0.0,
+            "last_inference_time_ms": 0.0,
             "reports_sent": 0,
             "reports_failed": 0,
             "reports_cached": 0,
+            "reports_flushed": 0,
+            "reporter_report_count": 0,
+            "reporter_failure_count": 0,
+            "reporter_success_rate": 0.0,
+            "cache_entries": 0,
+            "report_queue_max": 0,
             "start_time": None,
             "last_frame_time": None,
         }
@@ -91,16 +102,27 @@ class EdgeAgent:
     def _setup_logging(self) -> None:
         """配置日志"""
         log_level = getattr(logging, self.config.log_level.upper(), logging.INFO)
-
-        # 配置根日志
-        logging.basicConfig(
+        configure_logging(
+            "edge_agent",
             level=log_level,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+            log_format=os.getenv("LOG_FORMAT", "json"),
         )
 
         # 设置 edge_agent 模块日志级别
         logging.getLogger("vision_analysis_pro.edge_agent").setLevel(log_level)
+
+    def _update_reporter_stats(self, reporter: Any) -> None:
+        """将 reporter 运行统计同步到 Agent 状态。"""
+        reporter_stats = reporter.get_stats()
+        self._stats["reporter_report_count"] = reporter_stats["report_count"]
+        self._stats["reporter_failure_count"] = reporter_stats["failure_count"]
+        self._stats["reporter_success_rate"] = round(
+            reporter_stats["success_rate"],
+            4,
+        )
+        if hasattr(reporter, "get_cache_stats"):
+            cache_stats = reporter.get_cache_stats()
+            self._stats["cache_entries"] = cache_stats.get("count", 0)
 
     def _setup_signal_handlers(self) -> None:
         """设置信号处理器以支持优雅关闭"""
@@ -223,6 +245,8 @@ class EdgeAgent:
                         self._stats["reports_failed"] += 1
                         logger.warning(f"上报失败: {payload.batch_id}")
 
+                    self._update_reporter_stats(reporter)
+
                     self._report_queue.task_done()
 
                 except Empty:
@@ -235,11 +259,14 @@ class EdgeAgent:
                         flushed = reporter.flush_cache_sync()
                         if flushed > 0:
                             self._stats["reports_sent"] += flushed
+                            self._stats["reports_flushed"] += flushed
                             logger.info(f"缓存刷新: {flushed} 条成功")
 
                     # 清理过期缓存
                     if hasattr(reporter, "cleanup_cache"):
                         reporter.cleanup_cache()
+
+                    self._update_reporter_stats(reporter)
 
                     last_flush_time = current_time
 
@@ -260,6 +287,9 @@ class EdgeAgent:
         # 更新统计
         self._stats["frames_processed"] += 1
         self._stats["detections_total"] += result.detection_count
+        self._stats["inference_count"] += 1
+        self._stats["inference_time_ms_total"] += result.inference_time_ms
+        self._stats["last_inference_time_ms"] = round(result.inference_time_ms, 2)
         self._stats["last_frame_time"] = datetime.now().isoformat()
 
         # 日志
@@ -350,6 +380,10 @@ class EdgeAgent:
                             results=results_buffer.copy(),
                         )
                         self._report_queue.put(payload)
+                        self._stats["report_queue_max"] = max(
+                            self._stats["report_queue_max"],
+                            self._report_queue.qsize(),
+                        )
                         results_buffer.clear()
                         last_report_time = time.time()
 
@@ -360,6 +394,10 @@ class EdgeAgent:
                         results=results_buffer,
                     )
                     self._report_queue.put(payload)
+                    self._stats["report_queue_max"] = max(
+                        self._stats["report_queue_max"],
+                        self._report_queue.qsize(),
+                    )
 
             logger.info("数据源处理完成")
 
@@ -429,6 +467,12 @@ class EdgeAgent:
 
             if elapsed > 0:
                 stats["fps"] = round(stats["frames_processed"] / elapsed, 2)
+
+        if stats["inference_count"] > 0:
+            stats["avg_inference_time_ms"] = round(
+                stats["inference_time_ms_total"] / stats["inference_count"],
+                2,
+            )
 
         return stats
 

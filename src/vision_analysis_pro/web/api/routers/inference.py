@@ -29,6 +29,26 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
 
+def _record_inference_metrics(
+    metrics: dict[str, Any],
+    *,
+    inference_time_ms: float,
+    input_bytes: int,
+    detection_count: int = 0,
+    visualized: bool = False,
+    success: bool,
+) -> None:
+    metrics["inference_duration_ms_sum"] += inference_time_ms
+    metrics["inference_duration_ms_count"] += 1
+    metrics["inference_duration_ms_last"] = inference_time_ms
+    metrics["inference_input_bytes_total"] += input_bytes
+    if success:
+        metrics["inference_success_total"] += 1
+        metrics["inference_detections_total"] += detection_count
+        if visualized:
+            metrics["inference_visualizations_total"] += 1
+
+
 def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
     """将推理结果转换为标准结构
 
@@ -78,11 +98,13 @@ async def inference_image(
     start_time = time.perf_counter()
 
     logger.info(
-        "收到推理请求 request_id=%s filename=%s content_type=%s visualize=%s",
-        request_id,
-        file.filename,
-        file.content_type,
-        visualize,
+        "inference_request_received",
+        extra={
+            "request_id": request_id,
+            "upload_filename": file.filename,
+            "content_type": file.content_type,
+            "visualize": visualize,
+        },
     )
 
     file_bytes = await file.read()
@@ -122,7 +144,8 @@ async def inference_image(
             },
         )
 
-    request.app.state.metrics["inference_requests_total"] += 1
+    metrics: dict[str, Any] = request.app.state.metrics
+    metrics["inference_requests_total"] += 1
     try:
         raw_result = engine.predict(
             file_bytes,
@@ -131,12 +154,23 @@ async def inference_image(
         )  # type: ignore[arg-type]
         detections = _serialize_detections(raw_result)
     except RuntimeError as e:
-        request.app.state.metrics["inference_failures_total"] += 1
+        inference_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        metrics["inference_failures_total"] += 1
+        _record_inference_metrics(
+            metrics,
+            inference_time_ms=inference_time_ms,
+            input_bytes=len(file_bytes),
+            success=False,
+        )
         logger.exception(
-            "推理失败 request_id=%s filename=%s engine=%s",
-            request_id,
-            file.filename,
-            engine.__class__.__name__,
+            "inference_request_failed",
+            extra={
+                "request_id": request_id,
+                "upload_filename": file.filename,
+                "engine": engine.__class__.__name__,
+                "input_bytes": len(file_bytes),
+                "inference_time_ms": inference_time_ms,
+            },
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -166,14 +200,27 @@ async def inference_image(
 
     inference_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
     detection_count = len(detections)
+    visualized = visualization_data is not None
+    _record_inference_metrics(
+        metrics,
+        inference_time_ms=inference_time_ms,
+        input_bytes=len(file_bytes),
+        detection_count=detection_count,
+        visualized=visualized,
+        success=True,
+    )
 
     logger.info(
-        "推理完成 request_id=%s filename=%s engine=%s detections=%s inference_time_ms=%.2f",
-        request_id,
-        file.filename,
-        engine.__class__.__name__,
-        detection_count,
-        inference_time_ms,
+        "inference_request_completed",
+        extra={
+            "request_id": request_id,
+            "upload_filename": file.filename,
+            "engine": engine.__class__.__name__,
+            "detections": detection_count,
+            "input_bytes": len(file_bytes),
+            "visualized": visualized,
+            "inference_time_ms": inference_time_ms,
+        },
     )
 
     return schemas.InferenceResponse(

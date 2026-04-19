@@ -1,5 +1,5 @@
 <template>
-  <div v-if="result" class="detection-result">
+  <div v-if="result" class="detection-result" data-testid="detection-result">
     <el-card class="stats-card">
       <template #header>
         <div class="card-header">
@@ -7,7 +7,7 @@
         </div>
       </template>
       <el-row :gutter="20">
-        <el-col :span="8">
+        <el-col :span="8" data-testid="detection-count">
           <el-statistic title="检测数量" :value="result.detections.length" />
         </el-col>
         <el-col :span="8">

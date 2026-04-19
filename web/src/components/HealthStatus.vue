@@ -13,7 +13,7 @@
       <el-icon v-else>
         <QuestionFilled />
       </el-icon>
-      <span class="status-text">{{ statusText }}</span>
+      <span class="status-text" data-testid="health-status-text">{{ statusText }}</span>
     </el-tag>
 
     <el-tooltip content="刷新状态" placement="bottom">
