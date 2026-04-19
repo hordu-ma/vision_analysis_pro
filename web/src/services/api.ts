@@ -5,10 +5,14 @@ import type {
   InferenceResponse,
   BatchInferenceResponse,
   InferenceTaskResponse,
+  InferenceTaskDetailResponse,
   InferenceTaskStatus,
   ErrorResponse,
   ReportBatchListResponse,
   ReportDeviceListResponse,
+  ReportDeviceMetadataRequest,
+  ReportDeviceMetadataResponse,
+  AlertSummaryResponse,
   ReportRecordResponse,
   ReportReviewRequest,
   ReportReviewResponse
@@ -298,8 +302,8 @@ class ApiService {
     return response.data
   }
 
-  async getBatchTask(taskId: string): Promise<InferenceTaskResponse> {
-    const response = await this.client.get<InferenceTaskResponse>(
+  async getBatchTask(taskId: string): Promise<InferenceTaskDetailResponse> {
+    const response = await this.client.get<InferenceTaskDetailResponse>(
       `/inference/images/tasks/${taskId}`
     )
     return response.data
@@ -333,8 +337,29 @@ class ApiService {
     return response.data
   }
 
+  async retryFailedBatchTask(taskId: string): Promise<InferenceTaskResponse> {
+    const response = await this.client.post<InferenceTaskResponse>(
+      `/inference/images/tasks/${taskId}/retry-failed`
+    )
+    return response.data
+  }
+
   async exportBatchTaskCsv(taskId: string): Promise<Blob> {
     const response = await this.client.get(`/inference/images/tasks/${taskId}/export.csv`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  }
+
+  async exportBatchTaskJson(taskId: string): Promise<Blob> {
+    const response = await this.client.get(`/inference/images/tasks/${taskId}/export.json`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  }
+
+  async exportBatchTaskZip(taskId: string): Promise<Blob> {
+    const response = await this.client.get(`/inference/images/tasks/${taskId}/export.zip`, {
       responseType: 'blob'
     })
     return response.data as Blob
@@ -395,6 +420,29 @@ class ApiService {
     const response = await this.client.get<ReportDeviceListResponse>(
       `/reports/devices?limit=${limit}`
     )
+    return response.data
+  }
+
+  async getReportDeviceMetadata(deviceId: string): Promise<ReportDeviceMetadataResponse> {
+    const response = await this.client.get<ReportDeviceMetadataResponse>(
+      `/reports/devices/${deviceId}`
+    )
+    return response.data
+  }
+
+  async updateReportDeviceMetadata(
+    deviceId: string,
+    payload: ReportDeviceMetadataRequest
+  ): Promise<ReportDeviceMetadataResponse> {
+    const response = await this.client.put<ReportDeviceMetadataResponse>(
+      `/reports/devices/${deviceId}`,
+      payload
+    )
+    return response.data
+  }
+
+  async getAlertSummary(): Promise<AlertSummaryResponse> {
+    const response = await this.client.get<AlertSummaryResponse>('/reports/alerts/summary')
     return response.data
   }
 

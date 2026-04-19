@@ -13,6 +13,9 @@
           >
             导出 CSV
           </el-button>
+          <el-button v-if="taskId" type="info" plain size="small" @click="emit('detail', taskId)">
+            查看详情
+          </el-button>
         </div>
       </template>
       <el-row :gutter="20">
@@ -74,6 +77,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   export: [taskId: string]
+  detail: [taskId: string]
 }>()
 
 const totalDetections = computed(() => {

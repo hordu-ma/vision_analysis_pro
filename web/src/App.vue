@@ -17,20 +17,25 @@
             <BatchTaskStatus
               :task="batchTask"
               @retry="handleRetryTask"
+              @retry-failed="handleRetryFailedTask"
               @rerun="handleRerunTask"
               @export="handleExportTaskCsv"
+              @detail="openTaskHistory"
             />
             <BatchDetectionResult
               :result="batchDetectionResult"
-              :task-id="batchTask?.status === 'completed' ? batchTask.task_id : undefined"
+              :task-id="batchTask ? batchTask.task_id : undefined"
               @export="handleExportTaskCsv"
+              @detail="openTaskHistory"
             />
           </el-col>
           <el-col :lg="10" :xs="24">
+            <AlertSummaryCard :summary="alertSummary" @refresh="loadAlertSummary" />
             <DeviceOverview
               :devices="devices"
               @refresh="loadReportData"
               @select-device="handleDeviceSelect"
+              @edit-device="openDeviceMetadata"
             />
             <ReportBatchList
               :batches="batches"
@@ -45,6 +50,7 @@
               @refresh="loadTaskHistory"
               @select="openTaskHistory"
               @retry="handleRetryTask"
+              @retry-failed="handleRetryFailedTask"
               @rerun="handleRerunTask"
               @export="handleExportTaskCsv"
               @delete="handleDeleteTask"
@@ -60,6 +66,22 @@
           @export="handleExportCsv"
           @save-review="handleSaveReview"
         />
+        <TaskDetailDrawer
+          :visible="taskDetailVisible"
+          :task="batchTask"
+          @close="taskDetailVisible = false"
+          @retry-failed="handleRetryFailedTask"
+          @export-csv="handleExportTaskCsv"
+          @export-json="handleExportTaskJson"
+          @export-zip="handleExportTaskZip"
+        />
+        <DeviceMetadataDrawer
+          :visible="deviceDrawerVisible"
+          :device-id="editingDeviceId"
+          :device="editingDevice"
+          @close="deviceDrawerVisible = false"
+          @save="handleSaveDeviceMetadata"
+        />
       </el-main>
     </el-container>
   </div>
@@ -67,23 +89,29 @@
 
 <script setup lang="ts">
 import { ElContainer, ElHeader, ElMain, ElRow, ElCol } from 'element-plus'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import AlertSummaryCard from '@/components/AlertSummaryCard.vue'
 import DeviceOverview from '@/components/DeviceOverview.vue'
 import BatchDetectionResult from '@/components/BatchDetectionResult.vue'
 import BatchTaskStatus from '@/components/BatchTaskStatus.vue'
 import DetectionResult from '@/components/DetectionResult.vue'
+import DeviceMetadataDrawer from '@/components/DeviceMetadataDrawer.vue'
 import HealthStatus from '@/components/HealthStatus.vue'
 import ImageUpload from '@/components/ImageUpload.vue'
 import ReportBatchList from '@/components/ReportBatchList.vue'
 import ReportDetailDrawer from '@/components/ReportDetailDrawer.vue'
+import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
 import TaskHistoryList from '@/components/TaskHistoryList.vue'
 import { apiService } from '@/services/api'
 import type {
   InferenceResponse,
   BatchInferenceResponse,
+  AlertSummaryResponse,
+  InferenceTaskDetailResponse,
   InferenceTaskResponse,
   InferenceTaskStatus,
   ReportBatchSummary,
+  ReportDeviceMetadataRequest,
   ReportDeviceSummary,
   ReportRecordResponse,
   ReportReviewRequest
@@ -91,14 +119,22 @@ import type {
 
 const detectionResult = ref<InferenceResponse | null>(null)
 const batchDetectionResult = ref<BatchInferenceResponse | null>(null)
-const batchTask = ref<InferenceTaskResponse | null>(null)
+const batchTask = ref<InferenceTaskDetailResponse | null>(null)
 const taskHistory = ref<InferenceTaskResponse[]>([])
 const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
+const alertSummary = ref<AlertSummaryResponse | null>(null)
 const batches = ref<ReportBatchSummary[]>([])
 const devices = ref<ReportDeviceSummary[]>([])
 const selectedDeviceId = ref('')
+const deviceDrawerVisible = ref(false)
+const editingDeviceId = ref('')
 const detailVisible = ref(false)
+const taskDetailVisible = ref(false)
 const selectedReport = ref<ReportRecordResponse | null>(null)
+
+const editingDevice = computed(() => {
+  return devices.value.find(item => item.device_id === editingDeviceId.value) || null
+})
 
 const handleResult = (data: InferenceResponse) => {
   batchTask.value = null
@@ -126,7 +162,7 @@ const pollBatchTask = async (taskId: string) => {
     const task = await apiService.getBatchTask(taskId)
     batchTask.value = task
 
-    if (task.status === 'completed') {
+    if (task.status === 'completed' || task.status === 'partial_failed') {
       batchDetectionResult.value = {
         files: task.results,
         metadata: task.metadata
@@ -151,7 +187,7 @@ const pollBatchTask = async (taskId: string) => {
 const handleBatchTask = (task: InferenceTaskResponse) => {
   detectionResult.value = null
   batchDetectionResult.value = null
-  batchTask.value = task
+  batchTask.value = null
   stopTaskPolling()
   void loadTaskHistory()
   void pollBatchTask(task.task_id)
@@ -165,11 +201,11 @@ const loadTaskHistory = async () => {
   }
 }
 
-const selectTask = (task: InferenceTaskResponse) => {
+const selectTask = (task: InferenceTaskDetailResponse) => {
   batchTask.value = task
   detectionResult.value = null
 
-  if (task.status === 'completed') {
+  if (task.status === 'completed' || task.status === 'partial_failed') {
     batchDetectionResult.value = {
       files: task.results,
       metadata: task.metadata
@@ -185,6 +221,7 @@ const openTaskHistory = async (taskId: string) => {
   try {
     const task = await apiService.getBatchTask(taskId)
     selectTask(task)
+    taskDetailVisible.value = true
     if (task.status === 'running' || task.status === 'pending') {
       void pollBatchTask(taskId)
     }
@@ -195,7 +232,9 @@ const openTaskHistory = async (taskId: string) => {
 
 const startTaskFromResponse = (task: InferenceTaskResponse) => {
   stopTaskPolling()
-  selectTask(task)
+  batchTask.value = null
+  batchDetectionResult.value = null
+  taskDetailVisible.value = false
   void loadTaskHistory()
   void pollBatchTask(task.task_id)
 }
@@ -218,18 +257,44 @@ const handleRerunTask = async (taskId: string) => {
   }
 }
 
+const handleRetryFailedTask = async (taskId: string) => {
+  try {
+    const task = await apiService.retryFailedBatchTask(taskId)
+    startTaskFromResponse(task)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
 const handleTaskStatusFilterChange = (status: InferenceTaskStatus | '') => {
   taskStatusFilter.value = status
   void loadTaskHistory()
 }
 
 const handleExportTaskCsv = async (taskId: string) => {
+  await downloadTaskExport(taskId, 'csv')
+}
+
+const handleExportTaskJson = async (taskId: string) => {
+  await downloadTaskExport(taskId, 'json')
+}
+
+const handleExportTaskZip = async (taskId: string) => {
+  await downloadTaskExport(taskId, 'zip')
+}
+
+const downloadTaskExport = async (taskId: string, format: 'csv' | 'json' | 'zip') => {
   try {
-    const blob = await apiService.exportBatchTaskCsv(taskId)
+    const blob =
+      format === 'csv'
+        ? await apiService.exportBatchTaskCsv(taskId)
+        : format === 'json'
+          ? await apiService.exportBatchTaskJson(taskId)
+          : await apiService.exportBatchTaskZip(taskId)
     const url = URL.createObjectURL(blob)
     const anchor = document.createElement('a')
     anchor.href = url
-    anchor.download = `${taskId}.csv`
+    anchor.download = `${taskId}.${format}`
     anchor.click()
     URL.revokeObjectURL(url)
   } catch (error) {
@@ -285,6 +350,14 @@ const loadReportData = async () => {
   }
 }
 
+const loadAlertSummary = async () => {
+  try {
+    alertSummary.value = await apiService.getAlertSummary()
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
 const handleDeviceSelect = (deviceId: string) => {
   selectedDeviceId.value = deviceId
   void loadReportData()
@@ -293,6 +366,23 @@ const handleDeviceSelect = (deviceId: string) => {
 const clearDeviceFilter = () => {
   selectedDeviceId.value = ''
   void loadReportData()
+}
+
+const openDeviceMetadata = (deviceId: string) => {
+  editingDeviceId.value = deviceId
+  deviceDrawerVisible.value = true
+}
+
+const handleSaveDeviceMetadata = async (payload: ReportDeviceMetadataRequest) => {
+  if (!editingDeviceId.value) return
+
+  try {
+    await apiService.updateReportDeviceMetadata(editingDeviceId.value, payload)
+    deviceDrawerVisible.value = false
+    await loadReportData()
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
 }
 
 const openBatchDetail = async (batchId: string) => {
@@ -332,6 +422,7 @@ const handleExportCsv = async (batchId: string) => {
 
 onMounted(() => {
   void loadReportData()
+  void loadAlertSummary()
   void loadTaskHistory()
 })
 

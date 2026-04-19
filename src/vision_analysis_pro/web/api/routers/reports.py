@@ -3,6 +3,7 @@
 import csv
 import io
 import logging
+import time
 from secrets import compare_digest
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -10,6 +11,7 @@ from fastapi.responses import Response
 
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
+from vision_analysis_pro.web.api.inference_tasks import get_inference_task_manager
 from vision_analysis_pro.web.api.report_store import (
     ReportFrameReview,
     ReportStoreSaveResult,
@@ -71,6 +73,75 @@ async def receive_report(
         result_count=save_result.result_count,
         total_detections=save_result.total_detections,
         request_id=request_id,
+    )
+
+
+@router.put(
+    "/reports/devices/{device_id}",
+    response_model=schemas.ReportDeviceMetadataResponse,
+    responses={200: {"model": schemas.ReportDeviceMetadataResponse}},
+)
+async def upsert_report_device_metadata(
+    device_id: str,
+    payload: schemas.ReportDeviceMetadataRequest,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> schemas.ReportDeviceMetadataResponse:
+    """写入设备元数据。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None) or "unknown"
+    store = get_report_store(str(settings.report_store_db_path))
+    actor = request.headers.get("x-actor", "system")
+    metadata = store.upsert_device_metadata(
+        device_id=device_id,
+        site_name=payload.site_name,
+        display_name=payload.display_name,
+        note=payload.note,
+    )
+    store.append_audit_log(
+        event_type="device_metadata_updated",
+        resource_id=device_id,
+        actor=actor,
+        request_id=request_id,
+        detail=payload.model_dump(mode="json"),
+    )
+    return schemas.ReportDeviceMetadataResponse(
+        device_id=metadata.device_id,
+        site_name=metadata.site_name,
+        display_name=metadata.display_name,
+        note=metadata.note,
+        updated_at=metadata.updated_at,
+    )
+
+
+@router.get(
+    "/reports/devices/{device_id}",
+    response_model=schemas.ReportDeviceMetadataResponse,
+    responses={200: {"model": schemas.ReportDeviceMetadataResponse}},
+)
+async def get_report_device_metadata(
+    device_id: str,
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> schemas.ReportDeviceMetadataResponse:
+    """读取设备元数据。"""
+    _authorize_report_request(request, settings)
+    store = get_report_store(str(settings.report_store_db_path))
+    metadata = store.get_device_metadata(device_id)
+    if metadata is None:
+        return schemas.ReportDeviceMetadataResponse(
+            device_id=device_id,
+            site_name="",
+            display_name="",
+            note="",
+            updated_at=0.0,
+        )
+    return schemas.ReportDeviceMetadataResponse(
+        device_id=metadata.device_id,
+        site_name=metadata.site_name,
+        display_name=metadata.display_name,
+        note=metadata.note,
+        updated_at=metadata.updated_at,
     )
 
 
@@ -302,9 +373,50 @@ async def list_report_devices(
                 last_report_time=item.last_report_time,
                 last_batch_id=item.last_batch_id,
                 last_created_at=item.last_created_at,
+                site_name=item.site_name,
+                display_name=item.display_name,
+                note=item.note,
             )
             for item in items
         ],
+        request_id=request_id,
+    )
+
+
+@router.get(
+    "/reports/alerts/summary",
+    response_model=schemas.AlertSummaryResponse,
+    responses={200: {"model": schemas.AlertSummaryResponse}},
+)
+async def get_alert_summary(
+    request: Request,
+    settings: Settings = Depends(get_settings),
+) -> schemas.AlertSummaryResponse:
+    """返回最小告警摘要。"""
+    _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    store = get_report_store(str(settings.report_store_db_path))
+    devices = store.list_devices(limit=100)
+    now = time.time()
+    stale_device_count = sum(
+        1 for item in devices if now - item.last_report_time > 3600
+    )
+
+    task_manager = get_inference_task_manager()
+    tasks = task_manager.list_tasks(limit=100)
+    failed_task_count = sum(1 for item in tasks if item.status == "failed")
+    partial_failed_task_count = sum(
+        1 for item in tasks if item.status == "partial_failed"
+    )
+
+    return schemas.AlertSummaryResponse(
+        status="ok",
+        stale_device_count=stale_device_count,
+        failed_task_count=failed_task_count,
+        partial_failed_task_count=partial_failed_task_count,
+        ready_failure_count=int(
+            request.app.state.metrics["health_ready_failures_total"]
+        ),
         request_id=request_id,
     )
 

@@ -3,8 +3,10 @@
 import base64
 import csv
 import io
+import json
 import logging
 import time
+import zipfile
 from types import SimpleNamespace
 from typing import Annotated, Any
 
@@ -426,26 +428,61 @@ def _run_batch_task(
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     batch_start_time = time.perf_counter()
     results: list[schemas.InferenceResponse] = []
+    file_records: list[dict[str, Any]] = []
+    failed_files = 0
     for index, stored_file in enumerate(stored_files, start=1):
         metrics["inference_requests_total"] += 1
         upload_file = SimpleNamespace(
             filename=stored_file.filename,
             content_type=stored_file.content_type,
         )
-        result = _run_inference(
-            request_id=request_id,
-            file=upload_file,
-            file_bytes=stored_file.file_bytes,
-            settings=settings,
-            engine=engine,
-            metrics=metrics,
-            visualize=visualize,
-        )
+        try:
+            result = _run_inference(
+                request_id=request_id,
+                file=upload_file,
+                file_bytes=stored_file.file_bytes,
+                settings=settings,
+                engine=engine,
+                metrics=metrics,
+                visualize=visualize,
+            )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {}
+            file_records.append(
+                {
+                    "filename": stored_file.filename,
+                    "status": "failed",
+                    "result": None,
+                    "error": {
+                        "code": str(detail.get("code", "INFERENCE_ERROR")),
+                        "message": str(detail.get("message", "推理失败")),
+                        "detail": str(detail.get("detail", stored_file.filename)),
+                    },
+                }
+            )
+            failed_files += 1
+            progress_callback(index, len(stored_files))
+            continue
+
         results.append(result)
+        file_records.append(
+            {
+                "filename": stored_file.filename,
+                "status": "completed",
+                "result": result.model_dump(mode="json"),
+                "error": None,
+            }
+        )
         progress_callback(index, len(stored_files))
 
     batch_time_ms = round((time.perf_counter() - batch_start_time) * 1000, 2)
     total_detections = sum(len(item.detections) for item in results)
+    if failed_files == 0:
+        status = "completed"
+    elif failed_files == len(stored_files):
+        status = "failed"
+    else:
+        status = "partial_failed"
     return (
         [item.model_dump(mode="json") for item in results],
         {
@@ -455,6 +492,10 @@ def _run_batch_task(
             "total_detections": total_detections,
             "batch_inference_time_ms": batch_time_ms,
             "visualize": visualize,
+            "status": status,
+            "failed_files": failed_files,
+            "successful_files": len(results),
+            "files": file_records,
         },
     )
 
@@ -518,13 +559,13 @@ async def list_inference_tasks(
 
 @router.get(
     "/images/tasks/{task_id}",
-    response_model=schemas.InferenceTaskResponse,
+    response_model=schemas.InferenceTaskDetailResponse,
     responses={
-        200: {"model": schemas.InferenceTaskResponse},
+        200: {"model": schemas.InferenceTaskDetailResponse},
         404: {"model": schemas.ErrorResponse},
     },
 )
-async def get_inference_task(task_id: str) -> schemas.InferenceTaskResponse:
+async def get_inference_task(task_id: str) -> schemas.InferenceTaskDetailResponse:
     """查询批量图像异步推理任务。"""
     task_manager = get_inference_task_manager()
     record = task_manager.get_task(task_id)
@@ -537,7 +578,82 @@ async def get_inference_task(task_id: str) -> schemas.InferenceTaskResponse:
                 "detail": task_id,
             },
         )
-    return _task_record_to_response(record)
+    return _task_record_to_detail_response(record)
+
+
+@router.post(
+    "/images/tasks/{task_id}/retry-failed",
+    response_model=schemas.InferenceTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        202: {"model": schemas.InferenceTaskResponse},
+        400: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def retry_failed_files_inference_task(
+    task_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+) -> schemas.InferenceTaskResponse:
+    """仅重试任务中失败的文件。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+
+    failed_filenames = {
+        item.get("filename", "")
+        for item in record.metadata.get("files", [])
+        if item.get("status") == "failed"
+    }
+    if not failed_filenames:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TASK_RETRY_NOT_ALLOWED",
+                "message": "当前任务没有失败文件可重试",
+                "detail": task_id,
+            },
+        )
+
+    retry_files = [
+        item for item in record.input_files if item.filename in failed_filenames
+    ]
+    request_id = getattr(request.state, "request_id", "unknown")
+    metrics: dict[str, Any] = request.app.state.metrics
+
+    def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return _run_batch_task(
+            request_id=request_id,
+            stored_files=retry_files,
+            settings=settings,
+            engine=engine,
+            metrics=metrics,
+            visualize=record.visualize,
+            progress_callback=progress_callback,
+        )
+
+    replay_record = task_manager.create_task(
+        file_count=len(retry_files),
+        input_files=retry_files,
+        visualize=record.visualize,
+        metadata={
+            "request_id": request_id,
+            "source_task_id": task_id,
+            "replay_mode": "retry_failed",
+        },
+        worker=worker,
+    )
+    return _task_record_to_response(replay_record)
 
 
 @router.post(
@@ -703,6 +819,87 @@ async def export_inference_task_csv(task_id: str) -> Response:
     )
 
 
+@router.get(
+    "/images/tasks/{task_id}/export.json",
+    responses={
+        200: {"content": {"application/json": {}}},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def export_inference_task_json(task_id: str) -> Response:
+    """导出任务详情 JSON。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    payload = _task_record_to_detail_response(record).model_dump(mode="json")
+    return Response(
+        content=json.dumps(payload, ensure_ascii=False),
+        media_type="application/json; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{task_id}.json"',
+        },
+    )
+
+
+@router.get(
+    "/images/tasks/{task_id}/export.zip",
+    responses={
+        200: {"content": {"application/zip": {}}},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def export_inference_task_zip(task_id: str) -> Response:
+    """导出任务结果 ZIP（JSON + CSV）。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(["task_id", "filename", "status", "error_code", "error_message"])
+    for item in record.metadata.get("files", []):
+        error = item.get("error") or {}
+        writer.writerow(
+            [
+                task_id,
+                item.get("filename", ""),
+                item.get("status", ""),
+                error.get("code", ""),
+                error.get("message", ""),
+            ]
+        )
+
+    json_payload = _task_record_to_detail_response(record).model_dump(mode="json")
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr(
+            f"{task_id}.json", json.dumps(json_payload, ensure_ascii=False, indent=2)
+        )
+        zf.writestr(f"{task_id}.csv", csv_buffer.getvalue())
+
+    return Response(
+        content=zip_buffer.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{task_id}.zip"'},
+    )
+
+
 @router.delete(
     "/images/tasks/{task_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -773,4 +970,24 @@ def _task_record_to_response(record: Any) -> schemas.InferenceTaskResponse:
         ],
         metadata=record.metadata,
         error=record.error,
+    )
+
+
+def _task_record_to_detail_response(record: Any) -> schemas.InferenceTaskDetailResponse:
+    base = _task_record_to_response(record)
+    return schemas.InferenceTaskDetailResponse(
+        **base.model_dump(),
+        files=[
+            schemas.InferenceTaskFileResult(
+                filename=str(item.get("filename", "unknown")),
+                status=str(item.get("status", "failed")),
+                result=(
+                    schemas.InferenceResponse.model_validate(item["result"])
+                    if item.get("result")
+                    else None
+                ),
+                error=dict(item.get("error")) if item.get("error") else None,
+            )
+            for item in record.metadata.get("files", [])
+        ],
     )

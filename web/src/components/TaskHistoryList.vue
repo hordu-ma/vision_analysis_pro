@@ -60,7 +60,15 @@
               重试
             </el-button>
             <el-button
-              v-else-if="scope.row.status === 'completed'"
+              v-if="scope.row.status === 'partial_failed'"
+              link
+              type="danger"
+              @click="emit('retry-failed', scope.row.task_id)"
+            >
+              重试失败项
+            </el-button>
+            <el-button
+              v-else-if="scope.row.status === 'completed' || scope.row.status === 'partial_failed'"
               link
               type="success"
               @click="emit('rerun', scope.row.task_id)"
@@ -68,7 +76,7 @@
               复跑
             </el-button>
             <el-button
-              v-if="scope.row.status === 'completed'"
+              v-if="scope.row.status === 'completed' || scope.row.status === 'partial_failed'"
               link
               type="primary"
               @click="emit('export', scope.row.task_id)"
@@ -112,6 +120,7 @@ const emit = defineEmits<{
   refresh: []
   select: [taskId: string]
   retry: [taskId: string]
+  'retry-failed': [taskId: string]
   rerun: [taskId: string]
   export: [taskId: string]
   delete: [taskId: string]
@@ -147,6 +156,8 @@ const statusText = (status: string): string => {
       return '已完成'
     case 'failed':
       return '失败'
+    case 'partial_failed':
+      return '部分失败'
     default:
       return '待开始'
   }
@@ -160,6 +171,8 @@ const statusType = (status: string): 'info' | 'warning' | 'success' | 'danger' =
       return 'success'
     case 'failed':
       return 'danger'
+    case 'partial_failed':
+      return 'warning'
     default:
       return 'info'
   }

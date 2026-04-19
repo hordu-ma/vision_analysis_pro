@@ -11,6 +11,16 @@
 
     <el-table v-else :data="devices" stripe>
       <el-table-column prop="device_id" label="设备 ID" min-width="160" />
+      <el-table-column label="显示名称" min-width="140">
+        <template #default="scope">
+          {{ scope.row.display_name || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="站点" min-width="120">
+        <template #default="scope">
+          {{ scope.row.site_name || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="batch_count" label="批次数" width="90" />
       <el-table-column prop="result_count" label="结果数" width="90" />
       <el-table-column prop="total_detections" label="检测数" width="90" />
@@ -24,6 +34,13 @@
       <el-table-column label="最近上报" min-width="160">
         <template #default="scope">
           {{ formatTime(scope.row.last_report_time) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="100">
+        <template #default="scope">
+          <el-button link type="primary" @click="emit('edit-device', scope.row.device_id)">
+            编辑
+          </el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -41,6 +58,7 @@ defineProps<{
 const emit = defineEmits<{
   refresh: []
   'select-device': [deviceId: string]
+  'edit-device': [deviceId: string]
 }>()
 
 const formatTime = (timestamp: number): string => {

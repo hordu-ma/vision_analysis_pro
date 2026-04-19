@@ -153,7 +153,12 @@ class InferenceTaskResponse(BaseModel):
     """批量推理异步任务响应。"""
 
     task_id: str = Field(..., description="任务 ID")
-    status: str = Field(..., description="任务状态")
+    status: Literal["pending", "running", "completed", "failed", "partial_failed"] = (
+        Field(
+            ...,
+            description="任务状态",
+        )
+    )
     created_at: float = Field(..., description="任务创建时间")
     updated_at: float = Field(..., description="任务更新时间")
     file_count: int = Field(..., ge=0, description="任务文件数")
@@ -164,6 +169,24 @@ class InferenceTaskResponse(BaseModel):
     )
     metadata: dict[str, Any] = Field(default_factory=dict, description="任务元信息")
     error: dict[str, str] | None = Field(None, description="失败信息")
+
+
+class InferenceTaskFileResult(BaseModel):
+    """批量任务中的单文件执行结果。"""
+
+    filename: str = Field(..., description="文件名")
+    status: Literal["completed", "failed"] = Field(..., description="文件处理状态")
+    result: InferenceResponse | None = Field(None, description="成功时的推理结果")
+    error: dict[str, str] | None = Field(None, description="失败信息")
+
+
+class InferenceTaskDetailResponse(InferenceTaskResponse):
+    """批量任务详情响应。"""
+
+    files: list[InferenceTaskFileResult] = Field(
+        default_factory=list,
+        description="文件级执行结果列表",
+    )
 
 
 class ReportInferenceResult(BaseModel):
@@ -375,6 +398,38 @@ class ReportDeviceSummaryResponse(BaseModel):
     last_report_time: float = Field(..., description="最近上报时间")
     last_batch_id: str = Field(..., description="最近批次 ID")
     last_created_at: float = Field(..., description="最近服务端接收时间")
+    site_name: str = Field("", description="站点名称")
+    display_name: str = Field("", description="设备显示名称")
+    note: str = Field("", description="设备备注")
+
+
+class ReportDeviceMetadataRequest(BaseModel):
+    """设备元数据写入请求。"""
+
+    site_name: str = Field("", max_length=100, description="站点名称")
+    display_name: str = Field("", max_length=100, description="设备显示名称")
+    note: str = Field("", max_length=500, description="设备备注")
+
+
+class ReportDeviceMetadataResponse(BaseModel):
+    """设备元数据响应。"""
+
+    device_id: str = Field(..., description="设备标识")
+    site_name: str = Field("", description="站点名称")
+    display_name: str = Field("", description="设备显示名称")
+    note: str = Field("", description="设备备注")
+    updated_at: float = Field(..., description="更新时间")
+
+
+class AlertSummaryResponse(BaseModel):
+    """最小告警摘要。"""
+
+    status: str = Field(..., description="摘要状态")
+    stale_device_count: int = Field(..., ge=0, description="长时间未上报设备数")
+    failed_task_count: int = Field(..., ge=0, description="失败任务数")
+    partial_failed_task_count: int = Field(..., ge=0, description="部分失败任务数")
+    ready_failure_count: int = Field(..., ge=0, description="就绪检查失败次数")
+    request_id: str | None = Field(None, description="请求 ID")
 
 
 class ReportDeviceListResponse(BaseModel):

@@ -37,7 +37,15 @@
         重试当前任务
       </el-button>
       <el-button
-        v-if="task.status === 'completed'"
+        v-if="task.status === 'partial_failed'"
+        type="danger"
+        plain
+        @click="emit('retry-failed', task.task_id)"
+      >
+        重试失败文件
+      </el-button>
+      <el-button
+        v-if="task.status === 'completed' || task.status === 'partial_failed'"
         type="success"
         plain
         @click="emit('rerun', task.task_id)"
@@ -45,13 +53,14 @@
         复跑当前任务
       </el-button>
       <el-button
-        v-if="task.status === 'completed'"
+        v-if="task.status === 'completed' || task.status === 'partial_failed'"
         type="primary"
         plain
         @click="emit('export', task.task_id)"
       >
         导出 CSV
       </el-button>
+      <el-button type="info" plain @click="emit('detail', task.task_id)">查看详情</el-button>
     </div>
   </el-card>
 </template>
@@ -74,8 +83,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   retry: [taskId: string]
+  'retry-failed': [taskId: string]
   rerun: [taskId: string]
   export: [taskId: string]
+  detail: [taskId: string]
 }>()
 
 const statusLabel = computed(() => {
@@ -86,6 +97,8 @@ const statusLabel = computed(() => {
       return '已完成'
     case 'failed':
       return '失败'
+    case 'partial_failed':
+      return '部分失败'
     default:
       return '待开始'
   }
@@ -97,6 +110,8 @@ const tagType = computed(() => {
       return 'success'
     case 'failed':
       return 'danger'
+    case 'partial_failed':
+      return 'warning'
     case 'running':
       return 'warning'
     default:

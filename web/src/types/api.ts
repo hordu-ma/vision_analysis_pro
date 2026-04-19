@@ -30,7 +30,7 @@ export interface BatchInferenceResponse {
 
 export interface InferenceTaskResponse {
   task_id: string
-  status: string
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial_failed'
   created_at: number
   updated_at: number
   file_count: number
@@ -43,9 +43,11 @@ export interface InferenceTaskResponse {
     file_count?: number
     total_detections?: number
     batch_inference_time_ms?: number
+    successful_files?: number
+    failed_files?: number
     visualize?: boolean
     source_task_id?: string
-    replay_mode?: 'retry' | 'rerun'
+    replay_mode?: 'retry' | 'rerun' | 'retry_failed'
   }
   error?: {
     code: string
@@ -54,7 +56,22 @@ export interface InferenceTaskResponse {
   } | null
 }
 
-export type InferenceTaskStatus = 'pending' | 'running' | 'completed' | 'failed'
+export interface InferenceTaskFileResult {
+  filename: string
+  status: 'completed' | 'failed'
+  result?: InferenceResponse | null
+  error?: {
+    code: string
+    message: string
+    detail?: string
+  } | null
+}
+
+export interface InferenceTaskDetailResponse extends InferenceTaskResponse {
+  files: InferenceTaskFileResult[]
+}
+
+export type InferenceTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'partial_failed'
 
 export interface HealthResponse {
   status: string
@@ -122,6 +139,9 @@ export interface ReportDeviceSummary {
   last_report_time: number
   last_batch_id: string
   last_created_at: number
+  site_name: string
+  display_name: string
+  note: string
 }
 
 export interface ReportDeviceListResponse {
@@ -141,6 +161,29 @@ export interface ReportReviewResponse {
   status: string
   batch_id: string
   review: ReportFrameReview
+  request_id?: string
+}
+
+export interface ReportDeviceMetadataRequest {
+  site_name: string
+  display_name: string
+  note: string
+}
+
+export interface ReportDeviceMetadataResponse {
+  device_id: string
+  site_name: string
+  display_name: string
+  note: string
+  updated_at: number
+}
+
+export interface AlertSummaryResponse {
+  status: string
+  stale_device_count: number
+  failed_task_count: number
+  partial_failed_task_count: number
+  ready_failure_count: number
   request_id?: string
 }
 

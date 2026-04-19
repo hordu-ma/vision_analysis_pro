@@ -51,6 +51,32 @@ class ReportDeviceSummary:
     last_report_time: float
     last_batch_id: str
     last_created_at: float
+    site_name: str = ""
+    display_name: str = ""
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class ReportDeviceMetadata:
+    """设备元数据。"""
+
+    device_id: str
+    site_name: str
+    display_name: str
+    note: str
+    updated_at: float
+
+
+@dataclass(frozen=True)
+class AuditLogRecord:
+    """最小审计日志记录。"""
+
+    event_type: str
+    resource_id: str
+    actor: str
+    request_id: str
+    detail_json: str
+    created_at: float
 
 
 @dataclass(frozen=True)
@@ -194,7 +220,10 @@ class SQLiteReportStore:
                         SUM(b.total_detections) AS total_detections,
                         MAX(b.report_time) AS last_report_time,
                         latest.batch_id AS last_batch_id,
-                        latest.created_at AS last_created_at
+                        latest.created_at AS last_created_at,
+                        COALESCE(m.site_name, '') AS site_name,
+                        COALESCE(m.display_name, '') AS display_name,
+                        COALESCE(m.note, '') AS note
                     FROM edge_report_batches AS b
                     JOIN edge_report_batches AS latest
                       ON latest.batch_id = (
@@ -204,6 +233,8 @@ class SQLiteReportStore:
                           ORDER BY inner_b.created_at DESC
                           LIMIT 1
                       )
+                    LEFT JOIN edge_device_metadata AS m
+                      ON m.device_id = b.device_id
                     GROUP BY b.device_id
                     ORDER BY latest.created_at DESC
                     LIMIT ?
@@ -212,6 +243,88 @@ class SQLiteReportStore:
                 ).fetchall()
 
         return [_row_to_device_summary(row) for row in rows]
+
+    def upsert_device_metadata(
+        self,
+        *,
+        device_id: str,
+        site_name: str,
+        display_name: str,
+        note: str,
+    ) -> ReportDeviceMetadata:
+        updated_at = time.time()
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO edge_device_metadata (
+                        device_id,
+                        site_name,
+                        display_name,
+                        note,
+                        updated_at
+                    ) VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(device_id) DO UPDATE SET
+                        site_name = excluded.site_name,
+                        display_name = excluded.display_name,
+                        note = excluded.note,
+                        updated_at = excluded.updated_at
+                    """,
+                    (device_id, site_name, display_name, note, updated_at),
+                )
+                conn.commit()
+                row = conn.execute(
+                    "SELECT * FROM edge_device_metadata WHERE device_id = ?",
+                    (device_id,),
+                ).fetchone()
+        if row is None:
+            raise RuntimeError(f"设备元数据保存失败: {device_id}")
+        return _row_to_device_metadata(row)
+
+    def get_device_metadata(self, device_id: str) -> ReportDeviceMetadata | None:
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT * FROM edge_device_metadata WHERE device_id = ?",
+                    (device_id,),
+                ).fetchone()
+        return _row_to_device_metadata(row) if row else None
+
+    def append_audit_log(
+        self,
+        *,
+        event_type: str,
+        resource_id: str,
+        actor: str,
+        request_id: str,
+        detail: dict[str, Any],
+    ) -> None:
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                conn.execute(
+                    """
+                    INSERT INTO audit_logs (
+                        event_type,
+                        resource_id,
+                        actor,
+                        request_id,
+                        detail_json,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        event_type,
+                        resource_id,
+                        actor,
+                        request_id,
+                        json.dumps(detail, ensure_ascii=False),
+                        time.time(),
+                    ),
+                )
+                conn.commit()
 
     def list_reviews(self, batch_id: str) -> dict[int, ReportFrameReview]:
         """读取指定批次的人工复核信息。"""
@@ -323,6 +436,30 @@ class SQLiteReportStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS edge_device_metadata (
+                    device_id TEXT PRIMARY KEY,
+                    site_name TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    note TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    event_type TEXT NOT NULL,
+                    resource_id TEXT NOT NULL,
+                    actor TEXT NOT NULL,
+                    request_id TEXT NOT NULL,
+                    detail_json TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                )
+                """
+            )
             conn.commit()
 
     def _connect(self) -> sqlite3.Connection:
@@ -382,6 +519,19 @@ def _row_to_device_summary(row: sqlite3.Row) -> ReportDeviceSummary:
         last_report_time=float(row["last_report_time"]),
         last_batch_id=str(row["last_batch_id"]),
         last_created_at=float(row["last_created_at"]),
+        site_name=str(row["site_name"]),
+        display_name=str(row["display_name"]),
+        note=str(row["note"]),
+    )
+
+
+def _row_to_device_metadata(row: sqlite3.Row) -> ReportDeviceMetadata:
+    return ReportDeviceMetadata(
+        device_id=str(row["device_id"]),
+        site_name=str(row["site_name"]),
+        display_name=str(row["display_name"]),
+        note=str(row["note"]),
+        updated_at=float(row["updated_at"]),
     )
 
 

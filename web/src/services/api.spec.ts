@@ -1,11 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
 import type {
+  AlertSummaryResponse,
   HealthResponse,
   InferenceResponse,
   BatchInferenceResponse,
+  InferenceTaskDetailResponse,
   InferenceTaskResponse,
   ReportBatchListResponse,
+  ReportDeviceMetadataResponse,
   ReportDeviceListResponse,
   ReportRecordResponse,
   ReportReviewResponse
@@ -217,7 +220,7 @@ describe('API Service', () => {
     })
 
     it('应该查询批量任务', async () => {
-      const mockResponse: InferenceTaskResponse = {
+      const mockResponse: InferenceTaskDetailResponse = {
         task_id: 'task-001',
         status: 'completed',
         created_at: 1700000000,
@@ -226,7 +229,8 @@ describe('API Service', () => {
         completed_files: 1,
         progress: 100,
         results: [],
-        metadata: {}
+        metadata: {},
+        files: []
       }
 
       mockGet.mockResolvedValue({ data: mockResponse })
@@ -312,6 +316,27 @@ describe('API Service', () => {
       expect(mockPost).toHaveBeenCalledWith('/inference/images/tasks/task-completed/rerun')
     })
 
+    it('应该只重试失败文件', async () => {
+      const mockResponse: InferenceTaskResponse = {
+        task_id: 'task-retry-failed',
+        status: 'pending',
+        created_at: 1700000000,
+        updated_at: 1700000000,
+        file_count: 1,
+        completed_files: 0,
+        progress: 0,
+        results: [],
+        metadata: { source_task_id: 'task-partial', replay_mode: 'retry_failed' }
+      }
+
+      mockPost.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.retryFailedBatchTask('task-partial')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPost).toHaveBeenCalledWith('/inference/images/tasks/task-partial/retry-failed')
+    })
+
     it('应该导出已完成任务 CSV', async () => {
       const blob = new Blob(['task_id,filename'], { type: 'text/csv' })
       mockGet.mockResolvedValue({ data: blob })
@@ -324,12 +349,66 @@ describe('API Service', () => {
       })
     })
 
+    it('应该导出任务 JSON', async () => {
+      const blob = new Blob(['{"task_id":"task-001"}'], { type: 'application/json' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportBatchTaskJson('task-001')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-001/export.json', {
+        responseType: 'blob'
+      })
+    })
+
+    it('应该导出任务 ZIP', async () => {
+      const blob = new Blob(['zip-bytes'], { type: 'application/zip' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportBatchTaskZip('task-001')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-001/export.zip', {
+        responseType: 'blob'
+      })
+    })
+
     it('应该删除单个终态任务', async () => {
       mockDelete.mockResolvedValue({ data: undefined })
 
       await apiService.deleteBatchTask('task-completed')
 
       expect(mockDelete).toHaveBeenCalledWith('/inference/images/tasks/task-completed')
+    })
+
+    it('应该获取任务详情', async () => {
+      const mockResponse: InferenceTaskDetailResponse = {
+        task_id: 'task-detail',
+        status: 'partial_failed',
+        created_at: 1700000000,
+        updated_at: 1700000001,
+        file_count: 2,
+        completed_files: 1,
+        progress: 100,
+        results: [],
+        metadata: { failed_files: 1, successful_files: 1 },
+        files: [
+          { filename: 'ok.jpg', status: 'completed', result: null, error: null },
+          {
+            filename: 'fail.jpg',
+            status: 'failed',
+            result: null,
+            error: { code: 'INFERENCE_ERROR', message: '推理失败' }
+          }
+        ]
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.getBatchTask('task-detail')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-detail')
     })
 
     it('应该批量清理终态任务', async () => {
@@ -341,6 +420,30 @@ describe('API Service', () => {
 
       expect(result).toEqual({ status: 'ok', deleted_count: 2, status_filter: 'completed' })
       expect(mockDelete).toHaveBeenCalledWith('/inference/images/tasks?status=completed')
+    })
+
+    it('应该导出任务 JSON', async () => {
+      const blob = new Blob(['{"task_id":"task-001"}'], { type: 'application/json' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportBatchTaskJson('task-001')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-001/export.json', {
+        responseType: 'blob'
+      })
+    })
+
+    it('应该导出任务 ZIP', async () => {
+      const blob = new Blob(['zip-bytes'], { type: 'application/zip' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportBatchTaskZip('task-001')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-001/export.zip', {
+        responseType: 'blob'
+      })
     })
   })
 
@@ -421,7 +524,10 @@ describe('API Service', () => {
             total_detections: 5,
             last_report_time: 1700000000,
             last_batch_id: 'batch-002',
-            last_created_at: 1700000001
+            last_created_at: 1700000001,
+            site_name: '西区',
+            display_name: '杆塔 02',
+            note: '夜间告警频繁'
           }
         ]
       }
@@ -432,6 +538,65 @@ describe('API Service', () => {
 
       expect(result).toEqual(mockResponse)
       expect(mockGet).toHaveBeenCalledWith('/reports/devices?limit=10')
+    })
+
+    it('应该获取设备元数据', async () => {
+      const mockResponse: ReportDeviceMetadataResponse = {
+        device_id: 'device-a',
+        site_name: '西区',
+        display_name: '杆塔 02',
+        note: '夜间告警频繁',
+        updated_at: 1700000001
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.getReportDeviceMetadata('device-a')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/reports/devices/device-a')
+    })
+
+    it('应该更新设备元数据', async () => {
+      const mockResponse: ReportDeviceMetadataResponse = {
+        device_id: 'device-a',
+        site_name: '西区',
+        display_name: '杆塔 02',
+        note: '夜间告警频繁',
+        updated_at: 1700000001
+      }
+
+      mockPut.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.updateReportDeviceMetadata('device-a', {
+        site_name: '西区',
+        display_name: '杆塔 02',
+        note: '夜间告警频繁'
+      })
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPut).toHaveBeenCalledWith('/reports/devices/device-a', {
+        site_name: '西区',
+        display_name: '杆塔 02',
+        note: '夜间告警频繁'
+      })
+    })
+
+    it('应该获取告警摘要', async () => {
+      const mockResponse: AlertSummaryResponse = {
+        status: 'ok',
+        stale_device_count: 1,
+        failed_task_count: 2,
+        partial_failed_task_count: 3,
+        ready_failure_count: 4
+      }
+
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.getAlertSummary()
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/reports/alerts/summary')
     })
 
     it('应该获取批次详情', async () => {
@@ -508,12 +673,18 @@ describe('API Service', () => {
       expect(apiService.listBatchTasks).toBeDefined()
       expect(apiService.retryBatchTask).toBeDefined()
       expect(apiService.rerunBatchTask).toBeDefined()
+      expect(apiService.retryFailedBatchTask).toBeDefined()
       expect(apiService.exportBatchTaskCsv).toBeDefined()
+      expect(apiService.exportBatchTaskJson).toBeDefined()
+      expect(apiService.exportBatchTaskZip).toBeDefined()
       expect(apiService.deleteBatchTask).toBeDefined()
       expect(apiService.cleanupBatchTasks).toBeDefined()
       expect(apiService.isServiceAvailable).toBeDefined()
       expect(apiService.listReportBatches).toBeDefined()
       expect(apiService.listReportDevices).toBeDefined()
+      expect(apiService.getReportDeviceMetadata).toBeDefined()
+      expect(apiService.updateReportDeviceMetadata).toBeDefined()
+      expect(apiService.getAlertSummary).toBeDefined()
       expect(apiService.getReport).toBeDefined()
       expect(apiService.updateReportReview).toBeDefined()
       expect(apiService.exportReportCsv).toBeDefined()

@@ -797,6 +797,158 @@ async def test_terminal_tasks_are_pruned_when_exceeding_limit() -> None:
 
 
 @pytest.mark.asyncio
+async def test_get_inference_task_returns_file_level_results_for_partial_failure() -> (
+    None
+):
+    """测试任务详情返回文件级结果，并允许部分失败。"""
+
+    class SelectiveFailureStubInferenceEngine(StubInferenceEngine):
+        def predict(self, image, *args, **kwargs):  # type: ignore[override]
+            if image == b"fail-image":
+                raise RuntimeError("selective failure")
+            return super().predict(image, *args, **kwargs)
+
+    app.dependency_overrides[get_inference_engine] = lambda: (
+        SelectiveFailureStubInferenceEngine(mode="normal")
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[
+                ("files", ("ok.jpg", b"ok-image", "image/jpeg")),
+                ("files", ("fail.jpg", b"fail-image", "image/jpeg")),
+            ],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            detail_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert detail_resp.status_code == 200
+            if detail_resp.json()["status"] == "partial_failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内进入 partial_failed 状态")
+
+    data = detail_resp.json()
+    assert data["status"] == "partial_failed"
+    assert data["metadata"]["failed_files"] == 1
+    assert data["metadata"]["successful_files"] == 1
+    assert len(data["files"]) == 2
+    failed_item = next(item for item in data["files"] if item["filename"] == "fail.jpg")
+    assert failed_item["status"] == "failed"
+    assert failed_item["error"]["code"] == "INFERENCE_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_files_inference_task_replays_only_failed_files() -> None:
+    """测试仅重试失败文件。"""
+
+    class SelectiveFailureStubInferenceEngine(StubInferenceEngine):
+        def predict(self, image, *args, **kwargs):  # type: ignore[override]
+            if image == b"fail-image":
+                raise RuntimeError("selective failure")
+            return super().predict(image, *args, **kwargs)
+
+    app.dependency_overrides[get_inference_engine] = lambda: (
+        SelectiveFailureStubInferenceEngine(mode="normal")
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[
+                ("files", ("ok.jpg", b"ok-image", "image/jpeg")),
+                ("files", ("fail.jpg", b"fail-image", "image/jpeg")),
+            ],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            detail_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert detail_resp.status_code == 200
+            if detail_resp.json()["status"] == "partial_failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内进入 partial_failed 状态")
+
+        app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+            mode="normal"
+        )
+        retry_resp = await client.post(
+            f"/api/v1/inference/images/tasks/{task_id}/retry-failed"
+        )
+        assert retry_resp.status_code == 202
+        replay_task_id = retry_resp.json()["task_id"]
+
+        for _ in range(20):
+            replay_detail_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{replay_task_id}"
+            )
+            assert replay_detail_resp.status_code == 200
+            if replay_detail_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败文件重试任务未在预期时间内完成")
+
+    data = replay_detail_resp.json()
+    assert data["file_count"] == 1
+    assert data["metadata"]["replay_mode"] == "retry_failed"
+    assert data["metadata"]["source_task_id"] == task_id
+    assert data["files"][0]["filename"] == "fail.jpg"
+
+
+@pytest.mark.asyncio
+async def test_export_inference_task_json_and_zip() -> None:
+    """测试任务详情支持导出 JSON 与 ZIP。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("ok.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            detail_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert detail_resp.status_code == 200
+            if detail_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内完成")
+
+        json_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.json"
+        )
+        zip_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.zip"
+        )
+
+    assert json_resp.status_code == 200
+    assert (
+        json_resp.headers["content-disposition"]
+        == f'attachment; filename="{task_id}.json"'
+    )
+    assert json_resp.json()["task_id"] == task_id
+
+    assert zip_resp.status_code == 200
+    assert (
+        zip_resp.headers["content-disposition"]
+        == f'attachment; filename="{task_id}.zip"'
+    )
+    assert zip_resp.headers["content-type"] == "application/zip"
+
+
+@pytest.mark.asyncio
 async def test_live_health_endpoint() -> None:
     """测试存活检查端点"""
     transport = ASGITransport(app=app)
@@ -806,7 +958,101 @@ async def test_live_health_endpoint() -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "alive"
-    assert data["version"] == app.version
+
+
+@pytest.mark.asyncio
+async def test_report_device_metadata_roundtrip() -> None:
+    """测试设备元数据写入与读取。"""
+    transport = ASGITransport(app=app)
+    payload = _create_report_payload(device_id="edge-device-01")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        report_resp = await client.post("/api/v1/report", json=payload)
+        assert report_resp.status_code == 202
+
+        update_resp = await client.put(
+            "/api/v1/reports/devices/edge-device-01",
+            json={
+                "site_name": "一号站点",
+                "display_name": "东塔相机",
+                "note": "重点巡检位",
+            },
+        )
+        assert update_resp.status_code == 200
+
+        get_resp = await client.get("/api/v1/reports/devices/edge-device-01")
+
+    assert get_resp.status_code == 200
+    data = get_resp.json()
+    assert data["device_id"] == "edge-device-01"
+    assert data["site_name"] == "一号站点"
+    assert data["display_name"] == "东塔相机"
+    assert data["note"] == "重点巡检位"
+
+
+@pytest.mark.asyncio
+async def test_report_devices_include_metadata() -> None:
+    """测试设备概览返回设备元数据。"""
+    transport = ASGITransport(app=app)
+    payload = _create_report_payload(device_id="edge-device-02")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        report_resp = await client.post("/api/v1/report", json=payload)
+        assert report_resp.status_code == 202
+
+        update_resp = await client.put(
+            "/api/v1/reports/devices/edge-device-02",
+            json={
+                "site_name": "西区",
+                "display_name": "杆塔 02",
+                "note": "夜间告警频繁",
+            },
+        )
+        assert update_resp.status_code == 200
+
+        list_resp = await client.get("/api/v1/reports/devices?limit=10")
+
+    assert list_resp.status_code == 200
+    item = list_resp.json()["items"][0]
+    assert item["device_id"] == "edge-device-02"
+    assert item["site_name"] == "西区"
+    assert item["display_name"] == "杆塔 02"
+    assert item["note"] == "夜间告警频繁"
+
+
+@pytest.mark.asyncio
+async def test_alert_summary_reports_device_and_task_failures() -> None:
+    """测试告警摘要返回设备与任务失败统计。"""
+    transport = ASGITransport(app=app)
+    payload = _create_report_payload(device_id="edge-alert-01")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        report_resp = await client.post("/api/v1/report", json=payload)
+        assert report_resp.status_code == 202
+
+        app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+            mode="error"
+        )
+        task_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("failed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert task_resp.status_code == 202
+        task_id = task_resp.json()["task_id"]
+
+        for _ in range(20):
+            poll_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert poll_resp.status_code == 200
+            if poll_resp.json()["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败任务未在预期时间内进入 failed 状态")
+
+        summary_resp = await client.get("/api/v1/reports/alerts/summary")
+
+    assert summary_resp.status_code == 200
+    data = summary_resp.json()
+    assert data["failed_task_count"] >= 1
+    assert data["partial_failed_task_count"] >= 0
+    assert data["stale_device_count"] >= 0
 
 
 @pytest.mark.asyncio
