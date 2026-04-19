@@ -9,6 +9,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
+from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
 from vision_analysis_pro.core.inference import YOLOInferenceEngine
@@ -179,6 +180,17 @@ class TestDependencyInjection:
         engine = get_inference_engine(settings)
 
         assert isinstance(engine, StubInferenceEngine)
+
+    def test_get_inference_engine_rejects_removed_hf_crack(self, monkeypatch) -> None:
+        """测试已下线的临时引擎不会静默回退到 YOLO。"""
+        monkeypatch.setenv("INFERENCE_ENGINE", "hf_crack")
+
+        settings = _build_test_settings()()
+        with pytest.raises(HTTPException) as exc_info:
+            get_inference_engine(settings)
+
+        assert exc_info.value.status_code == 503
+        assert "支持的类型: ['stub', 'yolo', 'onnx']" in str(exc_info.value.detail)
 
 
 class TestEdgeCases:

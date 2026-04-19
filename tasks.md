@@ -56,7 +56,19 @@ Goal:
 Exit criteria:
 - Browser E2E and Edge Agent reporting steady-state tests pass.
 - Pilot deployment runbook is complete.
-- Rollback path to `stub` or `hf_crack` remains documented.
+- Rollback path to `stub` remains documented for link testing; model rollback uses the previous local YOLO/ONNX artifact.
+
+## Noise Control
+
+Removed from the mainline:
+- `hf_crack` was removed because it duplicated the Stage A objective, introduced a separate `transformers` model stack, and only worked on the API side.
+
+Future engine additions must satisfy all of the following before entering `INFERENCE_ENGINE`:
+- It has a clear owner task in this file.
+- It works for the intended deployment surface: API only, Edge Agent only, or both.
+- It does not add a second model framework when `stub`, `yolo`, or `onnx` already satisfies the use case.
+- It has tests, deployment docs, and a rollback path.
+- It is not just a temporary demo fallback.
 
 ## Original Direction Traceability
 
@@ -85,7 +97,7 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - `scripts/prepare_stage_a_crack_dataset.py` converts COCO annotations to single-class YOLO labels.
 - Generated local dataset: `data/stage_a_crack/data.yaml`.
 - Smoke training completed with `yolov8n.pt`, 1 epoch, `imgsz=320`, MPS.
-- Current backend baseline: `175 passed, 43 skipped`.
+- Current backend baseline: `176 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Active Task

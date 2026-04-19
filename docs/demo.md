@@ -316,7 +316,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：175 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：176 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：53 passed ✅
 
 ---

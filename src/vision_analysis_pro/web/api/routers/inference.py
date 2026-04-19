@@ -144,8 +144,6 @@ def _run_inference(
     """执行单文件推理并更新指标。"""
     start_time = time.perf_counter()
     confidence_threshold = settings.confidence_threshold
-    if engine.__class__.__name__ == "HFCrackInferenceEngine":
-        confidence_threshold = min(confidence_threshold, 0.2)
 
     try:
         raw_result = engine.predict(

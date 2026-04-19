@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
 **最后更新**：2026-04-19
-**后端测试**：175 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：176 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：53 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 通过
 
@@ -25,7 +25,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ## 🧭 当前路线决策（2026-04-19）
 
-- 短期以 **裂缝检测试点** 为交付目标：`stub` 用于链路验证，`hf_crack` 用于公开裂缝参考模型联调。
+- 短期以 **裂缝检测试点** 为交付目标：`stub` 用于链路验证，Stage A 自训练 YOLO/ONNX 用于真实模型路径。
 - 五类缺陷（crack/rust/deformation/spalling/corrosion）仍作为中期目标，但必须依赖真实数据集、训练权重和评估报告，不再在 README 中表述为已成熟能力。
 - 数据层先使用 OpenCV 可解释规则抽取关键帧：固定间隔、场景变化阈值、模糊过滤；暂不引入复杂视频模型。
 - 视觉识别主线保持 YOLO/ONNX 目标检测；DeepLab 语义分割仅在需要像素级裂缝面积/长度估计时作为后续 refinement。
@@ -39,15 +39,16 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - ✅ 修复本地质量基线：ruff、pytest、前端 lint/test/build 重新对齐
 - ✅ 修复 YOLO 权重缺失时 E2E/训练产物测试未跳过的问题
 - ✅ 统一默认 YOLO 路径口径为 `runs/train/exp/weights/best.pt`
-- ✅ `.gitignore` 忽略本地模型目录，避免误提交 `models/only-crack-I`
+- ✅ `.gitignore` 忽略本地模型目录，避免误提交本地模型权重
 - ✅ 新增 OpenCV 关键帧抽取模块与 CLI：固定间隔、场景变化、模糊过滤、可选落盘
 - ✅ 新增边缘上报批次模板报告接口：`GET /api/v1/report/{batch_id}/summary`
 - ✅ 前端 API 类型与服务层补充模板报告读取能力
+- ✅ 下线 `hf_crack` 临时参考引擎，主线推理引擎收敛为 `stub` / `yolo` / `onnx`
 
 ### 当前验证
 
 - ✅ `uv run ruff check .`
-- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：175 passed, 43 skipped
+- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：176 passed, 43 skipped
 - ✅ `cd web && npm run lint`
 - ✅ `cd web && npm run test -- --run`：53 passed
 - ✅ `cd web && npm run build`
@@ -422,7 +423,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 175 passed, 43 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 176 passed, 43 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账

@@ -8,7 +8,7 @@
 
 ### 当前路线决策（2026-04-19）
 
-- **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 `hf_crack` 做公开裂缝模型联调。
+- **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 Stage A 自训练 YOLO/ONNX 做真实模型路径。
 - **中期目标**：补齐真实数据集与评估报告后，再恢复五类缺陷 YOLO/ONNX 模型路线。
 - **数据层**：已提供 OpenCV 视频帧读取与关键帧抽取工具，先使用固定间隔、场景变化和模糊过滤等可解释规则。
 - **报告层**：已提供基于结构化检测结果的模板报告接口，LLM 后续只作为解释与报告生成层，不参与检测判定。
@@ -17,7 +17,7 @@
 ### 核心特性
 
 - 🚁 **无人机巡检**：支持图片上传、批量任务、边缘端视频/摄像头/RTSP 采集和关键帧抽取工具
-- 🤖 **AI 检测**：Stub / Hugging Face 裂缝检测参考模型 / YOLO / ONNX Runtime 推理
+- 🤖 **AI 检测**：Stub / YOLO / ONNX Runtime 推理
 - 🔧 **边缘计算**：完整的边缘 Agent（采集/推理/上报/离线缓存）
 - 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传/批量任务/复跑/导出/复核/设备视图）+ 边缘上报接收
 - 📝 **报告输出**：边缘批次模板报告摘要，预留 LLM 报告生成上下文
@@ -243,9 +243,9 @@ docker run --rm -p 8000:8000 \
 ### 部署建议
 
 - 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
-- 若仓库内自训练 YOLO 权重不可用，可临时切换 API 的 `INFERENCE_ENGINE=hf_crack` 与 `HF_CRACK_MODEL_PATH=models/only-crack-I` 使用公开裂缝参考模型联调
-- 公开裂缝参考模型可通过 `uv run python scripts/download_hf_crack_model.py` 下载到 `models/only-crack-I`
-- Edge Agent 当前推理引擎仍只支持 `onnx` 与 `yolo`；`hf_crack` 先作为云端 API 联调路径
+- 真实模型路径统一使用 `INFERENCE_ENGINE=yolo` 或 `INFERENCE_ENGINE=onnx`
+- 若仓库内自训练 YOLO 权重不可用，先完成 `tasks.md` 中的 HE-001 Stage A YOLO baseline，不再引入临时第三方参考引擎
+- API 与 Edge Agent 的部署口径保持一致：`stub` 用于链路测试，`yolo` 用于训练/实验，`onnx` 用于部署/边缘推理
 - 生产环境通过 `CORS_ALLOW_ORIGINS` 明确限制前端域名，避免使用通配符
 - 模型文件、数据目录、日志目录建议通过挂载卷管理
 - 密钥类配置统一通过环境变量注入，不要写入镜像
@@ -258,7 +258,7 @@ docker run --rm -p 8000:8000 \
 vision_analysis_pro/
 ├── src/vision_analysis_pro/
 │   ├── core/
-│   │   ├── inference/          # 推理引擎（stub/yolo/hf_crack/onnx）
+│   │   ├── inference/          # 推理引擎（stub/yolo/onnx）
 │   │   └── preprocessing/      # 预处理、可视化、关键帧抽取
 │   ├── web/api/                # FastAPI 路由与依赖
 │   └── edge_agent/             # 边缘 Agent 完整实现
@@ -272,7 +272,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 175 passed, 43 skipped）
+├── tests/                      # Python 测试（当前轻量基线 176 passed, 43 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -299,7 +299,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 175 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 176 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（53 passed）
 
 ### 提交规范
