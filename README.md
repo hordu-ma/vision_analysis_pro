@@ -137,6 +137,22 @@ docker compose up --build
 
 如需启用 ONNX 容器构建，可在 `.env` 中设置 `COMPOSE_INSTALL_ONNX=true`。
 
+### 试点环境一键启动
+
+仓库新增 `scripts/bootstrap_trial.sh`，用于快速完成试点版环境准备：
+
+```bash
+bash scripts/bootstrap_trial.sh
+```
+
+该脚本会：
+
+- 自动补齐 `.env`
+- 创建 `data/`、`models/`、`runs/` 目录
+- 直接启动 `docker compose up --build -d`
+
+适合本地演示、试点交付预演和客户现场快速启动。
+
 ### 本地监控栈（Prometheus + Grafana）
 
 仓库额外提供一个可叠加的监控编排文件：`docker-compose.observability.yml`。
@@ -291,6 +307,9 @@ vision_analysis_pro/
 - [x] Edge Agent 上报持久化、批次幂等与 API Key 校验
 - [x] 生产部署文档
 - [ ] 浏览器级端到端集成测试
+- [x] 批量任务持久化、文件级失败重试与多格式导出
+- [x] 设备元数据管理、告警摘要与审计日志查询
+- [x] 试点环境一键启动脚本
 - [ ] 可选：MQTT 上报器
 - [ ] 可选：Rust/PyO3 性能优化
 

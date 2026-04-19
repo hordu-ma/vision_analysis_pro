@@ -421,6 +421,33 @@ async def get_alert_summary(
     )
 
 
+@router.get(
+    "/reports/audit-logs",
+    response_model=list[schemas.AuditLogResponse],
+    responses={200: {"model": list[schemas.AuditLogResponse]}},
+)
+async def list_audit_logs(
+    request: Request,
+    limit: int = Query(50, ge=1, le=200, description="返回日志数量上限"),
+    settings: Settings = Depends(get_settings),
+) -> list[schemas.AuditLogResponse]:
+    """读取最近的审计日志。"""
+    _authorize_report_request(request, settings)
+    store = get_report_store(str(settings.report_store_db_path))
+    logs = store.list_audit_logs(limit=limit)
+    return [
+        schemas.AuditLogResponse(
+            event_type=item.event_type,
+            resource_id=item.resource_id,
+            actor=item.actor,
+            request_id=item.request_id,
+            detail_json=item.detail_json,
+            created_at=item.created_at,
+        )
+        for item in logs
+    ]
+
+
 def _authorize_report_request(request: Request, settings: Settings) -> None:
     """在配置 API Key 时校验上报请求。"""
     expected_key = settings.cloud_api_key

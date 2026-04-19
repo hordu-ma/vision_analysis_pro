@@ -13,6 +13,7 @@ import type {
   ReportDeviceMetadataRequest,
   ReportDeviceMetadataResponse,
   AlertSummaryResponse,
+  AuditLogResponse,
   ReportRecordResponse,
   ReportReviewRequest,
   ReportReviewResponse
@@ -443,6 +444,11 @@ class ApiService {
 
   async getAlertSummary(): Promise<AlertSummaryResponse> {
     const response = await this.client.get<AlertSummaryResponse>('/reports/alerts/summary')
+    return response.data
+  }
+
+  async listAuditLogs(limit = 50): Promise<AuditLogResponse[]> {
+    const response = await this.client.get<AuditLogResponse[]>(`/reports/audit-logs?limit=${limit}`)
     return response.data
   }
 

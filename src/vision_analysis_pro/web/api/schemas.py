@@ -153,11 +153,16 @@ class InferenceTaskResponse(BaseModel):
     """批量推理异步任务响应。"""
 
     task_id: str = Field(..., description="任务 ID")
-    status: Literal["pending", "running", "completed", "failed", "partial_failed"] = (
-        Field(
-            ...,
-            description="任务状态",
-        )
+    status: Literal[
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "partial_failed",
+        "cancelled",
+    ] = Field(
+        ...,
+        description="任务状态",
     )
     created_at: float = Field(..., description="任务创建时间")
     updated_at: float = Field(..., description="任务更新时间")
@@ -430,6 +435,17 @@ class AlertSummaryResponse(BaseModel):
     partial_failed_task_count: int = Field(..., ge=0, description="部分失败任务数")
     ready_failure_count: int = Field(..., ge=0, description="就绪检查失败次数")
     request_id: str | None = Field(None, description="请求 ID")
+
+
+class AuditLogResponse(BaseModel):
+    """审计日志响应。"""
+
+    event_type: str = Field(..., description="事件类型")
+    resource_id: str = Field(..., description="资源标识")
+    actor: str = Field(..., description="操作者")
+    request_id: str = Field(..., description="请求 ID")
+    detail_json: str = Field(..., description="详情 JSON")
+    created_at: float = Field(..., description="创建时间")
 
 
 class ReportDeviceListResponse(BaseModel):

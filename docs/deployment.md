@@ -123,6 +123,26 @@
 
 ## 5. 本地直接部署
 
+### 5.0 试点环境一键启动
+
+如果你要快速拉起试点版环境，可直接执行：
+
+```bash
+bash scripts/bootstrap_trial.sh
+```
+
+脚本会自动：
+
+- 复制 `.env.example` 到 `.env`（如果尚不存在）
+- 创建 `data/`、`models/`、`runs/` 目录
+- 执行 `docker compose up --build -d`
+
+适合：
+
+- 本地试点预演
+- 客户现场快速启动
+- 演示环境恢复
+
 ## 5.1 安装依赖
 
 基础依赖：

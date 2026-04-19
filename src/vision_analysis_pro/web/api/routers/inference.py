@@ -934,6 +934,50 @@ async def delete_inference_task(task_id: str) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post(
+    "/images/tasks/{task_id}/cancel",
+    response_model=schemas.InferenceTaskResponse,
+    responses={
+        200: {"model": schemas.InferenceTaskResponse},
+        400: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def cancel_inference_task(task_id: str) -> schemas.InferenceTaskResponse:
+    """取消尚未执行的任务。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    if not task_manager.cancel_task(task_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TASK_CANCEL_NOT_ALLOWED",
+                "message": "仅待执行任务支持取消",
+                "detail": task_id,
+            },
+        )
+    updated_record = task_manager.get_task(task_id)
+    if updated_record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    return _task_record_to_response(updated_record)
+
+
 @router.delete(
     "/images/tasks",
     responses={200: {"content": {"application/json": {}}}},

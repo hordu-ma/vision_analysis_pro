@@ -1056,6 +1056,73 @@ async def test_alert_summary_reports_device_and_task_failures() -> None:
 
 
 @pytest.mark.asyncio
+async def test_cancel_pending_inference_task() -> None:
+    """测试待执行任务可取消。"""
+
+    class SlowStubInferenceEngine(StubInferenceEngine):
+        def predict(self, image, *args, **kwargs):  # type: ignore[override]
+            time.sleep(0.2)
+            return super().predict(image, *args, **kwargs)
+
+    app.dependency_overrides[get_inference_engine] = lambda: SlowStubInferenceEngine(
+        mode="normal"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        first_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("first.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert first_resp.status_code == 202
+
+        second_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("second.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert second_resp.status_code == 202
+        second_task_id = second_resp.json()["task_id"]
+
+        cancel_resp = await client.post(
+            f"/api/v1/inference/images/tasks/{second_task_id}/cancel"
+        )
+
+    assert cancel_resp.status_code == 200
+    data = cancel_resp.json()
+    assert data["status"] == "cancelled"
+    assert data["error"]["code"] == "TASK_CANCELLED"
+
+
+@pytest.mark.asyncio
+async def test_list_audit_logs_returns_recent_entries() -> None:
+    """测试可查询最近审计日志。"""
+    transport = ASGITransport(app=app)
+    payload = _create_report_payload(device_id="edge-audit-01")
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        report_resp = await client.post("/api/v1/report", json=payload)
+        assert report_resp.status_code == 202
+
+        update_resp = await client.put(
+            "/api/v1/reports/devices/edge-audit-01",
+            headers={"x-actor": "tester"},
+            json={
+                "site_name": "测试站点",
+                "display_name": "测试设备",
+                "note": "审计验证",
+            },
+        )
+        assert update_resp.status_code == 200
+
+        audit_resp = await client.get("/api/v1/reports/audit-logs?limit=10")
+
+    assert audit_resp.status_code == 200
+    data = audit_resp.json()
+    assert len(data) >= 1
+    assert data[0]["event_type"] == "device_metadata_updated"
+    assert data[0]["actor"] == "tester"
+
+
+@pytest.mark.asyncio
 async def test_ready_health_endpoint() -> None:
     """测试就绪检查端点"""
     transport = ASGITransport(app=app)

@@ -2,11 +2,17 @@
   <div class="app-container">
     <el-container>
       <el-header>
-        <h1>Vision Analysis Pro</h1>
+        <div class="header-left">
+          <h1>Vision Analysis Pro</h1>
+          <el-radio-group v-model="activeView" size="small">
+            <el-radio-button label="workspace">任务工作台</el-radio-button>
+            <el-radio-button label="devices">设备管理</el-radio-button>
+          </el-radio-group>
+        </div>
         <HealthStatus />
       </el-header>
       <el-main>
-        <el-row :gutter="24">
+        <el-row v-if="activeView === 'workspace'" :gutter="24">
           <el-col :lg="14" :xs="24">
             <ImageUpload
               @result="handleResult"
@@ -59,6 +65,17 @@
             />
           </el-col>
         </el-row>
+        <DeviceManagementView
+          v-else
+          :summary="alertSummary"
+          :devices="devices"
+          :logs="auditLogs"
+          @refresh-alerts="loadAlertSummary"
+          @refresh-devices="loadReportData"
+          @refresh-audit-logs="loadAuditLogs"
+          @select-device="handleDeviceSelect"
+          @edit-device="openDeviceMetadata"
+        />
         <ReportDetailDrawer
           :visible="detailVisible"
           :report="selectedReport"
@@ -88,25 +105,39 @@
 </template>
 
 <script setup lang="ts">
-import { ElContainer, ElHeader, ElMain, ElRow, ElCol } from 'element-plus'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import AlertSummaryCard from '@/components/AlertSummaryCard.vue'
-import DeviceOverview from '@/components/DeviceOverview.vue'
-import BatchDetectionResult from '@/components/BatchDetectionResult.vue'
-import BatchTaskStatus from '@/components/BatchTaskStatus.vue'
-import DetectionResult from '@/components/DetectionResult.vue'
-import DeviceMetadataDrawer from '@/components/DeviceMetadataDrawer.vue'
+import {
+  ElCol,
+  ElContainer,
+  ElHeader,
+  ElMain,
+  ElRadioButton,
+  ElRadioGroup,
+  ElRow
+} from 'element-plus'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
+const DeviceManagementView = defineAsyncComponent(
+  () => import('@/components/DeviceManagementView.vue')
+)
+const BatchDetectionResult = defineAsyncComponent(
+  () => import('@/components/BatchDetectionResult.vue')
+)
+const BatchTaskStatus = defineAsyncComponent(() => import('@/components/BatchTaskStatus.vue'))
+const DeviceMetadataDrawer = defineAsyncComponent(
+  () => import('@/components/DeviceMetadataDrawer.vue')
+)
+const DetectionResult = defineAsyncComponent(() => import('@/components/DetectionResult.vue'))
 import HealthStatus from '@/components/HealthStatus.vue'
 import ImageUpload from '@/components/ImageUpload.vue'
 import ReportBatchList from '@/components/ReportBatchList.vue'
-import ReportDetailDrawer from '@/components/ReportDetailDrawer.vue'
-import TaskDetailDrawer from '@/components/TaskDetailDrawer.vue'
+const ReportDetailDrawer = defineAsyncComponent(() => import('@/components/ReportDetailDrawer.vue'))
+const TaskDetailDrawer = defineAsyncComponent(() => import('@/components/TaskDetailDrawer.vue'))
 import TaskHistoryList from '@/components/TaskHistoryList.vue'
 import { apiService } from '@/services/api'
 import type {
   InferenceResponse,
   BatchInferenceResponse,
   AlertSummaryResponse,
+  AuditLogResponse,
   InferenceTaskDetailResponse,
   InferenceTaskResponse,
   InferenceTaskStatus,
@@ -118,11 +149,13 @@ import type {
 } from '@/types/api'
 
 const detectionResult = ref<InferenceResponse | null>(null)
+const activeView = ref<'workspace' | 'devices'>('workspace')
 const batchDetectionResult = ref<BatchInferenceResponse | null>(null)
 const batchTask = ref<InferenceTaskDetailResponse | null>(null)
 const taskHistory = ref<InferenceTaskResponse[]>([])
 const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
 const alertSummary = ref<AlertSummaryResponse | null>(null)
+const auditLogs = ref<AuditLogResponse[]>([])
 const batches = ref<ReportBatchSummary[]>([])
 const devices = ref<ReportDeviceSummary[]>([])
 const selectedDeviceId = ref('')
@@ -358,6 +391,14 @@ const loadAlertSummary = async () => {
   }
 }
 
+const loadAuditLogs = async () => {
+  try {
+    auditLogs.value = await apiService.listAuditLogs(20)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
 const handleDeviceSelect = (deviceId: string) => {
   selectedDeviceId.value = deviceId
   void loadReportData()
@@ -380,6 +421,7 @@ const handleSaveDeviceMetadata = async (payload: ReportDeviceMetadataRequest) =>
     await apiService.updateReportDeviceMetadata(editingDeviceId.value, payload)
     deviceDrawerVisible.value = false
     await loadReportData()
+    await loadAuditLogs()
   } catch (error) {
     apiService.showError(error as Error)
   }
@@ -423,6 +465,7 @@ const handleExportCsv = async (batchId: string) => {
 onMounted(() => {
   void loadReportData()
   void loadAlertSummary()
+  void loadAuditLogs()
   void loadTaskHistory()
 })
 
@@ -444,6 +487,12 @@ onBeforeUnmount(() => {
   background-color: #ffffff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   padding: 0 20px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
 .el-header h1 {

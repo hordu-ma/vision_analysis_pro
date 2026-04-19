@@ -187,6 +187,15 @@ export interface AlertSummaryResponse {
   request_id?: string
 }
 
+export interface AuditLogResponse {
+  event_type: string
+  resource_id: string
+  actor: string
+  request_id: string
+  detail_json: string
+  created_at: number
+}
+
 export interface ErrorResponse {
   code: string
   message: string

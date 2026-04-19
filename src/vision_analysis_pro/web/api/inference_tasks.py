@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-TERMINAL_TASK_STATUSES = {"completed", "failed"}
+TERMINAL_TASK_STATUSES = {"completed", "failed", "cancelled"}
 MAX_TERMINAL_TASKS = 50
 
 
@@ -190,6 +190,7 @@ class InferenceTaskManager:
         self._queue: deque[tuple[str, WorkerCallback]] = deque()
         self._queue_event = threading.Event()
         self._closed = False
+        self._active_task_id: str | None = None
         self._worker = threading.Thread(
             target=self._worker_loop,
             daemon=True,
@@ -231,7 +232,23 @@ class InferenceTaskManager:
     def list_tasks(
         self, *, limit: int = 20, status_filter: str | None = None
     ) -> list[InferenceTaskRecord]:
-        return self._store.list_tasks(limit=limit, status_filter=status_filter)
+        records = self._store.list_tasks(limit=limit, status_filter=status_filter)
+        with self._lock:
+            queue_positions = {
+                queued_task_id: index + 1
+                for index, (queued_task_id, _) in enumerate(self._queue)
+            }
+            active_task_id = self._active_task_id
+
+        for record in records:
+            if record.status == "pending":
+                record.metadata = dict(record.metadata)
+                record.metadata["queue_position"] = queue_positions.get(
+                    record.task_id, 0
+                )
+            record.metadata = dict(record.metadata)
+            record.metadata["is_active"] = record.task_id == active_task_id
+        return records
 
     def clear(self) -> None:
         with self._lock:
@@ -240,6 +257,31 @@ class InferenceTaskManager:
 
     def delete_task(self, task_id: str) -> bool:
         return self._store.delete_task(task_id)
+
+    def cancel_task(self, task_id: str) -> bool:
+        record = self.get_task(task_id)
+        if record is None or record.status != "pending":
+            return False
+
+        with self._lock:
+            self._queue = deque(
+                (queued_task_id, worker)
+                for queued_task_id, worker in self._queue
+                if queued_task_id != task_id
+            )
+            if not self._queue:
+                self._queue_event.clear()
+
+        self._update_task(
+            task_id,
+            status="cancelled",
+            error={
+                "code": "TASK_CANCELLED",
+                "message": "任务已取消",
+                "detail": task_id,
+            },
+        )
+        return True
 
     def cleanup_tasks(self, *, status_filter: str | None = None) -> int:
         return self._store.cleanup_tasks(status_filter=status_filter)
@@ -253,7 +295,11 @@ class InferenceTaskManager:
                         self._queue_event.clear()
                         break
                     task_id, worker = self._queue.popleft()
+                    self._active_task_id = task_id
                 self._run_task(task_id, worker)
+                with self._lock:
+                    if self._active_task_id == task_id:
+                        self._active_task_id = None
 
     def _run_task(self, task_id: str, worker: WorkerCallback) -> None:
         self._update_task(task_id, status="running")

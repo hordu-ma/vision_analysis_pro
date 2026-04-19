@@ -326,6 +326,21 @@ class SQLiteReportStore:
                 )
                 conn.commit()
 
+    def list_audit_logs(self, *, limit: int = 50) -> list[AuditLogRecord]:
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT event_type, resource_id, actor, request_id, detail_json, created_at
+                    FROM audit_logs
+                    ORDER BY created_at DESC
+                    LIMIT ?
+                    """,
+                    (limit,),
+                ).fetchall()
+        return [_row_to_audit_log(row) for row in rows]
+
     def list_reviews(self, batch_id: str) -> dict[int, ReportFrameReview]:
         """读取指定批次的人工复核信息。"""
         with self._lock:
@@ -532,6 +547,17 @@ def _row_to_device_metadata(row: sqlite3.Row) -> ReportDeviceMetadata:
         display_name=str(row["display_name"]),
         note=str(row["note"]),
         updated_at=float(row["updated_at"]),
+    )
+
+
+def _row_to_audit_log(row: sqlite3.Row) -> AuditLogRecord:
+    return AuditLogRecord(
+        event_type=str(row["event_type"]),
+        resource_id=str(row["resource_id"]),
+        actor=str(row["actor"]),
+        request_id=str(row["request_id"]),
+        detail_json=str(row["detail_json"]),
+        created_at=float(row["created_at"]),
     )
 
 
