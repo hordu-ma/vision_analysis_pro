@@ -14,8 +14,17 @@
               @batch-task="handleBatchTask"
             />
             <DetectionResult :result="detectionResult" />
-            <BatchTaskStatus :task="batchTask" @retry="handleRetryTask" @rerun="handleRerunTask" />
-            <BatchDetectionResult :result="batchDetectionResult" />
+            <BatchTaskStatus
+              :task="batchTask"
+              @retry="handleRetryTask"
+              @rerun="handleRerunTask"
+              @export="handleExportTaskCsv"
+            />
+            <BatchDetectionResult
+              :result="batchDetectionResult"
+              :task-id="batchTask?.status === 'completed' ? batchTask.task_id : undefined"
+              @export="handleExportTaskCsv"
+            />
           </el-col>
           <el-col :lg="10" :xs="24">
             <DeviceOverview
@@ -37,6 +46,7 @@
               @select="openTaskHistory"
               @retry="handleRetryTask"
               @rerun="handleRerunTask"
+              @export="handleExportTaskCsv"
               @update:status-filter="handleTaskStatusFilterChange"
             />
           </el-col>
@@ -209,6 +219,20 @@ const handleRerunTask = async (taskId: string) => {
 const handleTaskStatusFilterChange = (status: InferenceTaskStatus | '') => {
   taskStatusFilter.value = status
   void loadTaskHistory()
+}
+
+const handleExportTaskCsv = async (taskId: string) => {
+  try {
+    const blob = await apiService.exportBatchTaskCsv(taskId)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `${taskId}.csv`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
 }
 
 const loadReportData = async () => {

@@ -44,6 +44,14 @@
       >
         复跑当前任务
       </el-button>
+      <el-button
+        v-if="task.status === 'completed'"
+        type="primary"
+        plain
+        @click="emit('export', task.task_id)"
+      >
+        导出 CSV
+      </el-button>
     </div>
   </el-card>
 </template>
@@ -67,6 +75,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   retry: [taskId: string]
   rerun: [taskId: string]
+  export: [taskId: string]
 }>()
 
 const statusLabel = computed(() => {

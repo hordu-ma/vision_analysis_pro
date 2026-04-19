@@ -333,6 +333,13 @@ class ApiService {
     return response.data
   }
 
+  async exportBatchTaskCsv(taskId: string): Promise<Blob> {
+    const response = await this.client.get(`/inference/images/tasks/${taskId}/export.csv`, {
+      responseType: 'blob'
+    })
+    return response.data as Blob
+  }
+
   /**
    * 检查服务可用性
    */

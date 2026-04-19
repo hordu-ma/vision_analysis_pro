@@ -309,6 +309,18 @@ describe('API Service', () => {
       expect(result).toEqual(mockResponse)
       expect(mockPost).toHaveBeenCalledWith('/inference/images/tasks/task-completed/rerun')
     })
+
+    it('应该导出已完成任务 CSV', async () => {
+      const blob = new Blob(['task_id,filename'], { type: 'text/csv' })
+      mockGet.mockResolvedValue({ data: blob })
+
+      const result = await apiService.exportBatchTaskCsv('task-completed')
+
+      expect(result).toBe(blob)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks/task-completed/export.csv', {
+        responseType: 'blob'
+      })
+    })
   })
 
   describe('isServiceAvailable()', () => {
@@ -475,6 +487,7 @@ describe('API Service', () => {
       expect(apiService.listBatchTasks).toBeDefined()
       expect(apiService.retryBatchTask).toBeDefined()
       expect(apiService.rerunBatchTask).toBeDefined()
+      expect(apiService.exportBatchTaskCsv).toBeDefined()
       expect(apiService.isServiceAvailable).toBeDefined()
       expect(apiService.listReportBatches).toBeDefined()
       expect(apiService.listReportDevices).toBeDefined()

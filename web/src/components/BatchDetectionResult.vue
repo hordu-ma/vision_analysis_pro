@@ -4,6 +4,15 @@
       <template #header>
         <div class="card-header">
           <span>批量分析结果</span>
+          <el-button
+            v-if="taskId"
+            type="primary"
+            plain
+            size="small"
+            @click="emit('export', taskId)"
+          >
+            导出 CSV
+          </el-button>
         </div>
       </template>
       <el-row :gutter="20">
@@ -45,13 +54,26 @@
 </template>
 
 <script setup lang="ts">
-import { ElCard, ElCol, ElCollapse, ElCollapseItem, ElRow, ElStatistic } from 'element-plus'
+import {
+  ElButton,
+  ElCard,
+  ElCol,
+  ElCollapse,
+  ElCollapseItem,
+  ElRow,
+  ElStatistic
+} from 'element-plus'
 import { computed } from 'vue'
 import DetectionResult from '@/components/DetectionResult.vue'
 import type { BatchInferenceResponse } from '@/types/api'
 
 const props = defineProps<{
   result: BatchInferenceResponse | null
+  taskId?: string
+}>()
+
+const emit = defineEmits<{
+  export: [taskId: string]
 }>()
 
 const totalDetections = computed(() => {

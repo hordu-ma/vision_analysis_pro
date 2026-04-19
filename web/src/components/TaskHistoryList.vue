@@ -66,6 +66,14 @@
             >
               复跑
             </el-button>
+            <el-button
+              v-if="scope.row.status === 'completed'"
+              link
+              type="primary"
+              @click="emit('export', scope.row.task_id)"
+            >
+              导出
+            </el-button>
           </div>
         </template>
       </el-table-column>
@@ -96,6 +104,7 @@ const emit = defineEmits<{
   select: [taskId: string]
   retry: [taskId: string]
   rerun: [taskId: string]
+  export: [taskId: string]
   'update:statusFilter': [status: InferenceTaskStatus | '']
 }>()
 

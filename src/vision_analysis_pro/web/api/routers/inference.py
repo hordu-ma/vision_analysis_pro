@@ -1,6 +1,8 @@
 """推理相关 API"""
 
 import base64
+import csv
+import io
 import logging
 import time
 from types import SimpleNamespace
@@ -16,6 +18,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import Response
 
 from vision_analysis_pro.core.preprocessing.visualization import draw_detections
 from vision_analysis_pro.settings import Settings, get_settings
@@ -621,6 +624,81 @@ async def rerun_inference_task(
         settings=settings,
         engine=engine,
         metrics=metrics,
+    )
+
+
+@router.get(
+    "/images/tasks/{task_id}/export.csv",
+    responses={
+        200: {"content": {"text/csv": {}}},
+        400: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def export_inference_task_csv(task_id: str) -> Response:
+    """导出已完成批量任务的 CSV 结果。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    if record.status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TASK_EXPORT_NOT_ALLOWED",
+                "message": "仅已完成任务支持导出",
+                "detail": task_id,
+            },
+        )
+
+    csv_buffer = io.StringIO()
+    writer = csv.writer(csv_buffer)
+    writer.writerow(
+        [
+            "task_id",
+            "filename",
+            "label",
+            "confidence",
+            "bbox",
+            "detection_count",
+            "inference_time_ms",
+            "engine",
+            "request_id",
+        ]
+    )
+
+    for result in record.results:
+        detections = result.get("detections", [])
+        metadata = result.get("metadata", {})
+        rows = detections or [{}]
+        for detection in rows:
+            writer.writerow(
+                [
+                    task_id,
+                    result.get("filename", ""),
+                    detection.get("label", ""),
+                    detection.get("confidence", ""),
+                    detection.get("bbox", ""),
+                    metadata.get("detection_count", len(detections)),
+                    metadata.get("inference_time_ms", ""),
+                    metadata.get("engine", ""),
+                    metadata.get("request_id", record.metadata.get("request_id", "")),
+                ]
+            )
+
+    return Response(
+        content=csv_buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{task_id}.csv"',
+        },
     )
 
 

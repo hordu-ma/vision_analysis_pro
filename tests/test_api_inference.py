@@ -540,6 +540,93 @@ async def test_rerun_inference_task_replays_completed_task() -> None:
 
 
 @pytest.mark.asyncio
+async def test_export_inference_task_csv_returns_attachment() -> None:
+    """测试已完成任务支持导出 CSV。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("export.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内完成")
+
+        export_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.csv"
+        )
+
+    assert export_resp.status_code == 200
+    assert export_resp.headers["content-type"].startswith("text/csv")
+    assert (
+        export_resp.headers["content-disposition"]
+        == f'attachment; filename="{task_id}.csv"'
+    )
+    assert (
+        "task_id,filename,label,confidence,bbox,detection_count,inference_time_ms,engine,request_id"
+        in export_resp.text
+    )
+    assert task_id in export_resp.text
+    assert "export.jpg" in export_resp.text
+
+
+@pytest.mark.asyncio
+async def test_export_inference_task_csv_rejects_non_completed_task() -> None:
+    """测试只有已完成任务支持导出 CSV。"""
+    app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+        mode="error"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("failed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败任务未在预期时间内进入 failed 状态")
+
+        export_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.csv"
+        )
+
+    assert export_resp.status_code == 400
+    data = export_resp.json()
+    assert data["code"] == "TASK_EXPORT_NOT_ALLOWED"
+
+
+@pytest.mark.asyncio
+async def test_export_inference_task_csv_returns_not_found_for_missing_task() -> None:
+    """测试导出不存在的任务返回 404。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get(
+            "/api/v1/inference/images/tasks/task-missing/export.csv"
+        )
+
+    assert resp.status_code == 404
+    data = resp.json()
+    assert data["code"] == "TASK_NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_live_health_endpoint() -> None:
     """测试存活检查端点"""
     transport = ASGITransport(app=app)
