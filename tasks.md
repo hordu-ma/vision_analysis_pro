@@ -2,11 +2,11 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-001 / Stage A crack-only YOLO baseline**; Stage B is already planned but starts after HE-001 acceptance.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-002 / Browser E2E Smoke**; Stage B is already planned but starts after HE-001 acceptance.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -23,7 +23,7 @@ Goal:
 Status:
 - Data source selected and converted locally.
 - 1-epoch smoke training passed.
-- Formal baseline training, evaluation, ONNX export, and model note are still pending in HE-001.
+- Formal baseline training, evaluation, ONNX export, YOLO/API smoke, and ONNX smoke passed in HE-001.
 
 Exit criteria:
 - `runs/stage_a_crack/baseline_v0_1/weights/best.pt` exists locally.
@@ -97,14 +97,17 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - `scripts/prepare_stage_a_crack_dataset.py` converts COCO annotations to single-class YOLO labels.
 - Generated local dataset: `data/stage_a_crack/data.yaml`.
 - Smoke training completed with `yolov8n.pt`, 1 epoch, `imgsz=320`, MPS.
+- HE-001 Stage A formal YOLO baseline completed from `data/stage_a_crack/data.yaml`.
+- Best Stage A validation metrics at epoch 26: precision `0.92581`, recall `0.91344`, mAP50 `0.95556`, mAP50-95 `0.63521`.
+- Local artifacts created: `runs/stage_a_crack/baseline_v0_1/weights/best.pt` and `models/stage_a_crack/best.onnx`.
 - Current backend baseline: `176 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
-## Active Task
+## Accepted Task
 
 ### HE-001 Stage A YOLO Baseline v0.1
 
-Status: Next
+Status: Done
 Priority: P0
 Owner: project maintainer
 
@@ -119,12 +122,18 @@ Implementation notes:
 - Keep training outputs under `runs/stage_a_crack/` and model exports under ignored `models/`.
 - Do not claim production accuracy from the 1-epoch smoke run.
 
+Result:
+- Training completed on CUDA device `0` with early stopping at epoch 31.
+- Best model came from epoch 26.
+- Evaluation note: `docs/stage-a-yolo-baseline-v0.1.md`.
+- API/YOLO smoke and ONNX smoke passed on `data/stage_a_crack/images/val/crack-101-_jpg.rf.7250a8c4188a62263f703859846f833d.jpg`.
+
 Acceptance criteria:
-- Training command and hyperparameters are recorded in docs.
-- Validation metrics include at least precision, recall, mAP50, and mAP50-95.
-- A sample inference succeeds through the existing YOLO path.
-- ONNX export succeeds or the blocker is documented with exact error output.
-- A short model card or evaluation note is added under `docs/`.
+- [x] Training command and hyperparameters are recorded in docs.
+- [x] Validation metrics include at least precision, recall, mAP50, and mAP50-95.
+- [x] A sample inference succeeds through the existing YOLO path.
+- [x] ONNX export succeeds or the blocker is documented with exact error output.
+- [x] A short model card or evaluation note is added under `docs/`.
 
 Validation commands:
 
@@ -139,11 +148,13 @@ uv run python scripts/train.py \
   --epochs 50 \
   --batch 8 \
   --imgsz 640 \
-  --device mps \
+  --device 0 \
   --workers 0 \
   --project runs/stage_a_crack \
   --name baseline_v0_1 \
   --exist-ok
+
+uv sync --extra dev --extra onnx
 
 uv run python scripts/export_onnx.py \
   --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
@@ -157,11 +168,11 @@ Rollback:
 - Remove `runs/stage_a_crack/baseline_v0_1/` and exported files under `models/stage_a_crack/`.
 - Leave `scripts/prepare_stage_a_crack_dataset.py` and `data/stage_a_crack/data.yaml` intact unless the dataset source changes.
 
-## P0 Queue
+## Active Task
 
 ### HE-002 Browser E2E Smoke
 
-Status: Planned
+Status: Next
 Priority: P0
 
 Scope:
@@ -183,6 +194,8 @@ npm run test -- --run
 npm run build
 npm run test:e2e
 ```
+
+## P0 Queue
 
 ### HE-003 Keyframes Into Edge Agent
 

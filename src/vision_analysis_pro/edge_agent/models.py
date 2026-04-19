@@ -2,13 +2,13 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 import numpy as np
 
 
-class SourceType(str, Enum):
+class SourceType(StrEnum):
     """数据源类型"""
 
     VIDEO = "video"
@@ -17,7 +17,7 @@ class SourceType(str, Enum):
     CAMERA = "camera"
 
 
-class ReportStatus(str, Enum):
+class ReportStatus(StrEnum):
     """上报状态"""
 
     PENDING = "pending"

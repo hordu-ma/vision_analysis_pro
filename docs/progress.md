@@ -488,23 +488,36 @@ uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-repor
 
 ---
 
+## 最新进展：HE-001 Stage A YOLO Baseline v0.1
+
+2026-04-20 完成 Stage A crack-only YOLO 基线验收。
+
+- 数据集：`data/stage_a_crack/data.yaml`，来自 Hugging Face `senthilsk/crack_detection_dataset`，单类 `crack`。
+- 训练命令：`uv run python scripts/train.py --data data/stage_a_crack/data.yaml --model yolov8n.pt --epochs 50 --batch 8 --imgsz 640 --device 0 --workers 0 --project runs/stage_a_crack --name baseline_v0_1 --exist-ok`。
+- 训练结果：EarlyStopping 于 31 epochs 结束，best epoch 为 26。
+- best 验证指标：precision `0.92581`，recall `0.91344`，mAP50 `0.95556`，mAP50-95 `0.63521`。
+- 本地产物：`runs/stage_a_crack/baseline_v0_1/weights/best.pt`，`models/stage_a_crack/best.onnx`。
+- 评估记录：`docs/stage-a-yolo-baseline-v0.1.md`。
+- 烟测：YOLO direct、FastAPI `/api/v1/inference/image`、ONNX direct 均通过。
+
+Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Stage B 自有数据闭环确认。
+
 ## 📋 下一步计划
 
 下一步开发计划以根目录 `tasks.md` 为准。当前活跃队列：
 
-1. **HE-001 Stage A YOLO Baseline v0.1**：正式训练 crack-only YOLO、记录评估、导出 ONNX。
-2. **HE-002 Browser E2E Smoke**：验证前端上传到结果展示的真实浏览器流程。
-3. **HE-003 Keyframes Into Edge Agent**：将 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
-4. **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
-5. **HE-005 Pilot Deployment Runbook**：明确试点部署、模型挂载、观测与回滚步骤。
-6. **HE-006 Stage B Pilot Data Loop**：将自有视频/图片抽帧、标注、切分为独立 YOLO 数据集。
-7. **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型做同集对比。
-8. **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要和导出链路。
+1. **HE-002 Browser E2E Smoke**：验证前端上传到结果展示的真实浏览器流程。
+2. **HE-003 Keyframes Into Edge Agent**：将 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
+3. **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
+4. **HE-005 Pilot Deployment Runbook**：明确试点部署、模型挂载、观测与回滚步骤。
+5. **HE-006 Stage B Pilot Data Loop**：将自有视频/图片抽帧、标注、切分为独立 YOLO 数据集。
+6. **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型做同集对比。
+7. **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要和导出链路。
 
 非关键路径：MQTT、Rust/PyO3、DeepLab、Transformer 趋势分析、LLM 报告扩展均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
 ---
 
 **文档维护者**：Vision Analysis Pro Team  
-**最后更新**：2026-04-19
-**下次更新**：完成 HE-001 Stage A YOLO Baseline v0.1 后
+**最后更新**：2026-04-20
+**下次更新**：完成 HE-002 Browser E2E Smoke 后

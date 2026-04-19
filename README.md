@@ -244,7 +244,7 @@ docker run --rm -p 8000:8000 \
 
 - 开发环境优先使用 `INFERENCE_ENGINE=stub` 验证 API 与前端链路
 - 真实模型路径统一使用 `INFERENCE_ENGINE=yolo` 或 `INFERENCE_ENGINE=onnx`
-- 若仓库内自训练 YOLO 权重不可用，先完成 `tasks.md` 中的 HE-001 Stage A YOLO baseline，不再引入临时第三方参考引擎
+- Stage A 自训练模型路径已验收；本地权重位于 `runs/stage_a_crack/baseline_v0_1/weights/best.pt`，ONNX 位于 `models/stage_a_crack/best.onnx`
 - API 与 Edge Agent 的部署口径保持一致：`stub` 用于链路测试，`yolo` 用于训练/实验，`onnx` 用于部署/边缘推理
 - 生产环境通过 `CORS_ALLOW_ORIGINS` 明确限制前端域名，避免使用通配符
 - 模型文件、数据目录、日志目录建议通过挂载卷管理
@@ -355,7 +355,6 @@ vision_analysis_pro/
 
 ### 📋 当前任务队列
 
-- **HE-001 Stage A YOLO Baseline v0.1**：训练可复现的 crack-only YOLO 基线，形成评估记录并导出 ONNX。
 - **HE-002 Browser E2E Smoke**：补浏览器级上传、推理、结果展示 smoke test。
 - **HE-003 Keyframes Into Edge Agent**：把 OpenCV 关键帧抽取接入边缘 Agent 视频链路。
 - **HE-004 Edge Agent Reporting Steady State**：覆盖离线缓存回放、重复 batch、API Key 与报告摘要。
