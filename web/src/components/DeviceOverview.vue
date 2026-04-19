@@ -7,7 +7,10 @@
       </div>
     </template>
 
-    <el-empty v-if="!devices.length" description="暂无设备上报记录" />
+    <div v-if="!devices.length" class="empty-state">
+      <div class="empty-icon">◎</div>
+      <p>暂无设备上报记录</p>
+    </div>
 
     <el-table v-else :data="devices" stripe>
       <el-table-column prop="device_id" label="设备 ID" min-width="160" />
@@ -48,7 +51,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElEmpty, ElTable, ElTableColumn } from 'element-plus'
+import { ElButton, ElCard, ElTable, ElTableColumn } from 'element-plus'
 import type { ReportDeviceSummary } from '@/types/api'
 
 defineProps<{
@@ -68,12 +71,41 @@ const formatTime = (timestamp: number): string => {
 
 <style scoped>
 .device-overview-card {
-  margin-bottom: 24px;
+  height: 100%;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.device-overview-card :deep(.el-button.is-link) {
+  font-weight: 600;
+}
+
+.device-overview-card :deep(.el-card__header) {
+  padding-bottom: 14px;
+}
+
+.empty-state {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  color: #0f766e;
+  font-size: 22px;
 }
 </style>

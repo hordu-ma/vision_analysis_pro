@@ -148,5 +148,11 @@ const progressStatus = computed(() => {
   margin-top: 16px;
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.batch-task-card :deep(.el-descriptions) {
+  border-radius: 16px;
+  overflow: hidden;
 }
 </style>

@@ -1,6 +1,15 @@
 <template>
   <el-drawer :model-value="visible" size="55%" title="批次详情" @close="emit('close')">
     <div v-if="report" class="detail-wrapper">
+      <div class="detail-hero">
+        <div>
+          <p class="detail-kicker">Batch Archive</p>
+          <h3>{{ report.batch_id }}</h3>
+          <p>用于查看边缘上报批次、人工复核与导出交付明细。</p>
+        </div>
+        <span class="detail-status">{{ report.device_id }}</span>
+      </div>
+
       <el-descriptions :column="2" border class="detail-summary">
         <el-descriptions-item label="批次 ID">{{ report.batch_id }}</el-descriptions-item>
         <el-descriptions-item label="设备 ID">{{ report.device_id }}</el-descriptions-item>
@@ -199,6 +208,42 @@ const formatReviewStatus = (status?: ReviewStatus | null): string => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.detail-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, rgba(14, 116, 144, 0.95), rgba(15, 23, 42, 0.92));
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.detail-kicker {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(165, 243, 252, 0.82);
+}
+
+.detail-hero h3 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.detail-hero p:last-child {
+  margin: 8px 0 0;
+  color: rgba(224, 242, 254, 0.78);
+}
+
+.detail-status {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  font-size: 12px;
 }
 
 .detail-actions {

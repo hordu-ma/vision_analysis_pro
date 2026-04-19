@@ -6,7 +6,7 @@
         <div class="header-actions">
           <el-select
             :model-value="statusFilter"
-            placeholder="筛选状态"
+            placeholder="状态"
             size="small"
             clearable
             class="status-filter"
@@ -17,13 +17,16 @@
             <el-option label="已完成" value="completed" />
             <el-option label="失败" value="failed" />
           </el-select>
-          <el-button text @click="emitCleanup">清理终态</el-button>
+          <el-button text @click="emitCleanup">清理</el-button>
           <el-button text @click="emit('refresh')">刷新</el-button>
         </div>
       </div>
     </template>
 
-    <el-empty v-if="!tasks.length" description="暂无批量任务" />
+    <div v-if="!tasks.length" class="empty-state">
+      <div class="empty-icon">◌</div>
+      <p>暂无批量任务</p>
+    </div>
 
     <el-table v-else :data="tasks" stripe>
       <el-table-column label="任务 ID" min-width="180">
@@ -99,16 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ElButton,
-  ElCard,
-  ElEmpty,
-  ElOption,
-  ElSelect,
-  ElTable,
-  ElTableColumn,
-  ElTag
-} from 'element-plus'
+import { ElButton, ElCard, ElOption, ElSelect, ElTable, ElTableColumn, ElTag } from 'element-plus'
 import type { InferenceTaskResponse, InferenceTaskStatus } from '@/types/api'
 
 const props = defineProps<{
@@ -181,7 +175,7 @@ const statusType = (status: string): 'info' | 'warning' | 'success' | 'danger' =
 
 <style scoped>
 .task-history-card {
-  margin-bottom: 24px;
+  height: 100%;
 }
 
 .card-header {
@@ -204,5 +198,36 @@ const statusType = (status: string): 'info' | 'warning' | 'success' | 'danger' =
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.task-history-card :deep(.el-tag) {
+  border-radius: 999px;
+  padding: 0 10px;
+}
+
+.task-history-card :deep(.el-card__header) {
+  padding-bottom: 14px;
+}
+
+.empty-state {
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  color: #0f766e;
+  font-size: 22px;
 }
 </style>

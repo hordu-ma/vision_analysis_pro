@@ -1,24 +1,83 @@
 <template>
-  <div class="app-container">
-    <el-container>
-      <el-header>
-        <div class="header-left">
-          <h1>Vision Analysis Pro</h1>
-          <el-input
-            v-model="actorName"
-            placeholder="当前操作者"
-            size="small"
-            class="actor-input"
-            @change="handleActorChange"
-          />
-          <el-radio-group :model-value="activeRoute" size="small" @change="handleRouteChange">
-            <el-radio-button label="/workspace">任务工作台</el-radio-button>
-            <el-radio-button label="/devices">设备管理</el-radio-button>
-          </el-radio-group>
+  <div class="app-shell">
+    <aside class="app-sidebar">
+      <div class="brand-block">
+        <div>
+          <p class="brand-en">Vision Analysis Pro</p>
+          <h1>基础设施视觉智能运维平台</h1>
         </div>
-        <HealthStatus />
-      </el-header>
-      <el-main>
+      </div>
+
+      <nav class="product-nav">
+        <button
+          class="nav-item"
+          :class="{ active: activeRoute === '/workspace' }"
+          @click="handleRouteChange('/workspace')"
+        >
+          <span class="nav-kicker">01</span>
+          <span>
+            <strong>任务工作台</strong>
+            <small>上传、检测、复跑与结果交付</small>
+          </span>
+        </button>
+        <button
+          class="nav-item"
+          :class="{ active: activeRoute === '/devices' }"
+          @click="handleRouteChange('/devices')"
+        >
+          <span class="nav-kicker">02</span>
+          <span>
+            <strong>设备管理</strong>
+            <small>设备元数据、告警摘要与审计记录</small>
+          </span>
+        </button>
+      </nav>
+
+      <div class="sidebar-footnote product-shell-card">
+        <p class="section-title">操作者</p>
+        <p class="section-caption">所有变更与设备维护都会进入审计日志</p>
+        <el-input
+          v-model="actorName"
+          placeholder="输入操作人名称"
+          size="large"
+          @change="handleActorChange"
+        />
+      </div>
+    </aside>
+
+    <main class="app-main">
+      <section class="topbar product-shell-card">
+        <div>
+          <p class="topbar-kicker">
+            {{ activeRoute === '/workspace' ? 'Workspace' : 'Device Control' }}
+          </p>
+          <h2 class="topbar-title">
+            {{ activeRoute === '/workspace' ? '任务工作台' : '设备与审计管理台' }}
+          </h2>
+          <p class="topbar-subtitle">
+            {{
+              activeRoute === '/workspace'
+                ? '检测、批次与任务的交付工作流。'
+                : '设备、告警与审计的统一运维视图。'
+            }}
+          </p>
+        </div>
+        <div class="topbar-status">
+          <div class="status-chip">
+            <span class="chip-label">操作者</span>
+            <strong>{{ actorName }}</strong>
+          </div>
+          <div class="status-chip">
+            <span class="chip-label">当前视图</span>
+            <strong>{{ activeRoute === '/workspace' ? '任务工作台' : '设备管理' }}</strong>
+          </div>
+          <div class="health-chip product-shell-card">
+            <HealthStatus />
+          </div>
+        </div>
+      </section>
+
+      <section class="content-surface product-shell-card">
         <router-view v-slot="{ Component }">
           <component
             :is="Component"
@@ -56,36 +115,37 @@
             @update:actor-filter="handleAuditActorFilterChange"
           />
         </router-view>
-        <ReportDetailDrawer
-          :visible="detailVisible"
-          :report="selectedReport"
-          @close="detailVisible = false"
-          @export="handleExportCsv"
-          @save-review="handleSaveReview"
-        />
-        <TaskDetailDrawer
-          :visible="taskDetailVisible"
-          :task="batchTask"
-          @close="taskDetailVisible = false"
-          @retry-failed="handleRetryFailedTask"
-          @export-csv="handleExportTaskCsv"
-          @export-json="handleExportTaskJson"
-          @export-zip="handleExportTaskZip"
-        />
-        <DeviceMetadataDrawer
-          :visible="deviceDrawerVisible"
-          :device-id="editingDeviceId"
-          :device="editingDevice"
-          @close="deviceDrawerVisible = false"
-          @save="handleSaveDeviceMetadata"
-        />
-      </el-main>
-    </el-container>
+      </section>
+
+      <ReportDetailDrawer
+        :visible="detailVisible"
+        :report="selectedReport"
+        @close="detailVisible = false"
+        @export="handleExportCsv"
+        @save-review="handleSaveReview"
+      />
+      <TaskDetailDrawer
+        :visible="taskDetailVisible"
+        :task="batchTask"
+        @close="taskDetailVisible = false"
+        @retry-failed="handleRetryFailedTask"
+        @export-csv="handleExportTaskCsv"
+        @export-json="handleExportTaskJson"
+        @export-zip="handleExportTaskZip"
+      />
+      <DeviceMetadataDrawer
+        :visible="deviceDrawerVisible"
+        :device-id="editingDeviceId"
+        :device="editingDevice"
+        @close="deviceDrawerVisible = false"
+        @save="handleSaveDeviceMetadata"
+      />
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ElContainer, ElHeader, ElInput, ElMain, ElRadioButton, ElRadioGroup } from 'element-plus'
+import { ElInput } from 'element-plus'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 const DeviceMetadataDrawer = defineAsyncComponent(
@@ -117,7 +177,7 @@ const taskHistory = ref<InferenceTaskResponse[]>([])
 const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
 const alertSummary = ref<AlertSummaryResponse | null>(null)
 const auditLogs = ref<AuditLogResponse[]>([])
-const actorName = ref('opencode')
+const actorName = ref('liguo ma')
 const auditActorFilter = ref('')
 const batches = ref<ReportBatchSummary[]>([])
 const devices = ref<ReportDeviceSummary[]>([])
@@ -459,45 +519,208 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.app-container {
+.app-shell {
   min-height: 100vh;
-  background-color: #f5f7fa;
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 24px;
+  padding: 24px;
 }
 
-.el-header {
+.app-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px 24px;
+  border-radius: 32px;
+  background: linear-gradient(180deg, #0f172a 0%, #172554 100%);
+  color: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.22);
+}
+
+.brand-block {
+  display: flex;
+}
+
+.brand-en {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: rgba(191, 219, 254, 0.8);
+}
+
+.brand-block h1 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.product-nav {
+  display: grid;
+  gap: 10px;
+}
+
+.nav-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  text-align: left;
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.nav-item:hover,
+.nav-item.active {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(147, 197, 253, 0.28);
+}
+
+.nav-kicker {
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(191, 219, 254, 0.78);
+}
+
+.nav-item strong {
+  display: block;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.nav-item small {
+  display: block;
+  font-size: 12px;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+.sidebar-footnote {
+  margin-top: auto;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+}
+
+.sidebar-footnote :deep(.el-input__wrapper) {
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.app-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background-color: #ffffff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  padding: 0 20px;
+  gap: 20px;
+  padding: 26px 28px;
 }
 
-.header-left {
+.topbar-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--brand);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.topbar-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.topbar-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.topbar-status {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.status-chip,
+.health-chip {
+  min-width: 140px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+}
+
+.chip-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.content-surface {
+  min-height: 0;
+  padding: 24px;
+}
+
+.health-chip {
   display: flex;
   align-items: center;
-  gap: 16px;
 }
 
-.actor-input {
-  width: 160px;
+@media (max-width: 1280px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    padding: 22px;
+  }
+
+  .sidebar-footnote {
+    margin-top: 0;
+  }
 }
 
-.el-header h1 {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
+@media (max-width: 960px) {
+  .app-shell {
+    padding: 14px;
+  }
 
-.el-main {
-  padding: 40px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
-}
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 
-@media (max-width: 768px) {
-  .el-main {
-    padding: 24px 12px;
+  .topbar-status {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .status-chip,
+  .health-chip {
+    flex: 1 1 180px;
+  }
+
+  .content-surface {
+    padding: 18px;
   }
 }
 </style>

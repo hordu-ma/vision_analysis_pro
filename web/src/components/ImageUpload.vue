@@ -1,5 +1,15 @@
 <template>
-  <div class="image-upload">
+  <div class="image-upload product-shell-card upload-shell">
+    <div class="section-heading">
+      <div>
+        <p class="section-title">检测发起</p>
+        <p class="section-caption">支持单图检测与批量任务发起。</p>
+      </div>
+      <span class="data-pill">{{
+        uploadMode === 'single' ? '单图' : `批量 ${selectedFiles.length}`
+      }}</span>
+    </div>
+
     <div data-testid="upload-area">
       <el-upload
         ref="uploadRef"
@@ -14,9 +24,7 @@
         :file-list="fileList"
         :disabled="analyzing"
       >
-        <el-icon class="upload-icon">
-          <UploadFilled />
-        </el-icon>
+        <ProductIcon name="upload-panel" class="upload-icon" />
         <div class="upload-text">
           <p>拖拽图片到此处或<em>点击上传</em></p>
           <p class="upload-hint">支持 JPG/PNG/WEBP 格式，文件大小不超过 10MB</p>
@@ -58,7 +66,7 @@
     <div v-if="analyzing && uploadProgress >= 100" class="progress-section">
       <el-progress :percentage="100" :stroke-width="8" :indeterminate="true" status="success" />
       <p class="progress-text">
-        <el-icon class="is-loading"><Loading /></el-icon>
+        <ProductIcon name="spinner" class="progress-icon" :spinning="true" />
         正在分析图片，请稍候...
       </p>
     </div>
@@ -72,7 +80,7 @@
       @click="handleAnalyze"
     >
       <template #loading>
-        <el-icon class="is-loading"><Loading /></el-icon>
+        <ProductIcon name="spinner" class="button-loading-icon" :spinning="true" />
       </template>
       {{ analyzeButtonText }}
     </el-button>
@@ -93,12 +101,10 @@
 </template>
 
 <script setup lang="ts">
-import { Loading, UploadFilled } from '@element-plus/icons-vue'
 import {
   ElAlert,
   ElButton,
   ElCheckbox,
-  ElIcon,
   ElImage,
   ElMessage,
   ElProgress,
@@ -109,6 +115,7 @@ import {
 } from 'element-plus'
 import { computed, ref } from 'vue'
 import type { UploadFile, UploadFiles, UploadInstance, UploadRawFile } from 'element-plus'
+import ProductIcon from '@/components/ProductIcon.vue'
 import { apiService, ApiError } from '@/services/api'
 import type { BatchInferenceResponse, InferenceTaskResponse, InferenceResponse } from '@/types/api'
 
@@ -289,8 +296,21 @@ const handleAnalyze = async () => {
 
 <style scoped>
 .image-upload {
-  max-width: 600px;
-  margin: 0 auto;
+  width: 100%;
+  padding: 18px;
+  border-radius: 18px;
+}
+
+.upload-shell {
+  margin-bottom: 18px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
 }
 
 .upload-area {
@@ -298,6 +318,9 @@ const handleAnalyze = async () => {
 }
 
 .upload-area:deep(.el-upload-dragger) {
+  border-radius: 16px;
+  border: 1px dashed rgba(148, 163, 184, 0.28);
+  background: #fbfdff;
   transition: border-color 0.3s ease;
 }
 
@@ -311,9 +334,9 @@ const handleAnalyze = async () => {
 }
 
 .upload-icon {
-  font-size: 67px;
-  color: #8c939d;
-  margin-bottom: 16px;
+  font-size: 58px;
+  color: #94a3b8;
+  margin-bottom: 12px;
   transition: color 0.3s ease;
 }
 
@@ -322,7 +345,7 @@ const handleAnalyze = async () => {
 }
 
 .upload-text {
-  color: #606266;
+  color: #475569;
 }
 
 .upload-text p {
@@ -336,7 +359,7 @@ const handleAnalyze = async () => {
 
 .upload-hint {
   font-size: 12px;
-  color: #909399;
+  color: #94a3b8;
 }
 
 .preview-section {
@@ -347,8 +370,8 @@ const handleAnalyze = async () => {
 .preview-image {
   max-width: 100%;
   max-height: 400px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 16px;
   margin-bottom: 10px;
 }
 
@@ -374,8 +397,8 @@ const handleAnalyze = async () => {
 .progress-section {
   margin: 20px 0;
   padding: 16px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
+  background-color: #f8fafc;
+  border-radius: 16px;
 }
 
 .progress-text {
@@ -392,6 +415,11 @@ const handleAnalyze = async () => {
   animation: rotate 1s linear infinite;
 }
 
+.progress-icon,
+.button-loading-icon {
+  font-size: 18px;
+}
+
 @keyframes rotate {
   from {
     transform: rotate(0deg);
@@ -403,8 +431,10 @@ const handleAnalyze = async () => {
 
 .analyze-button {
   width: 100%;
-  height: 44px;
+  height: 48px;
   font-size: 16px;
+  font-weight: 700;
+  border-radius: 16px;
 }
 
 .analyze-button .is-loading {
@@ -423,5 +453,15 @@ const handleAnalyze = async () => {
 
 .upload-area:deep(.is-disabled .el-upload-dragger:hover) {
   border-color: #dcdfe6;
+}
+
+@media (max-width: 768px) {
+  .image-upload {
+    padding: 18px;
+  }
+
+  .section-heading {
+    flex-direction: column;
+  }
 }
 </style>

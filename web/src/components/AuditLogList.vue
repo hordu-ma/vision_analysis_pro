@@ -16,7 +16,10 @@
       </div>
     </template>
 
-    <el-empty v-if="!logs.length" description="暂无审计记录" />
+    <div v-if="!logs.length" class="empty-state">
+      <div class="empty-icon">◌</div>
+      <p>暂无审计记录</p>
+    </div>
 
     <el-table v-else :data="logs" stripe>
       <el-table-column prop="event_type" label="事件" min-width="140" />
@@ -33,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElEmpty, ElInput, ElTable, ElTableColumn } from 'element-plus'
+import { ElButton, ElCard, ElInput, ElTable, ElTableColumn } from 'element-plus'
 import type { AuditLogResponse } from '@/types/api'
 
 defineProps<{
@@ -53,7 +56,7 @@ const formatTime = (timestamp: number): string => {
 
 <style scoped>
 .audit-log-card {
-  margin-bottom: 24px;
+  margin-bottom: 0;
 }
 
 .card-header {
@@ -70,5 +73,30 @@ const formatTime = (timestamp: number): string => {
 
 .actor-filter {
   width: 160px;
+}
+
+.audit-log-card :deep(.el-card__header) {
+  padding-bottom: 14px;
+}
+
+.empty-state {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  color: #0f766e;
+  font-size: 22px;
 }
 </style>

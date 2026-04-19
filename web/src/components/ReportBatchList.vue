@@ -4,7 +4,7 @@
       <div class="card-header">
         <div class="header-left">
           <span>历史批次</span>
-          <el-tag v-if="activeDeviceId" size="small" type="info">设备: {{ activeDeviceId }}</el-tag>
+          <el-tag v-if="activeDeviceId" size="small" type="info">{{ activeDeviceId }}</el-tag>
         </div>
         <div class="header-actions">
           <el-button v-if="activeDeviceId" text @click="emit('clear-filter')">清除筛选</el-button>
@@ -13,7 +13,10 @@
       </div>
     </template>
 
-    <el-empty v-if="!batches.length" description="暂无批次记录" />
+    <div v-if="!batches.length" class="empty-state">
+      <div class="empty-icon">◎</div>
+      <p>暂无批次记录</p>
+    </div>
 
     <el-table v-else :data="batches" stripe>
       <el-table-column label="批次 ID" min-width="180">
@@ -41,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElEmpty, ElTable, ElTableColumn, ElTag } from 'element-plus'
+import { ElButton, ElCard, ElTable, ElTableColumn, ElTag } from 'element-plus'
 import type { ReportBatchSummary } from '@/types/api'
 
 defineProps<{
@@ -62,7 +65,7 @@ const formatTime = (timestamp: number): string => {
 
 <style scoped>
 .batch-list-card {
-  margin-bottom: 24px;
+  height: 100%;
 }
 
 .card-header,
@@ -80,5 +83,34 @@ const formatTime = (timestamp: number): string => {
 .header-left,
 .header-actions {
   gap: 8px;
+}
+
+.batch-list-card :deep(.el-button.is-link) {
+  font-weight: 600;
+}
+
+.batch-list-card :deep(.el-card__header) {
+  padding-bottom: 14px;
+}
+
+.empty-state {
+  min-height: 200px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.empty-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+  color: var(--brand);
+  font-size: 22px;
 }
 </style>

@@ -1,39 +1,28 @@
 <template>
   <div class="health-status">
     <el-tag :type="statusType" effect="dark" class="status-tag">
-      <el-icon v-if="loading" class="is-loading">
-        <Loading />
-      </el-icon>
-      <el-icon v-else-if="statusType === 'success'">
-        <CircleCheck />
-      </el-icon>
-      <el-icon v-else-if="statusType === 'danger'">
-        <CircleClose />
-      </el-icon>
-      <el-icon v-else>
-        <QuestionFilled />
-      </el-icon>
+      <ProductIcon v-if="loading" name="spinner" :spinning="true" class="status-icon" />
+      <ProductIcon v-else-if="statusType === 'success'" name="health-ok" class="status-icon" />
+      <ProductIcon v-else-if="statusType === 'danger'" name="health-error" class="status-icon" />
+      <ProductIcon v-else name="health-idle" class="status-icon" />
       <span class="status-text" data-testid="health-status-text">{{ statusText }}</span>
     </el-tag>
 
     <el-tooltip content="刷新状态" placement="bottom">
       <el-button
         type="primary"
-        link
         :loading="loading"
         :disabled="loading"
         class="refresh-button"
         @click="handleRefreshClick"
       >
-        <el-icon v-if="!loading"><Refresh /></el-icon>
+        <ProductIcon v-if="!loading" name="refresh" class="control-icon" />
       </el-button>
     </el-tooltip>
 
     <el-popover placement="bottom" :width="320" trigger="hover">
       <template #reference>
-        <el-icon class="info-icon">
-          <InfoFilled />
-        </el-icon>
+        <ProductIcon name="info" class="info-icon" />
       </template>
       <div class="health-details">
         <el-descriptions :column="1" border size="small">
@@ -81,25 +70,17 @@
 
 <script setup lang="ts">
 import {
-  CircleCheck,
-  CircleClose,
-  InfoFilled,
-  Loading,
-  QuestionFilled,
-  Refresh
-} from '@element-plus/icons-vue'
-import {
   ElAlert,
   ElButton,
   ElDescriptions,
   ElDescriptionsItem,
-  ElIcon,
   ElPopover,
   ElTag,
   ElText,
   ElTooltip
 } from 'element-plus'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import ProductIcon from '@/components/ProductIcon.vue'
 import { apiService, ApiError } from '@/services/api'
 import type { HealthResponse } from '@/types/api'
 
@@ -243,17 +224,25 @@ onUnmounted(() => {
 .health-status {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .status-tag {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  padding: 0 14px;
+  height: 38px;
+  border-radius: 999px;
 }
 
 .status-tag .is-loading {
   animation: rotate 1s linear infinite;
+}
+
+.status-icon,
+.control-icon {
+  font-size: 16px;
 }
 
 @keyframes rotate {
@@ -270,8 +259,20 @@ onUnmounted(() => {
 }
 
 .refresh-button {
-  padding: 4px;
-  margin-left: -4px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.96));
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: #334155;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.refresh-button:hover {
+  color: var(--brand);
+  border-color: rgba(59, 130, 246, 0.28);
+  background: rgba(239, 246, 255, 0.96);
 }
 
 .refresh-button:hover {
@@ -282,6 +283,12 @@ onUnmounted(() => {
   cursor: pointer;
   color: #909399;
   transition: color 0.2s ease;
+  width: 34px;
+  height: 34px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.12);
 }
 
 .info-icon:hover {

@@ -1,5 +1,17 @@
 <template>
   <div v-if="result" class="detection-result" data-testid="detection-result">
+    <div class="result-banner product-shell-card">
+      <div>
+        <p class="banner-kicker">Detection Summary</p>
+        <h3>{{ result.filename }}</h3>
+        <p>面向客户展示的单图分析结果，强调检测可信度与结果可解释性。</p>
+      </div>
+      <div class="banner-stat">
+        <span>检测数量</span>
+        <strong>{{ result.detections.length }}</strong>
+      </div>
+    </div>
+
     <el-card class="stats-card">
       <template #header>
         <div class="card-header">
@@ -59,14 +71,16 @@
     </el-card>
   </div>
 
-  <el-empty v-else description="暂无检测结果" />
+  <div v-else class="empty-state">
+    <div class="empty-icon">◔</div>
+    <p>暂无检测结果</p>
+  </div>
 </template>
 
 <script setup lang="ts">
 import {
   ElCard,
   ElCol,
-  ElEmpty,
   ElImage,
   ElRow,
   ElStatistic,
@@ -93,6 +107,57 @@ const avgConfidence = computed(() => {
   margin-top: 20px;
 }
 
+.result-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 22px;
+  margin-bottom: 20px;
+}
+
+.banner-kicker {
+  margin: 0 0 8px;
+  color: var(--brand);
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+}
+
+.result-banner h3 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.result-banner p:last-child {
+  margin: 10px 0 0;
+  color: var(--text-secondary);
+}
+
+.banner-stat {
+  min-width: 120px;
+  padding: 16px;
+  border-radius: 18px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+}
+
+.banner-stat span,
+.banner-stat strong {
+  display: block;
+}
+
+.banner-stat span {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.banner-stat strong {
+  font-size: 34px;
+}
+
 .stats-card,
 .visualization-card,
 .details-card {
@@ -109,5 +174,31 @@ const avgConfidence = computed(() => {
 .visualization-image {
   width: 100%;
   max-height: 600px;
+  border-radius: 18px;
+}
+
+.empty-state {
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 20px;
+  border-radius: 18px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border-soft);
+}
+
+.empty-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--border-soft);
+  color: var(--brand);
+  font-size: 24px;
 }
 </style>
