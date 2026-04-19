@@ -47,6 +47,8 @@
               @retry="handleRetryTask"
               @rerun="handleRerunTask"
               @export="handleExportTaskCsv"
+              @delete="handleDeleteTask"
+              @cleanup="handleCleanupTasks"
               @update:status-filter="handleTaskStatusFilterChange"
             />
           </el-col>
@@ -230,6 +232,41 @@ const handleExportTaskCsv = async (taskId: string) => {
     anchor.download = `${taskId}.csv`
     anchor.click()
     URL.revokeObjectURL(url)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
+const handleDeleteTask = async (taskId: string) => {
+  try {
+    await apiService.deleteBatchTask(taskId)
+    if (batchTask.value?.task_id === taskId) {
+      batchTask.value = null
+      batchDetectionResult.value = null
+    }
+    await loadTaskHistory()
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
+const handleCleanupTasks = async (status: 'completed' | 'failed' | null) => {
+  try {
+    const result = await apiService.cleanupBatchTasks(status ?? '')
+    const activeStatus = batchTask.value?.status
+    if (
+      batchTask.value &&
+      activeStatus &&
+      (activeStatus === 'completed' || activeStatus === 'failed') &&
+      (!status || activeStatus === status)
+    ) {
+      batchTask.value = null
+      batchDetectionResult.value = null
+    }
+    await loadTaskHistory()
+    if (result.deleted_count === 0) {
+      return
+    }
   } catch (error) {
     apiService.showError(error as Error)
   }

@@ -19,6 +19,10 @@ class StoredUploadFile:
     file_bytes: bytes
 
 
+TERMINAL_TASK_STATUSES = {"completed", "failed"}
+MAX_TERMINAL_TASKS = 50
+
+
 @dataclass
 class InferenceTaskRecord:
     """批量推理任务记录。"""
@@ -69,6 +73,7 @@ class InferenceTaskManager:
         )
         with self._lock:
             self._tasks[task_id] = record
+            self._prune_terminal_tasks_locked()
 
         thread = threading.Thread(
             target=self._run_task,
@@ -135,6 +140,26 @@ class InferenceTaskManager:
         with self._lock:
             self._tasks.clear()
 
+    def delete_task(self, task_id: str) -> bool:
+        with self._lock:
+            record = self._tasks.get(task_id)
+            if record is None or record.status not in TERMINAL_TASK_STATUSES:
+                return False
+            del self._tasks[task_id]
+            return True
+
+    def cleanup_tasks(self, *, status_filter: str | None = None) -> int:
+        with self._lock:
+            task_ids = [
+                task_id
+                for task_id, record in self._tasks.items()
+                if record.status in TERMINAL_TASK_STATUSES
+                and (status_filter is None or record.status == status_filter)
+            ]
+            for task_id in task_ids:
+                del self._tasks[task_id]
+            return len(task_ids)
+
     def _run_task(
         self,
         task_id: str,
@@ -186,6 +211,20 @@ class InferenceTaskManager:
             for key, value in updates.items():
                 setattr(record, key, value)
             record.updated_at = time.time()
+            self._prune_terminal_tasks_locked()
+
+    def _prune_terminal_tasks_locked(self) -> None:
+        terminal_records = sorted(
+            (
+                record
+                for record in self._tasks.values()
+                if record.status in TERMINAL_TASK_STATUSES
+            ),
+            key=lambda item: item.updated_at,
+            reverse=True,
+        )
+        for record in terminal_records[MAX_TERMINAL_TASKS:]:
+            self._tasks.pop(record.task_id, None)
 
 
 _task_manager = InferenceTaskManager()

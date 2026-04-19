@@ -17,6 +17,7 @@
             <el-option label="已完成" value="completed" />
             <el-option label="失败" value="failed" />
           </el-select>
+          <el-button text @click="emitCleanup">清理终态</el-button>
           <el-button text @click="emit('refresh')">刷新</el-button>
         </div>
       </div>
@@ -74,6 +75,14 @@
             >
               导出
             </el-button>
+            <el-button
+              v-if="scope.row.status === 'completed' || scope.row.status === 'failed'"
+              link
+              type="info"
+              @click="emit('delete', scope.row.task_id)"
+            >
+              删除
+            </el-button>
           </div>
         </template>
       </el-table-column>
@@ -94,7 +103,7 @@ import {
 } from 'element-plus'
 import type { InferenceTaskResponse, InferenceTaskStatus } from '@/types/api'
 
-defineProps<{
+const props = defineProps<{
   tasks: InferenceTaskResponse[]
   statusFilter: InferenceTaskStatus | ''
 }>()
@@ -105,11 +114,25 @@ const emit = defineEmits<{
   retry: [taskId: string]
   rerun: [taskId: string]
   export: [taskId: string]
+  delete: [taskId: string]
+  cleanup: [status: 'completed' | 'failed' | null]
   'update:statusFilter': [status: InferenceTaskStatus | '']
 }>()
 
 const handleStatusChange = (value: InferenceTaskStatus | '' | undefined) => {
   emit('update:statusFilter', value ?? '')
+}
+
+const emitCleanup = () => {
+  const status = statusFilterValue()
+  emit('cleanup', status)
+}
+
+const statusFilterValue = (): 'completed' | 'failed' | null => {
+  if (props.statusFilter === 'completed' || props.statusFilter === 'failed') {
+    return props.statusFilter
+  }
+  return null
 }
 
 const formatTime = (timestamp: number): string => {

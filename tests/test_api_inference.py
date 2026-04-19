@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import re
+import time
 from pathlib import Path
 
 import cv2
@@ -14,7 +15,10 @@ from vision_analysis_pro.core.inference.stub_engine import StubInferenceEngine
 from vision_analysis_pro.edge_agent import Detection, InferenceResult, ReportPayload
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api.deps import get_inference_engine
-from vision_analysis_pro.web.api.inference_tasks import clear_inference_task_manager
+from vision_analysis_pro.web.api.inference_tasks import (
+    MAX_TERMINAL_TASKS,
+    clear_inference_task_manager,
+)
 from vision_analysis_pro.web.api.main import app
 from vision_analysis_pro.web.api.report_store import clear_report_store_cache
 
@@ -624,6 +628,172 @@ async def test_export_inference_task_csv_returns_not_found_for_missing_task() ->
     assert resp.status_code == 404
     data = resp.json()
     assert data["code"] == "TASK_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_delete_inference_task_removes_completed_task() -> None:
+    """测试可以删除已完成任务。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("done.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内完成")
+
+        delete_resp = await client.delete(f"/api/v1/inference/images/tasks/{task_id}")
+        get_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+
+    assert delete_resp.status_code == 204
+    assert get_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_delete_inference_task_rejects_running_task() -> None:
+    """测试运行中任务不能删除。"""
+
+    class BlockingStubInferenceEngine(StubInferenceEngine):
+        def predict(self, *args, **kwargs):  # type: ignore[override]
+            time.sleep(0.2)
+            return super().predict(*args, **kwargs)
+
+    app.dependency_overrides[get_inference_engine] = lambda: (
+        BlockingStubInferenceEngine(mode="normal")
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("running.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "running":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内进入 running 状态")
+
+        delete_resp = await client.delete(f"/api/v1/inference/images/tasks/{task_id}")
+
+    assert delete_resp.status_code == 400
+    data = delete_resp.json()
+    assert data["code"] == "TASK_DELETE_NOT_ALLOWED"
+
+
+@pytest.mark.asyncio
+async def test_cleanup_inference_tasks_removes_terminal_tasks_by_status() -> None:
+    """测试可按状态批量清理终态任务。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        completed_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("done.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert completed_resp.status_code == 202
+        completed_task_id = completed_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{completed_task_id}"
+            )
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("完成任务未在预期时间内完成")
+
+        app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+            mode="error"
+        )
+        failed_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("failed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert failed_resp.status_code == 202
+        failed_task_id = failed_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{failed_task_id}"
+            )
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败任务未在预期时间内进入 failed 状态")
+
+        cleanup_resp = await client.delete(
+            "/api/v1/inference/images/tasks?status=completed"
+        )
+        list_resp = await client.get("/api/v1/inference/images/tasks?limit=10")
+
+    assert cleanup_resp.status_code == 200
+    cleanup_data = cleanup_resp.json()
+    assert cleanup_data["deleted_count"] == 1
+    assert cleanup_data["status_filter"] == "completed"
+
+    task_ids = {item["task_id"] for item in list_resp.json()}
+    assert completed_task_id not in task_ids
+    assert failed_task_id in task_ids
+
+
+@pytest.mark.asyncio
+async def test_terminal_tasks_are_pruned_when_exceeding_limit() -> None:
+    """测试终态任务数量超过上限时会自动清理最旧记录。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        created_task_ids: list[str] = []
+        for index in range(MAX_TERMINAL_TASKS + 1):
+            create_resp = await client.post(
+                "/api/v1/inference/images/tasks?visualize=false",
+                files=[
+                    ("files", (f"task-{index}.jpg", _create_test_image(), "image/jpeg"))
+                ],
+            )
+            assert create_resp.status_code == 202
+            task_id = create_resp.json()["task_id"]
+            created_task_ids.append(task_id)
+
+            for _ in range(20):
+                task_resp = await client.get(
+                    f"/api/v1/inference/images/tasks/{task_id}"
+                )
+                assert task_resp.status_code == 200
+                if task_resp.json()["status"] == "completed":
+                    break
+                await asyncio.sleep(0.01)
+            else:
+                pytest.fail("任务未在预期时间内完成")
+
+        list_resp = await client.get(
+            f"/api/v1/inference/images/tasks?limit={MAX_TERMINAL_TASKS + 5}"
+        )
+        oldest_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{created_task_ids[0]}"
+        )
+
+    assert list_resp.status_code == 200
+    data = list_resp.json()
+    assert len(data) == MAX_TERMINAL_TASKS
+    assert oldest_resp.status_code == 404
 
 
 @pytest.mark.asyncio

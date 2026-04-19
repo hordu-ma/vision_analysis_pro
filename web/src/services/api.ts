@@ -340,6 +340,30 @@ class ApiService {
     return response.data as Blob
   }
 
+  async deleteBatchTask(taskId: string): Promise<void> {
+    await this.client.delete(`/inference/images/tasks/${taskId}`)
+  }
+
+  async cleanupBatchTasks(
+    status?: Extract<InferenceTaskStatus, 'completed' | 'failed'> | ''
+  ): Promise<{
+    status: string
+    deleted_count: number
+    status_filter?: string | null
+  }> {
+    const params = new URLSearchParams()
+    if (status) {
+      params.set('status', status)
+    }
+    const query = params.toString()
+    const response = await this.client.delete<{
+      status: string
+      deleted_count: number
+      status_filter?: string | null
+    }>(query ? `/inference/images/tasks?${query}` : '/inference/images/tasks')
+    return response.data
+  }
+
   /**
    * 检查服务可用性
    */

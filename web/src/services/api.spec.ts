@@ -17,6 +17,7 @@ vi.mock('axios')
 const mockGet = vi.fn()
 const mockPost = vi.fn()
 const mockPut = vi.fn()
+const mockDelete = vi.fn()
 const mockInterceptors = {
   request: { use: vi.fn() },
   response: { use: vi.fn() }
@@ -26,6 +27,7 @@ vi.mocked(axios.create).mockReturnValue({
   get: mockGet,
   post: mockPost,
   put: mockPut,
+  delete: mockDelete,
   interceptors: mockInterceptors
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 } as any)
@@ -321,6 +323,25 @@ describe('API Service', () => {
         responseType: 'blob'
       })
     })
+
+    it('应该删除单个终态任务', async () => {
+      mockDelete.mockResolvedValue({ data: undefined })
+
+      await apiService.deleteBatchTask('task-completed')
+
+      expect(mockDelete).toHaveBeenCalledWith('/inference/images/tasks/task-completed')
+    })
+
+    it('应该批量清理终态任务', async () => {
+      mockDelete.mockResolvedValue({
+        data: { status: 'ok', deleted_count: 2, status_filter: 'completed' }
+      })
+
+      const result = await apiService.cleanupBatchTasks('completed')
+
+      expect(result).toEqual({ status: 'ok', deleted_count: 2, status_filter: 'completed' })
+      expect(mockDelete).toHaveBeenCalledWith('/inference/images/tasks?status=completed')
+    })
   })
 
   describe('isServiceAvailable()', () => {
@@ -488,6 +509,8 @@ describe('API Service', () => {
       expect(apiService.retryBatchTask).toBeDefined()
       expect(apiService.rerunBatchTask).toBeDefined()
       expect(apiService.exportBatchTaskCsv).toBeDefined()
+      expect(apiService.deleteBatchTask).toBeDefined()
+      expect(apiService.cleanupBatchTasks).toBeDefined()
       expect(apiService.isServiceAvailable).toBeDefined()
       expect(apiService.listReportBatches).toBeDefined()
       expect(apiService.listReportDevices).toBeDefined()

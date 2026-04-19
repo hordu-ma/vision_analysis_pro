@@ -25,6 +25,7 @@ from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.deps import get_inference_engine
 from vision_analysis_pro.web.api.inference_tasks import (
+    TERMINAL_TASK_STATUSES,
     StoredUploadFile,
     get_inference_task_manager,
 )
@@ -700,6 +701,62 @@ async def export_inference_task_csv(task_id: str) -> Response:
             "Content-Disposition": f'attachment; filename="{task_id}.csv"',
         },
     )
+
+
+@router.delete(
+    "/images/tasks/{task_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        400: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def delete_inference_task(task_id: str) -> Response:
+    """删除指定的终态批量任务。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    if record.status not in TERMINAL_TASK_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TASK_DELETE_NOT_ALLOWED",
+                "message": "仅已完成或失败任务支持删除",
+                "detail": task_id,
+            },
+        )
+    task_manager.delete_task(task_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    "/images/tasks",
+    responses={200: {"content": {"application/json": {}}}},
+)
+async def cleanup_inference_tasks(
+    status_filter: str | None = Query(
+        None,
+        alias="status",
+        pattern="^(completed|failed)$",
+        description="按终态任务状态清理",
+    ),
+) -> dict[str, Any]:
+    """批量清理终态批量任务。"""
+    task_manager = get_inference_task_manager()
+    deleted_count = task_manager.cleanup_tasks(status_filter=status_filter)
+    return {
+        "status": "ok",
+        "deleted_count": deleted_count,
+        "status_filter": status_filter,
+    }
 
 
 def _task_record_to_response(record: Any) -> schemas.InferenceTaskResponse:
