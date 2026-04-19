@@ -364,6 +364,182 @@ async def test_list_inference_tasks_returns_recent_tasks() -> None:
 
 
 @pytest.mark.asyncio
+async def test_list_inference_tasks_supports_status_filter() -> None:
+    """测试任务列表接口支持按状态筛选。"""
+    app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+        mode="error"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        failed_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("failed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert failed_resp.status_code == 202
+        failed_task_id = failed_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{failed_task_id}"
+            )
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败任务未在预期时间内进入 failed 状态")
+
+        app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+            mode="normal"
+        )
+        completed_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("completed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert completed_resp.status_code == 202
+
+        resp = await client.get("/api/v1/inference/images/tasks?limit=10&status=failed")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert len(data) == 1
+    assert data[0]["task_id"] == failed_task_id
+    assert data[0]["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_retry_inference_task_replays_failed_task() -> None:
+    """测试失败任务可重试并生成新任务。"""
+    app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+        mode="error"
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        failed_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("failed.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert failed_resp.status_code == 202
+        failed_task_id = failed_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{failed_task_id}"
+            )
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "failed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("失败任务未在预期时间内进入 failed 状态")
+
+        app.dependency_overrides[get_inference_engine] = lambda: StubInferenceEngine(
+            mode="normal"
+        )
+        retry_resp = await client.post(
+            f"/api/v1/inference/images/tasks/{failed_task_id}/retry"
+        )
+        assert retry_resp.status_code == 202
+        retry_task_id = retry_resp.json()["task_id"]
+        assert retry_task_id != failed_task_id
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{retry_task_id}"
+            )
+            assert task_resp.status_code == 200
+            task_data = task_resp.json()
+            if task_data["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("重试任务未在预期时间内完成")
+
+    assert task_data["metadata"]["source_task_id"] == failed_task_id
+    assert task_data["metadata"]["replay_mode"] == "retry"
+    assert task_data["file_count"] == 1
+    assert task_data["completed_files"] == 1
+
+
+@pytest.mark.asyncio
+async def test_retry_inference_task_rejects_non_failed_task() -> None:
+    """测试非失败任务不能触发重试。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=false",
+            files=[("files", ("ok.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内完成")
+
+        retry_resp = await client.post(
+            f"/api/v1/inference/images/tasks/{task_id}/retry"
+        )
+
+    assert retry_resp.status_code == 400
+    data = retry_resp.json()
+    assert data["code"] == "TASK_RETRY_NOT_ALLOWED"
+
+
+@pytest.mark.asyncio
+async def test_rerun_inference_task_replays_completed_task() -> None:
+    """测试已完成任务支持复跑并生成新任务。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=true",
+            files=[("files", ("ok.jpg", _create_test_image(), "image/jpeg"))],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            if task_resp.json()["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("任务未在预期时间内完成")
+
+        rerun_resp = await client.post(
+            f"/api/v1/inference/images/tasks/{task_id}/rerun"
+        )
+        assert rerun_resp.status_code == 202
+        rerun_task_id = rerun_resp.json()["task_id"]
+        assert rerun_task_id != task_id
+
+        for _ in range(20):
+            task_resp = await client.get(
+                f"/api/v1/inference/images/tasks/{rerun_task_id}"
+            )
+            assert task_resp.status_code == 200
+            rerun_data = task_resp.json()
+            if rerun_data["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("复跑任务未在预期时间内完成")
+
+    assert rerun_data["metadata"]["source_task_id"] == task_id
+    assert rerun_data["metadata"]["replay_mode"] == "rerun"
+    assert rerun_data["metadata"]["visualize"] is True
+    assert len(rerun_data["results"]) == 1
+
+
+@pytest.mark.asyncio
 async def test_live_health_endpoint() -> None:
     """测试存活检查端点"""
     transport = ASGITransport(app=app)

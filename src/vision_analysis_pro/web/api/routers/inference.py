@@ -3,6 +3,7 @@
 import base64
 import logging
 import time
+from types import SimpleNamespace
 from typing import Annotated, Any
 
 from fastapi import (
@@ -20,7 +21,10 @@ from vision_analysis_pro.core.preprocessing.visualization import draw_detections
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.deps import get_inference_engine
-from vision_analysis_pro.web.api.inference_tasks import get_inference_task_manager
+from vision_analysis_pro.web.api.inference_tasks import (
+    StoredUploadFile,
+    get_inference_task_manager,
+)
 
 router = APIRouter(prefix="/api/v1/inference", tags=["inference"])
 logger = logging.getLogger(__name__)
@@ -362,7 +366,7 @@ async def create_inference_task(
             },
         )
 
-    validated_files: list[tuple[UploadFile, bytes]] = []
+    stored_files: list[StoredUploadFile] = []
     for file in files:
         logger.info(
             "inference_request_received",
@@ -374,42 +378,117 @@ async def create_inference_task(
                 "task_mode": True,
             },
         )
-        validated_files.append((file, await _read_and_validate_upload(file)))
+        stored_files.append(
+            StoredUploadFile(
+                filename=file.filename or "unknown",
+                content_type=file.content_type,
+                file_bytes=await _read_and_validate_upload(file),
+            )
+        )
 
     metrics: dict[str, Any] = request.app.state.metrics
     task_manager = get_inference_task_manager()
 
     def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        batch_start_time = time.perf_counter()
-        results: list[schemas.InferenceResponse] = []
-        for index, (file, file_bytes) in enumerate(validated_files, start=1):
-            metrics["inference_requests_total"] += 1
-            result = _run_inference(
-                request_id=request_id,
-                file=file,
-                file_bytes=file_bytes,
-                settings=settings,
-                engine=engine,
-                metrics=metrics,
-                visualize=visualize,
-            )
-            results.append(result)
-            progress_callback(index, len(validated_files))
-
-        batch_time_ms = round((time.perf_counter() - batch_start_time) * 1000, 2)
-        total_detections = sum(len(item.detections) for item in results)
-        return (
-            [item.model_dump(mode="json") for item in results],
-            {
-                "request_id": request_id,
-                "engine": engine.__class__.__name__,
-                "file_count": len(results),
-                "total_detections": total_detections,
-                "batch_inference_time_ms": batch_time_ms,
-            },
+        return _run_batch_task(
+            request_id=request_id,
+            stored_files=stored_files,
+            settings=settings,
+            engine=engine,
+            metrics=metrics,
+            visualize=visualize,
+            progress_callback=progress_callback,
         )
 
-    record = task_manager.create_task(file_count=len(validated_files), worker=worker)
+    record = task_manager.create_task(
+        file_count=len(stored_files),
+        input_files=stored_files,
+        visualize=visualize,
+        metadata={"request_id": request_id},
+        worker=worker,
+    )
+    return _task_record_to_response(record)
+
+
+def _run_batch_task(
+    *,
+    request_id: str,
+    stored_files: list[StoredUploadFile],
+    settings: Settings,
+    engine: Any,
+    metrics: dict[str, Any],
+    visualize: bool,
+    progress_callback: Any,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    batch_start_time = time.perf_counter()
+    results: list[schemas.InferenceResponse] = []
+    for index, stored_file in enumerate(stored_files, start=1):
+        metrics["inference_requests_total"] += 1
+        upload_file = SimpleNamespace(
+            filename=stored_file.filename,
+            content_type=stored_file.content_type,
+        )
+        result = _run_inference(
+            request_id=request_id,
+            file=upload_file,
+            file_bytes=stored_file.file_bytes,
+            settings=settings,
+            engine=engine,
+            metrics=metrics,
+            visualize=visualize,
+        )
+        results.append(result)
+        progress_callback(index, len(stored_files))
+
+    batch_time_ms = round((time.perf_counter() - batch_start_time) * 1000, 2)
+    total_detections = sum(len(item.detections) for item in results)
+    return (
+        [item.model_dump(mode="json") for item in results],
+        {
+            "request_id": request_id,
+            "engine": engine.__class__.__name__,
+            "file_count": len(results),
+            "total_detections": total_detections,
+            "batch_inference_time_ms": batch_time_ms,
+            "visualize": visualize,
+        },
+    )
+
+
+def _create_replayed_task(
+    *,
+    source_record: Any,
+    request_id: str,
+    settings: Settings,
+    engine: Any,
+    metrics: dict[str, Any],
+) -> schemas.InferenceTaskResponse:
+    task_manager = get_inference_task_manager()
+    stored_files = list(source_record.input_files)
+    visualize = source_record.visualize
+
+    def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        return _run_batch_task(
+            request_id=request_id,
+            stored_files=stored_files,
+            settings=settings,
+            engine=engine,
+            metrics=metrics,
+            visualize=visualize,
+            progress_callback=progress_callback,
+        )
+
+    record = task_manager.create_task(
+        file_count=len(stored_files),
+        input_files=stored_files,
+        visualize=visualize,
+        metadata={
+            "request_id": request_id,
+            "source_task_id": source_record.task_id,
+            "replay_mode": "retry" if source_record.status == "failed" else "rerun",
+        },
+        worker=worker,
+    )
     return _task_record_to_response(record)
 
 
@@ -420,10 +499,16 @@ async def create_inference_task(
 )
 async def list_inference_tasks(
     limit: int = Query(20, ge=1, le=100, description="返回任务数量上限"),
+    status_filter: str | None = Query(
+        None,
+        alias="status",
+        pattern="^(pending|running|completed|failed)$",
+        description="按任务状态过滤",
+    ),
 ) -> list[schemas.InferenceTaskResponse]:
     """列出最近的批量推理任务。"""
     task_manager = get_inference_task_manager()
-    records = task_manager.list_tasks(limit=limit)
+    records = task_manager.list_tasks(limit=limit, status_filter=status_filter)
     return [_task_record_to_response(record) for record in records]
 
 
@@ -449,6 +534,94 @@ async def get_inference_task(task_id: str) -> schemas.InferenceTaskResponse:
             },
         )
     return _task_record_to_response(record)
+
+
+@router.post(
+    "/images/tasks/{task_id}/retry",
+    response_model=schemas.InferenceTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        202: {"model": schemas.InferenceTaskResponse},
+        400: {"model": schemas.ErrorResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def retry_inference_task(
+    task_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+) -> schemas.InferenceTaskResponse:
+    """重试失败的批量图像异步推理任务。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+    if record.status != "failed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "TASK_RETRY_NOT_ALLOWED",
+                "message": "仅失败任务支持重试",
+                "detail": task_id,
+            },
+        )
+
+    request_id = getattr(request.state, "request_id", "unknown")
+    metrics: dict[str, Any] = request.app.state.metrics
+    return _create_replayed_task(
+        source_record=record,
+        request_id=request_id,
+        settings=settings,
+        engine=engine,
+        metrics=metrics,
+    )
+
+
+@router.post(
+    "/images/tasks/{task_id}/rerun",
+    response_model=schemas.InferenceTaskResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={
+        202: {"model": schemas.InferenceTaskResponse},
+        404: {"model": schemas.ErrorResponse},
+    },
+)
+async def rerun_inference_task(
+    task_id: str,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    engine: Annotated[Any, Depends(get_inference_engine)],
+) -> schemas.InferenceTaskResponse:
+    """复跑历史批量图像异步推理任务。"""
+    task_manager = get_inference_task_manager()
+    record = task_manager.get_task(task_id)
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "TASK_NOT_FOUND",
+                "message": "批量推理任务不存在",
+                "detail": task_id,
+            },
+        )
+
+    request_id = getattr(request.state, "request_id", "unknown")
+    metrics: dict[str, Any] = request.app.state.metrics
+    return _create_replayed_task(
+        source_record=record,
+        request_id=request_id,
+        settings=settings,
+        engine=engine,
+        metrics=metrics,
+    )
 
 
 def _task_record_to_response(record: Any) -> schemas.InferenceTaskResponse:

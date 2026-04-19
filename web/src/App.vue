@@ -14,7 +14,7 @@
               @batch-task="handleBatchTask"
             />
             <DetectionResult :result="detectionResult" />
-            <BatchTaskStatus :task="batchTask" />
+            <BatchTaskStatus :task="batchTask" @retry="handleRetryTask" @rerun="handleRerunTask" />
             <BatchDetectionResult :result="batchDetectionResult" />
           </el-col>
           <el-col :lg="10" :xs="24">
@@ -32,8 +32,12 @@
             />
             <TaskHistoryList
               :tasks="taskHistory"
+              :status-filter="taskStatusFilter"
               @refresh="loadTaskHistory"
               @select="openTaskHistory"
+              @retry="handleRetryTask"
+              @rerun="handleRerunTask"
+              @update:status-filter="handleTaskStatusFilterChange"
             />
           </el-col>
         </el-row>
@@ -66,6 +70,7 @@ import type {
   InferenceResponse,
   BatchInferenceResponse,
   InferenceTaskResponse,
+  InferenceTaskStatus,
   ReportBatchSummary,
   ReportDeviceSummary,
   ReportRecordResponse,
@@ -76,6 +81,7 @@ const detectionResult = ref<InferenceResponse | null>(null)
 const batchDetectionResult = ref<BatchInferenceResponse | null>(null)
 const batchTask = ref<InferenceTaskResponse | null>(null)
 const taskHistory = ref<InferenceTaskResponse[]>([])
+const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
 const batches = ref<ReportBatchSummary[]>([])
 const devices = ref<ReportDeviceSummary[]>([])
 const selectedDeviceId = ref('')
@@ -141,34 +147,68 @@ const handleBatchTask = (task: InferenceTaskResponse) => {
 
 const loadTaskHistory = async () => {
   try {
-    taskHistory.value = await apiService.listBatchTasks(10)
+    taskHistory.value = await apiService.listBatchTasks(10, taskStatusFilter.value)
   } catch (error) {
     apiService.showError(error as Error)
   }
+}
+
+const selectTask = (task: InferenceTaskResponse) => {
+  batchTask.value = task
+  detectionResult.value = null
+
+  if (task.status === 'completed') {
+    batchDetectionResult.value = {
+      files: task.results,
+      metadata: task.metadata
+    }
+    return
+  }
+
+  batchDetectionResult.value = null
 }
 
 const openTaskHistory = async (taskId: string) => {
   stopTaskPolling()
   try {
     const task = await apiService.getBatchTask(taskId)
-    batchTask.value = task
-    detectionResult.value = null
-
-    if (task.status === 'completed') {
-      batchDetectionResult.value = {
-        files: task.results,
-        metadata: task.metadata
-      }
-      return
-    }
-
-    batchDetectionResult.value = null
+    selectTask(task)
     if (task.status === 'running' || task.status === 'pending') {
       void pollBatchTask(taskId)
     }
   } catch (error) {
     apiService.showError(error as Error)
   }
+}
+
+const startTaskFromResponse = (task: InferenceTaskResponse) => {
+  stopTaskPolling()
+  selectTask(task)
+  void loadTaskHistory()
+  void pollBatchTask(task.task_id)
+}
+
+const handleRetryTask = async (taskId: string) => {
+  try {
+    const task = await apiService.retryBatchTask(taskId)
+    startTaskFromResponse(task)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
+const handleRerunTask = async (taskId: string) => {
+  try {
+    const task = await apiService.rerunBatchTask(taskId)
+    startTaskFromResponse(task)
+  } catch (error) {
+    apiService.showError(error as Error)
+  }
+}
+
+const handleTaskStatusFilterChange = (status: InferenceTaskStatus | '') => {
+  taskStatusFilter.value = status
+  void loadTaskHistory()
 }
 
 const loadReportData = async () => {

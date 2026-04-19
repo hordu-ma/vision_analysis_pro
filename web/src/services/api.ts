@@ -5,6 +5,7 @@ import type {
   InferenceResponse,
   BatchInferenceResponse,
   InferenceTaskResponse,
+  InferenceTaskStatus,
   ErrorResponse,
   ReportBatchListResponse,
   ReportDeviceListResponse,
@@ -304,9 +305,30 @@ class ApiService {
     return response.data
   }
 
-  async listBatchTasks(limit = 20): Promise<InferenceTaskResponse[]> {
+  async listBatchTasks(
+    limit = 20,
+    status?: InferenceTaskStatus | ''
+  ): Promise<InferenceTaskResponse[]> {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (status) {
+      params.set('status', status)
+    }
     const response = await this.client.get<InferenceTaskResponse[]>(
-      `/inference/images/tasks?limit=${limit}`
+      `/inference/images/tasks?${params.toString()}`
+    )
+    return response.data
+  }
+
+  async retryBatchTask(taskId: string): Promise<InferenceTaskResponse> {
+    const response = await this.client.post<InferenceTaskResponse>(
+      `/inference/images/tasks/${taskId}/retry`
+    )
+    return response.data
+  }
+
+  async rerunBatchTask(taskId: string): Promise<InferenceTaskResponse> {
+    const response = await this.client.post<InferenceTaskResponse>(
+      `/inference/images/tasks/${taskId}/rerun`
     )
     return response.data
   }

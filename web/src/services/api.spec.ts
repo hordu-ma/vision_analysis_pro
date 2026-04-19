@@ -257,6 +257,58 @@ describe('API Service', () => {
       expect(result).toEqual(mockResponse)
       expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10')
     })
+
+    it('应该按状态筛选批量任务列表', async () => {
+      const mockResponse: InferenceTaskResponse[] = []
+      mockGet.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.listBatchTasks(10, 'failed')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10&status=failed')
+    })
+
+    it('应该重试失败任务', async () => {
+      const mockResponse: InferenceTaskResponse = {
+        task_id: 'task-retry',
+        status: 'pending',
+        created_at: 1700000000,
+        updated_at: 1700000000,
+        file_count: 1,
+        completed_files: 0,
+        progress: 0,
+        results: [],
+        metadata: { source_task_id: 'task-failed', replay_mode: 'retry' }
+      }
+
+      mockPost.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.retryBatchTask('task-failed')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPost).toHaveBeenCalledWith('/inference/images/tasks/task-failed/retry')
+    })
+
+    it('应该复跑已完成任务', async () => {
+      const mockResponse: InferenceTaskResponse = {
+        task_id: 'task-rerun',
+        status: 'pending',
+        created_at: 1700000000,
+        updated_at: 1700000000,
+        file_count: 1,
+        completed_files: 0,
+        progress: 0,
+        results: [],
+        metadata: { source_task_id: 'task-completed', replay_mode: 'rerun' }
+      }
+
+      mockPost.mockResolvedValue({ data: mockResponse })
+
+      const result = await apiService.rerunBatchTask('task-completed')
+
+      expect(result).toEqual(mockResponse)
+      expect(mockPost).toHaveBeenCalledWith('/inference/images/tasks/task-completed/rerun')
+    })
   })
 
   describe('isServiceAvailable()', () => {
@@ -421,6 +473,8 @@ describe('API Service', () => {
       expect(apiService.createBatchTask).toBeDefined()
       expect(apiService.getBatchTask).toBeDefined()
       expect(apiService.listBatchTasks).toBeDefined()
+      expect(apiService.retryBatchTask).toBeDefined()
+      expect(apiService.rerunBatchTask).toBeDefined()
       expect(apiService.isServiceAvailable).toBeDefined()
       expect(apiService.listReportBatches).toBeDefined()
       expect(apiService.listReportDevices).toBeDefined()

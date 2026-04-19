@@ -43,6 +43,9 @@ export interface InferenceTaskResponse {
     file_count?: number
     total_detections?: number
     batch_inference_time_ms?: number
+    visualize?: boolean
+    source_task_id?: string
+    replay_mode?: 'retry' | 'rerun'
   }
   error?: {
     code: string
@@ -50,6 +53,8 @@ export interface InferenceTaskResponse {
     detail?: string
   } | null
 }
+
+export type InferenceTaskStatus = 'pending' | 'running' | 'completed' | 'failed'
 
 export interface HealthResponse {
   status: string

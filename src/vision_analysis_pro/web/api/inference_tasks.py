@@ -11,6 +11,15 @@ from typing import Any
 
 
 @dataclass
+class StoredUploadFile:
+    """内存中的上传文件快照，用于任务重试/复跑。"""
+
+    filename: str
+    content_type: str | None
+    file_bytes: bytes
+
+
+@dataclass
 class InferenceTaskRecord:
     """批量推理任务记录。"""
 
@@ -24,6 +33,8 @@ class InferenceTaskRecord:
     results: list[dict[str, Any]] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
     error: dict[str, str] | None = None
+    input_files: list[StoredUploadFile] = field(default_factory=list)
+    visualize: bool = False
 
 
 class InferenceTaskManager:
@@ -37,6 +48,9 @@ class InferenceTaskManager:
         self,
         *,
         file_count: int,
+        input_files: list[StoredUploadFile],
+        visualize: bool,
+        metadata: dict[str, Any] | None = None,
         worker: Callable[
             [Callable[[int, int], None]], tuple[list[dict[str, Any]], dict[str, Any]]
         ],
@@ -49,6 +63,9 @@ class InferenceTaskManager:
             created_at=now,
             updated_at=now,
             file_count=file_count,
+            metadata=dict(metadata or {}),
+            input_files=list(input_files),
+            visualize=visualize,
         )
         with self._lock:
             self._tasks[task_id] = record
@@ -78,12 +95,20 @@ class InferenceTaskManager:
                 results=list(record.results),
                 metadata=dict(record.metadata),
                 error=dict(record.error) if record.error else None,
+                input_files=list(record.input_files),
+                visualize=record.visualize,
             )
 
-    def list_tasks(self, *, limit: int = 20) -> list[InferenceTaskRecord]:
+    def list_tasks(
+        self, *, limit: int = 20, status_filter: str | None = None
+    ) -> list[InferenceTaskRecord]:
         with self._lock:
             records = sorted(
-                self._tasks.values(),
+                (
+                    record
+                    for record in self._tasks.values()
+                    if status_filter is None or record.status == status_filter
+                ),
                 key=lambda item: item.created_at,
                 reverse=True,
             )[:limit]
@@ -100,6 +125,8 @@ class InferenceTaskManager:
                 results=list(record.results),
                 metadata=dict(record.metadata),
                 error=dict(record.error) if record.error else None,
+                input_files=list(record.input_files),
+                visualize=record.visualize,
             )
             for record in records
         ]
@@ -139,13 +166,16 @@ class InferenceTaskManager:
             )
             return
 
+        record = self.get_task(task_id)
+        merged_metadata = dict(record.metadata) if record else {}
+        merged_metadata.update(metadata)
         self._update_task(
             task_id,
             status="completed",
             completed_files=len(results),
             progress=100,
             results=results,
-            metadata=metadata,
+            metadata=merged_metadata,
         )
 
     def _update_task(self, task_id: str, **updates: Any) -> None:

@@ -3,7 +3,22 @@
     <template #header>
       <div class="card-header">
         <span>最近任务</span>
-        <el-button text @click="emit('refresh')">刷新</el-button>
+        <div class="header-actions">
+          <el-select
+            :model-value="statusFilter"
+            placeholder="筛选状态"
+            size="small"
+            clearable
+            class="status-filter"
+            @change="handleStatusChange"
+          >
+            <el-option label="待开始" value="pending" />
+            <el-option label="执行中" value="running" />
+            <el-option label="已完成" value="completed" />
+            <el-option label="失败" value="failed" />
+          </el-select>
+          <el-button text @click="emit('refresh')">刷新</el-button>
+        </div>
       </div>
     </template>
 
@@ -29,22 +44,64 @@
           {{ formatTime(scope.row.created_at) }}
         </template>
       </el-table-column>
+      <el-table-column label="操作" min-width="140">
+        <template #default="scope">
+          <div class="row-actions">
+            <el-button link type="primary" @click="emit('select', scope.row.task_id)"
+              >查看</el-button
+            >
+            <el-button
+              v-if="scope.row.status === 'failed'"
+              link
+              type="danger"
+              @click="emit('retry', scope.row.task_id)"
+            >
+              重试
+            </el-button>
+            <el-button
+              v-else-if="scope.row.status === 'completed'"
+              link
+              type="success"
+              @click="emit('rerun', scope.row.task_id)"
+            >
+              复跑
+            </el-button>
+          </div>
+        </template>
+      </el-table-column>
     </el-table>
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElEmpty, ElTable, ElTableColumn, ElTag } from 'element-plus'
-import type { InferenceTaskResponse } from '@/types/api'
+import {
+  ElButton,
+  ElCard,
+  ElEmpty,
+  ElOption,
+  ElSelect,
+  ElTable,
+  ElTableColumn,
+  ElTag
+} from 'element-plus'
+import type { InferenceTaskResponse, InferenceTaskStatus } from '@/types/api'
 
 defineProps<{
   tasks: InferenceTaskResponse[]
+  statusFilter: InferenceTaskStatus | ''
 }>()
 
 const emit = defineEmits<{
   refresh: []
   select: [taskId: string]
+  retry: [taskId: string]
+  rerun: [taskId: string]
+  'update:statusFilter': [status: InferenceTaskStatus | '']
 }>()
+
+const handleStatusChange = (value: InferenceTaskStatus | '' | undefined) => {
+  emit('update:statusFilter', value ?? '')
+}
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString('zh-CN')
@@ -86,5 +143,21 @@ const statusType = (status: string): 'info' | 'warning' | 'success' | 'danger' =
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-filter {
+  width: 120px;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>

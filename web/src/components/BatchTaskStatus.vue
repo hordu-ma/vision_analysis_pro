@@ -26,6 +26,25 @@
       show-icon
       class="task-alert"
     />
+
+    <div class="task-actions">
+      <el-button
+        v-if="task.status === 'failed'"
+        type="danger"
+        plain
+        @click="emit('retry', task.task_id)"
+      >
+        重试当前任务
+      </el-button>
+      <el-button
+        v-if="task.status === 'completed'"
+        type="success"
+        plain
+        @click="emit('rerun', task.task_id)"
+      >
+        复跑当前任务
+      </el-button>
+    </div>
   </el-card>
 </template>
 
@@ -43,6 +62,11 @@ import type { InferenceTaskResponse } from '@/types/api'
 
 const props = defineProps<{
   task: InferenceTaskResponse | null
+}>()
+
+const emit = defineEmits<{
+  retry: [taskId: string]
+  rerun: [taskId: string]
 }>()
 
 const statusLabel = computed(() => {
@@ -94,5 +118,11 @@ const progressStatus = computed(() => {
 
 .task-alert {
   margin-top: 16px;
+}
+
+.task-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
 }
 </style>
