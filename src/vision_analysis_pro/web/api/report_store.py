@@ -326,19 +326,33 @@ class SQLiteReportStore:
                 )
                 conn.commit()
 
-    def list_audit_logs(self, *, limit: int = 50) -> list[AuditLogRecord]:
+    def list_audit_logs(
+        self, *, limit: int = 50, actor: str | None = None
+    ) -> list[AuditLogRecord]:
         with self._lock:
             self._ensure_schema()
             with self._connect() as conn:
-                rows = conn.execute(
-                    """
-                    SELECT event_type, resource_id, actor, request_id, detail_json, created_at
-                    FROM audit_logs
-                    ORDER BY created_at DESC
-                    LIMIT ?
-                    """,
-                    (limit,),
-                ).fetchall()
+                if actor:
+                    rows = conn.execute(
+                        """
+                        SELECT event_type, resource_id, actor, request_id, detail_json, created_at
+                        FROM audit_logs
+                        WHERE actor = ?
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (actor, limit),
+                    ).fetchall()
+                else:
+                    rows = conn.execute(
+                        """
+                        SELECT event_type, resource_id, actor, request_id, detail_json, created_at
+                        FROM audit_logs
+                        ORDER BY created_at DESC
+                        LIMIT ?
+                        """,
+                        (limit,),
+                    ).fetchall()
         return [_row_to_audit_log(row) for row in rows]
 
     def list_reviews(self, batch_id: str) -> dict[int, ReportFrameReview]:

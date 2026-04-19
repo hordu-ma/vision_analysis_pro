@@ -7,7 +7,12 @@
       @select-device="emit('select-device', $event)"
       @edit-device="emit('edit-device', $event)"
     />
-    <AuditLogList :logs="logs" @refresh="emit('refresh-audit-logs')" />
+    <AuditLogList
+      :logs="logs"
+      :actor-filter="actorFilter"
+      @refresh="emit('refresh-audit-logs')"
+      @update:actor-filter="emit('update:actor-filter', $event)"
+    />
   </div>
 </template>
 
@@ -21,6 +26,7 @@ defineProps<{
   summary: AlertSummaryResponse | null
   devices: ReportDeviceSummary[]
   logs: AuditLogResponse[]
+  actorFilter: string
 }>()
 
 const emit = defineEmits<{
@@ -29,6 +35,7 @@ const emit = defineEmits<{
   'refresh-audit-logs': []
   'select-device': [deviceId: string]
   'edit-device': [deviceId: string]
+  'update:actor-filter': [actor: string]
 }>()
 </script>
 

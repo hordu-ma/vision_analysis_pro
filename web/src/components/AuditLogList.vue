@@ -3,7 +3,16 @@
     <template #header>
       <div class="card-header">
         <span>审计日志</span>
-        <el-button text @click="emit('refresh')">刷新</el-button>
+        <div class="header-actions">
+          <el-input
+            :model-value="actorFilter"
+            placeholder="按操作者筛选"
+            size="small"
+            class="actor-filter"
+            @input="emit('update:actorFilter', String($event))"
+          />
+          <el-button text @click="emit('refresh')">刷新</el-button>
+        </div>
       </div>
     </template>
 
@@ -24,15 +33,17 @@
 </template>
 
 <script setup lang="ts">
-import { ElButton, ElCard, ElEmpty, ElTable, ElTableColumn } from 'element-plus'
+import { ElButton, ElCard, ElEmpty, ElInput, ElTable, ElTableColumn } from 'element-plus'
 import type { AuditLogResponse } from '@/types/api'
 
 defineProps<{
   logs: AuditLogResponse[]
+  actorFilter: string
 }>()
 
 const emit = defineEmits<{
   refresh: []
+  'update:actorFilter': [actor: string]
 }>()
 
 const formatTime = (timestamp: number): string => {
@@ -49,5 +60,15 @@ const formatTime = (timestamp: number): string => {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.actor-filter {
+  width: 160px;
 }
 </style>

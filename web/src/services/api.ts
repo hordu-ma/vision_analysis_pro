@@ -69,6 +69,7 @@ export type UploadProgressCallback = (progress: number) => void
 class ApiService {
   private client: AxiosInstance
   private isShowingError = false
+  private actor = 'opencode'
 
   constructor() {
     this.client = axios.create({
@@ -94,6 +95,8 @@ class ApiService {
         // if (token) {
         //   config.headers.Authorization = `Bearer ${token}`
         // }
+        config.headers = config.headers || {}
+        config.headers['X-Actor'] = this.actor
         return config
       },
       error => {
@@ -111,6 +114,10 @@ class ApiService {
         return Promise.reject(apiError)
       }
     )
+  }
+
+  setActor(actor: string): void {
+    this.actor = actor.trim() || 'opencode'
   }
 
   /**
@@ -447,8 +454,12 @@ class ApiService {
     return response.data
   }
 
-  async listAuditLogs(limit = 50): Promise<AuditLogResponse[]> {
-    const response = await this.client.get<AuditLogResponse[]>(`/reports/audit-logs?limit=${limit}`)
+  async listAuditLogs(limit = 50, actor?: string): Promise<AuditLogResponse[]> {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (actor) {
+      params.set('actor', actor)
+    }
+    const response = await this.client.get<AuditLogResponse[]>(`/reports/audit-logs?${params}`)
     return response.data
   }
 

@@ -4,78 +4,58 @@
       <el-header>
         <div class="header-left">
           <h1>Vision Analysis Pro</h1>
-          <el-radio-group v-model="activeView" size="small">
-            <el-radio-button label="workspace">任务工作台</el-radio-button>
-            <el-radio-button label="devices">设备管理</el-radio-button>
+          <el-input
+            v-model="actorName"
+            placeholder="当前操作者"
+            size="small"
+            class="actor-input"
+            @change="handleActorChange"
+          />
+          <el-radio-group :model-value="activeRoute" size="small" @change="handleRouteChange">
+            <el-radio-button label="/workspace">任务工作台</el-radio-button>
+            <el-radio-button label="/devices">设备管理</el-radio-button>
           </el-radio-group>
         </div>
         <HealthStatus />
       </el-header>
       <el-main>
-        <el-row v-if="activeView === 'workspace'" :gutter="24">
-          <el-col :lg="14" :xs="24">
-            <ImageUpload
-              @result="handleResult"
-              @batch-result="handleBatchResult"
-              @batch-task="handleBatchTask"
-            />
-            <DetectionResult :result="detectionResult" />
-            <BatchTaskStatus
-              :task="batchTask"
-              @retry="handleRetryTask"
-              @retry-failed="handleRetryFailedTask"
-              @rerun="handleRerunTask"
-              @export="handleExportTaskCsv"
-              @detail="openTaskHistory"
-            />
-            <BatchDetectionResult
-              :result="batchDetectionResult"
-              :task-id="batchTask ? batchTask.task_id : undefined"
-              @export="handleExportTaskCsv"
-              @detail="openTaskHistory"
-            />
-          </el-col>
-          <el-col :lg="10" :xs="24">
-            <AlertSummaryCard :summary="alertSummary" @refresh="loadAlertSummary" />
-            <DeviceOverview
-              :devices="devices"
-              @refresh="loadReportData"
-              @select-device="handleDeviceSelect"
-              @edit-device="openDeviceMetadata"
-            />
-            <ReportBatchList
-              :batches="batches"
-              :active-device-id="selectedDeviceId || undefined"
-              @refresh="loadReportData"
-              @clear-filter="clearDeviceFilter"
-              @view-detail="openBatchDetail"
-            />
-            <TaskHistoryList
-              :tasks="taskHistory"
-              :status-filter="taskStatusFilter"
-              @refresh="loadTaskHistory"
-              @select="openTaskHistory"
-              @retry="handleRetryTask"
-              @retry-failed="handleRetryFailedTask"
-              @rerun="handleRerunTask"
-              @export="handleExportTaskCsv"
-              @delete="handleDeleteTask"
-              @cleanup="handleCleanupTasks"
-              @update:status-filter="handleTaskStatusFilterChange"
-            />
-          </el-col>
-        </el-row>
-        <DeviceManagementView
-          v-else
-          :summary="alertSummary"
-          :devices="devices"
-          :logs="auditLogs"
-          @refresh-alerts="loadAlertSummary"
-          @refresh-devices="loadReportData"
-          @refresh-audit-logs="loadAuditLogs"
-          @select-device="handleDeviceSelect"
-          @edit-device="openDeviceMetadata"
-        />
+        <router-view v-slot="{ Component }">
+          <component
+            :is="Component"
+            :detection-result="detectionResult"
+            :batch-detection-result="batchDetectionResult"
+            :batch-task="batchTask"
+            :task-history="taskHistory"
+            :task-status-filter="taskStatusFilter"
+            :batches="batches"
+            :selected-device-id="selectedDeviceId"
+            :summary="alertSummary"
+            :devices="devices"
+            :logs="auditLogs"
+            :actor-filter="auditActorFilter"
+            @result="handleResult"
+            @batch-result="handleBatchResult"
+            @batch-task="handleBatchTask"
+            @refresh-reports="loadReportData"
+            @refresh-tasks="loadTaskHistory"
+            @retry-task="handleRetryTask"
+            @retry-failed-task="handleRetryFailedTask"
+            @rerun-task="handleRerunTask"
+            @export-task-csv="handleExportTaskCsv"
+            @open-task="openTaskHistory"
+            @open-batch="openBatchDetail"
+            @delete-task="handleDeleteTask"
+            @cleanup-tasks="handleCleanupTasks"
+            @clear-device-filter="clearDeviceFilter"
+            @update:task-status-filter="handleTaskStatusFilterChange"
+            @refresh-alerts="loadAlertSummary"
+            @refresh-devices="loadReportData"
+            @refresh-audit-logs="loadAuditLogs"
+            @select-device="handleDeviceSelect"
+            @edit-device="openDeviceMetadata"
+            @update:actor-filter="handleAuditActorFilterChange"
+          />
+        </router-view>
         <ReportDetailDrawer
           :visible="detailVisible"
           :report="selectedReport"
@@ -105,33 +85,15 @@
 </template>
 
 <script setup lang="ts">
-import {
-  ElCol,
-  ElContainer,
-  ElHeader,
-  ElMain,
-  ElRadioButton,
-  ElRadioGroup,
-  ElRow
-} from 'element-plus'
+import { ElContainer, ElHeader, ElInput, ElMain, ElRadioButton, ElRadioGroup } from 'element-plus'
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref } from 'vue'
-const DeviceManagementView = defineAsyncComponent(
-  () => import('@/components/DeviceManagementView.vue')
-)
-const BatchDetectionResult = defineAsyncComponent(
-  () => import('@/components/BatchDetectionResult.vue')
-)
-const BatchTaskStatus = defineAsyncComponent(() => import('@/components/BatchTaskStatus.vue'))
+import { useRoute, useRouter } from 'vue-router'
 const DeviceMetadataDrawer = defineAsyncComponent(
   () => import('@/components/DeviceMetadataDrawer.vue')
 )
-const DetectionResult = defineAsyncComponent(() => import('@/components/DetectionResult.vue'))
 import HealthStatus from '@/components/HealthStatus.vue'
-import ImageUpload from '@/components/ImageUpload.vue'
-import ReportBatchList from '@/components/ReportBatchList.vue'
 const ReportDetailDrawer = defineAsyncComponent(() => import('@/components/ReportDetailDrawer.vue'))
 const TaskDetailDrawer = defineAsyncComponent(() => import('@/components/TaskDetailDrawer.vue'))
-import TaskHistoryList from '@/components/TaskHistoryList.vue'
 import { apiService } from '@/services/api'
 import type {
   InferenceResponse,
@@ -149,13 +111,14 @@ import type {
 } from '@/types/api'
 
 const detectionResult = ref<InferenceResponse | null>(null)
-const activeView = ref<'workspace' | 'devices'>('workspace')
 const batchDetectionResult = ref<BatchInferenceResponse | null>(null)
 const batchTask = ref<InferenceTaskDetailResponse | null>(null)
 const taskHistory = ref<InferenceTaskResponse[]>([])
 const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
 const alertSummary = ref<AlertSummaryResponse | null>(null)
 const auditLogs = ref<AuditLogResponse[]>([])
+const actorName = ref('opencode')
+const auditActorFilter = ref('')
 const batches = ref<ReportBatchSummary[]>([])
 const devices = ref<ReportDeviceSummary[]>([])
 const selectedDeviceId = ref('')
@@ -164,10 +127,25 @@ const editingDeviceId = ref('')
 const detailVisible = ref(false)
 const taskDetailVisible = ref(false)
 const selectedReport = ref<ReportRecordResponse | null>(null)
+const route = useRoute()
+const router = useRouter()
+
+const activeRoute = computed(() => route.path)
 
 const editingDevice = computed(() => {
   return devices.value.find(item => item.device_id === editingDeviceId.value) || null
 })
+
+const handleRouteChange = (path: string | number | boolean | undefined) => {
+  if (typeof path === 'string') {
+    void router.push(path)
+  }
+}
+
+const handleActorChange = () => {
+  apiService.setActor(actorName.value)
+  void loadAuditLogs()
+}
 
 const handleResult = (data: InferenceResponse) => {
   batchTask.value = null
@@ -393,10 +371,15 @@ const loadAlertSummary = async () => {
 
 const loadAuditLogs = async () => {
   try {
-    auditLogs.value = await apiService.listAuditLogs(20)
+    auditLogs.value = await apiService.listAuditLogs(20, auditActorFilter.value || undefined)
   } catch (error) {
     apiService.showError(error as Error)
   }
+}
+
+const handleAuditActorFilterChange = (actor: string) => {
+  auditActorFilter.value = actor
+  void loadAuditLogs()
 }
 
 const handleDeviceSelect = (deviceId: string) => {
@@ -467,6 +450,7 @@ onMounted(() => {
   void loadAlertSummary()
   void loadAuditLogs()
   void loadTaskHistory()
+  apiService.setActor(actorName.value)
 })
 
 onBeforeUnmount(() => {
@@ -493,6 +477,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.actor-input {
+  width: 160px;
 }
 
 .el-header h1 {

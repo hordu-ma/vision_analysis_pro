@@ -429,12 +429,13 @@ async def get_alert_summary(
 async def list_audit_logs(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="返回日志数量上限"),
+    actor: str | None = Query(None, description="按操作者过滤"),
     settings: Settings = Depends(get_settings),
 ) -> list[schemas.AuditLogResponse]:
     """读取最近的审计日志。"""
     _authorize_report_request(request, settings)
     store = get_report_store(str(settings.report_store_db_path))
-    logs = store.list_audit_logs(limit=limit)
+    logs = store.list_audit_logs(limit=limit, actor=actor)
     return [
         schemas.AuditLogResponse(
             event_type=item.event_type,
