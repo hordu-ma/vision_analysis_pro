@@ -383,9 +383,12 @@ async def test_ready_health_endpoint() -> None:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         resp = await client.get("/api/v1/health/ready")
 
-    assert resp.status_code == 200
     data = resp.json()
-    assert data["status"] in {"ready", "degraded"}
+    expected_status_code = 200 if data["model_loaded"] else 503
+    expected_status = "ready" if data["model_loaded"] else "degraded"
+
+    assert resp.status_code == expected_status_code
+    assert data["status"] == expected_status
     assert "engine" in data
     assert "model_loaded" in data
 
