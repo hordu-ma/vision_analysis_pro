@@ -465,6 +465,14 @@ class DetectionReportResponse(BaseModel):
         default_factory=dict,
         description="后续接入大模型报告生成的结构化上下文",
     )
+    prompt_version: str = Field(
+        "inspection-report-prompt.v1",
+        description="LLM 报告 prompt 契约版本",
+    )
+    output_schema_version: str = Field(
+        "inspection-report-output.v1",
+        description="LLM 报告输出 schema 版本",
+    )
     generated_by: Literal["template", "llm"] = Field(..., description="生成方式")
     request_id: str | None = Field(None, description="请求 ID")
 

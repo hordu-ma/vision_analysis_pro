@@ -212,7 +212,13 @@ async def get_report_summary(
             },
         )
 
-    report = build_detection_report(record, store.list_reviews(batch_id))
+    report = build_detection_report(
+        record,
+        store.list_reviews(batch_id),
+        device_metadata=store.get_device_metadata(record.device_id),
+        generation_mode=settings.report_generation_mode,
+        llm_provider=settings.report_llm_provider,
+    )
     report["request_id"] = request_id
     return schemas.DetectionReportResponse.model_validate(report)
 

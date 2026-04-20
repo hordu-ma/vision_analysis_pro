@@ -46,6 +46,14 @@ class Settings(BaseSettings):
         Path("data/reports.db"),
         description="边缘上报批次持久化 SQLite 路径",
     )
+    report_generation_mode: Literal["template", "llm"] = Field(
+        "template",
+        description="报告生成模式；默认模板，llm 使用版本化报告契约生成文本",
+    )
+    report_llm_provider: Literal["local"] = Field(
+        "local",
+        description="LLM 报告 provider；local 为无外部依赖的确定性本地契约实现",
+    )
 
 
 @lru_cache(maxsize=1)

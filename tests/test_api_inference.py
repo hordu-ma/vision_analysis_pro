@@ -1721,6 +1721,55 @@ async def test_report_summary_endpoint_returns_template_report() -> None:
 
 
 @pytest.mark.asyncio
+async def test_report_summary_endpoint_can_generate_llm_contract_report(
+    tmp_path: Path,
+) -> None:
+    """测试 summary 可按 LLM 报告契约生成文本并保留源事实。"""
+
+    def _llm_settings() -> Settings:
+        return Settings.model_validate(
+            {
+                "model_path": "models/fake.pt",
+                "confidence_threshold": 0.5,
+                "iou_threshold": 0.5,
+                "cloud_api_key": "",
+                "report_store_db_path": str(tmp_path / "llm-reports.db"),
+                "report_generation_mode": "llm",
+                "report_llm_provider": "local",
+            }
+        )
+
+    app.dependency_overrides[get_settings] = _llm_settings
+    clear_report_store_cache()
+
+    payload = _create_report_payload(
+        batch_id="llm-summary-batch-001",
+        device_id="llm-summary-device",
+        label="crack",
+    )
+    payload["results"][0]["detections"][0]["confidence"] = 0.35
+    payload["results"][0]["metadata"] = {}
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.post("/api/v1/report", json=payload)
+        resp = await client.get("/api/v1/report/llm-summary-batch-001/summary")
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["generated_by"] == "llm"
+    assert data["prompt_version"] == "inspection-report-prompt.v1"
+    assert data["output_schema_version"] == "inspection-report-output.v1"
+    assert data["findings"][0]["label"] == "crack"
+    assert data["findings"][0]["max_confidence"] == 0.35
+    assert data["llm_context"]["missing_metadata"] == [
+        "device_metadata",
+        "frame:1:image_name",
+    ]
+    assert data["llm_context"]["low_confidence_detections"][0]["confidence"] == 0.35
+
+
+@pytest.mark.asyncio
 async def test_report_review_endpoint_returns_not_found_for_missing_batch() -> None:
     """测试不存在的批次不能写入复核结果。"""
     transport = ASGITransport(app=app)

@@ -6,11 +6,11 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-009 / LLM Report Extension**; HE-007 remains gated on reviewed pilot labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-007 / Stage B Model Comparison**, gated on reviewed pilot labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
-- DeepLab, Transformer trend modeling, MQTT, Rust/PyO3, and LLM report generation are not on the critical path unless a task below explicitly promotes them.
+- DeepLab, Transformer trend modeling, MQTT, and Rust/PyO3 are not on the critical path unless a task below explicitly promotes them.
 
 ## Stage Definitions
 
@@ -94,7 +94,7 @@ The best-practice path is not to build a four-model chain immediately. The proje
 2. Reproducible YOLO training and evaluation.
 3. Exported inference artifact wired into the existing API/Edge Agent paths.
 4. Browser and Edge Agent end-to-end checks.
-5. Only then expand to segmentation, temporal trends, or LLM reports.
+5. Only then expand to segmentation or temporal trends; LLM report text is now limited to the report layer and must not alter detection facts.
 
 ## Done Recently
 
@@ -110,7 +110,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
 - HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
 - HE-005 aligned the pilot deployment runbook, Compose model paths, Edge Agent sample config, smoke commands, and rollback steps.
-- Current backend baseline: `188 passed, 43 skipped`.
+- HE-009 added a versioned LLM report contract with deterministic template fallback and local provider mode.
+- Current backend baseline: `191 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
@@ -341,7 +342,7 @@ uv run ruff check .
 uv run pytest tests/test_deployment_config.py -q
 ```
 
-## P1 Queue
+## Active Task (Gated)
 
 ### HE-007 Stage B Model Comparison
 
@@ -414,11 +415,11 @@ Rollback:
 - Revert the HE-008 frontend status type/UI changes and the full-flow test if the task contract is narrowed.
 - Revert the README/demo/progress wording if the accepted demo path changes.
 
-## Active Task
+## Completed Task
 
 ### HE-009 LLM Report Extension
 
-Status: Next
+Status: Done
 Priority: P2
 
 Promote only after HE-001 and HE-004 are stable.
@@ -437,7 +438,19 @@ Validation commands:
 ```bash
 uv run ruff check .
 INFERENCE_ENGINE=stub uv run pytest tests/test_api_inference.py tests/test_reporting.py -q
+INFERENCE_ENGINE=stub uv run pytest -q
+cd web
+npm run lint
+npm run test -- --run
+npm run build
+npm run test:e2e
 ```
+
+Result:
+- `/api/v1/report/{batch_id}/summary` remains deterministic template output by default.
+- `REPORT_GENERATION_MODE=llm` enables the local versioned report contract without external network calls.
+- Response payloads now expose `prompt_version` and `output_schema_version`, while `llm_context` carries prompt text, output schema, guardrails, device metadata, review counts, missing metadata, and low-confidence detections.
+- Tests cover template fallback, LLM mode source-fact preservation, missing metadata, low-confidence detections, device metadata, review status, and the API route contract.
 
 Rollback:
 - Keep `/api/v1/report/{batch_id}/summary` on deterministic template output only.

@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
 **最后更新**：2026-04-20
-**后端测试**：188 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：191 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：53 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 browser smoke 通过
 
@@ -48,7 +48,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ### 当前验证
 
 - ✅ `uv run ruff check .`
-- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：188 passed, 43 skipped
+- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：191 passed, 43 skipped
 - ✅ `cd web && npm run lint`
 - ✅ `cd web && npm run test -- --run`：53 passed
 - ✅ `cd web && npm run build`
@@ -424,7 +424,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 188 passed, 43 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 191 passed, 43 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账
@@ -533,12 +533,21 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 - HE-008：`README.md` 与 `docs/demo.md` 明确单一 happy path 和 recovery path，避免上传、批量任务、上报、复核、摘要与导出说明分散漂移。
 - HE-008：浏览器 smoke 继续覆盖前端上传、推理结果展示、检测数量和首要缺陷展示。
 
+## 最新进展：HE-009 LLM Report Extension
+
+2026-04-20 完成 LLM 报告扩展的可测契约实现。
+
+- HE-009：`/api/v1/report/{batch_id}/summary` 默认继续返回确定性模板报告，`REPORT_GENERATION_MODE=llm` 时启用本地确定性 LLM 报告契约。
+- HE-009：summary 响应补充 `prompt_version`、`output_schema_version`，`llm_context` 固定包含 prompt、输出 schema、事实保护 guardrails、设备元数据、复核计数、缺失 metadata 与低置信度候选。
+- HE-009：测试覆盖模板 fallback、LLM 模式源事实保护、缺失 metadata、低置信度 detections、设备元数据、人工复核状态和 API 路由契约。
+- HE-009：`.env.example` 增加 `REPORT_GENERATION_MODE` 与 `REPORT_LLM_PROVIDER`，回滚只需切回 `template`。
+
 ## 📋 下一步计划
 
 下一步开发计划以根目录 `tasks.md` 为准。当前活跃队列：
 
-1. **HE-009 LLM Report Extension**：基于已稳定的模板报告与 `llm_context` 增加可配置 LLM 文本生成；不得改写检测标签、置信度或人工复核事实。
-2. **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型做同集对比。
+1. **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型做同集对比。
+2. **HE-010 / HE-011**：继续保持证据门禁；只有出现裂缝长度/面积需求或同设备多批次历史后再推进。
 
 非关键路径：MQTT、Rust/PyO3、DeepLab 和 Transformer 趋势分析均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
@@ -546,4 +555,4 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 **文档维护者**：Vision Analysis Pro Team  
 **最后更新**：2026-04-20
-**下次更新**：完成 HE-009 LLM Report Extension 后
+**下次更新**：HE-007 reviewed pilot labels 到位后

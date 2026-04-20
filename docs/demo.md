@@ -289,7 +289,7 @@ curl -X POST "http://localhost:8000/api/v1/report" \
 
 预期返回 `202 Accepted`，并包含 `status=accepted`、`batch_id` 和 `request_id`。
 
-### 模板报告摘要
+### 模板与 LLM 报告摘要
 
 完成上报后，可以基于已持久化批次生成确定性模板报告：
 
@@ -297,7 +297,21 @@ curl -X POST "http://localhost:8000/api/v1/report" \
 curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary"
 ```
 
-该接口返回整体风险等级、缺陷发现项、建议动作和 `llm_context`。`llm_context` 是后续接入自然语言大模型生成正式报告的结构化输入。
+该接口默认返回整体风险等级、缺陷发现项、建议动作、`prompt_version`、`output_schema_version` 和 `llm_context`。`llm_context` 是自然语言报告生成的结构化输入，包含复核状态、设备元数据、缺失 metadata、低置信度候选、prompt 契约、输出 schema 和事实保护 guardrails。
+
+如需演示 LLM 报告契约，可用本地确定性 provider 启动 API：
+
+```bash
+REPORT_GENERATION_MODE=llm \
+REPORT_LLM_PROVIDER=local \
+INFERENCE_ENGINE=stub \
+uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+
+curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary" \
+  | jq '{generated_by, prompt_version, output_schema_version, summary}'
+```
+
+`REPORT_GENERATION_MODE=llm` 只改变报告文本生成方式，不允许改写检测标签、置信度、bbox、人工复核状态或设备元数据。回滚时把 `REPORT_GENERATION_MODE` 改回 `template` 即可。
 
 ### 上报稳态与故障恢复
 
@@ -415,7 +429,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：188 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：191 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：53 passed ✅
 
 ---

@@ -211,6 +211,8 @@ export interface DetectionReportResponse {
   findings: DetectionReportFinding[]
   recommendations: string[]
   llm_context: Record<string, unknown>
+  prompt_version: string
+  output_schema_version: string
   generated_by: 'template' | 'llm'
   request_id?: string
 }

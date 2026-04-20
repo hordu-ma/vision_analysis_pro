@@ -11,7 +11,7 @@
 - **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 Stage A 自训练 YOLO/ONNX 做真实模型路径。
 - **中期目标**：补齐真实数据集与评估报告后，再恢复五类缺陷 YOLO/ONNX 模型路线。
 - **数据层**：已提供 OpenCV 视频帧读取与关键帧抽取工具，先使用固定间隔、场景变化和模糊过滤等可解释规则。
-- **报告层**：已提供基于结构化检测结果的模板报告接口，LLM 后续只作为解释与报告生成层，不参与检测判定。
+- **报告层**：已提供基于结构化检测结果的模板报告与版本化 LLM 报告契约，LLM 只作为解释与报告生成层，不参与检测判定。
 - **暂不作为当前主线**：DeepLab 语义分割、Transformer 趋势分析、LLM 自动结论判定。
 
 ### 核心特性
@@ -20,7 +20,7 @@
 - 🤖 **AI 检测**：Stub / YOLO / ONNX Runtime 推理
 - 🔧 **边缘计算**：完整的边缘 Agent（采集/推理/上报/离线缓存）
 - 🌐 **云端管理**：FastAPI 后端 + Vue3 前端（上传/批量任务/复跑/导出/复核/设备视图）+ 边缘上报接收
-- 📝 **报告输出**：边缘批次模板报告摘要，预留 LLM 报告生成上下文
+- 📝 **报告输出**：边缘批次模板摘要、版本化 LLM 报告上下文、人工复核与导出
 - ⚡ **高性能**：ONNX 推理相比 YOLO 提升 7.25x（基准测试）
 
 ## 快速开始
@@ -94,9 +94,11 @@ edge-agent
 
 ### 完整巡检流程
 
-当前稳定主路径是：在前端或 API 上传单张/批量图片，创建批量任务并执行推理，查看带框可视化结果；Edge Agent 或外部巡检批次上报到 `POST /api/v1/report` 后，云端持久化批次，人工在报告详情中复核单帧结果，再通过 `GET /api/v1/report/{batch_id}/summary` 生成模板摘要，并按需导出任务 CSV/JSON/ZIP 或报告 CSV。
+当前稳定主路径是：在前端或 API 上传单张/批量图片，创建批量任务并执行推理，查看带框可视化结果；Edge Agent 或外部巡检批次上报到 `POST /api/v1/report` 后，云端持久化批次，人工在报告详情中复核单帧结果，再通过 `GET /api/v1/report/{batch_id}/summary` 生成模板摘要或配置化 LLM 报告文本，并按需导出任务 CSV/JSON/ZIP 或报告 CSV。
 
 恢复路径是：批量任务失败时先查看任务详情，整体失败可调用 retry，部分失败可调用 retry-failed，已完成任务可 rerun；Edge Agent 网络故障时先进入本地 SQLite 缓存，云端恢复后按 FIFO 回放，同一 `batch_id` 的重复上报返回 `duplicate` 且不会重复累计检测数。需要鉴权的环境统一使用 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
+
+报告默认使用确定性模板。设置 `REPORT_GENERATION_MODE=llm`、`REPORT_LLM_PROVIDER=local` 后，summary 响应会返回 `generated_by=llm`、`prompt_version`、`output_schema_version` 和完整 `llm_context`；该模式只生成报告文本，不改写检测标签、置信度、bbox、复核状态或设备元数据。
 
 ### 关键帧抽取
 
@@ -278,7 +280,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 188 passed, 43 skipped）
+├── tests/                      # Python 测试（当前轻量基线 191 passed, 43 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -305,7 +307,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 188 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 191 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（53 passed）
 
 ### 提交规范
@@ -361,8 +363,8 @@ vision_analysis_pro/
 
 ### 📋 当前任务队列
 
-- **HE-009 LLM Report Extension**：在现有模板报告与 `llm_context` 基础上扩展 LLM 文本生成；不得改变检测标签、置信度或人工复核事实。
 - **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型在同一试点验证集上对比。
+- **HE-010 / HE-011**：语义分割和趋势分析继续保持证据门禁，只有在需要裂缝长度/面积或同设备多批次历史时再推进。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 
