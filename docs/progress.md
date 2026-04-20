@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
 **最后更新**：2026-04-20
-**后端测试**：185 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：187 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：53 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 通过
 
@@ -48,7 +48,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ### 当前验证
 
 - ✅ `uv run ruff check .`
-- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：185 passed, 43 skipped
+- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：187 passed, 43 skipped
 - ✅ `cd web && npm run lint`
 - ✅ `cd web && npm run test -- --run`：53 passed
 - ✅ `cd web && npm run build`
@@ -423,7 +423,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 185 passed, 43 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 187 passed, 43 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账
@@ -477,7 +477,9 @@ cd web && npm run test -- --run
 ### 导出 ONNX 模型
 
 ```bash
-uv run python scripts/export_onnx.py --output models/best.onnx
+uv run python scripts/export_onnx.py \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --output models/stage_a_crack/best.onnx
 ```
 
 ### 运行性能基准
@@ -502,9 +504,9 @@ uv run python scripts/benchmark.py --iterations 30 --output docs/benchmark-repor
 
 Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Stage B 自有数据闭环确认。
 
-## 最新进展：HE-002 / HE-003 / HE-006 / HE-004 主线推进
+## 最新进展：HE-002 / HE-003 / HE-006 / HE-004 / HE-005 主线推进
 
-2026-04-20 继续完成浏览器 smoke、Edge Agent 关键帧接入、Stage B 数据闭环和 Edge Agent 上报稳态覆盖。
+2026-04-20 继续完成浏览器 smoke、Edge Agent 关键帧接入、Stage B 数据闭环、Edge Agent 上报稳态覆盖和试点部署 runbook。
 
 - HE-002：`web/e2e/app.spec.ts` 已覆盖上传图片、触发推理、展示结果区、检测数量和首要缺陷。
 - HE-003：`VideoSource` 默认保留逐帧读取；启用 `source.keyframes.enabled` 后复用 OpenCV keyframe extractor 读取关键帧。
@@ -515,6 +517,9 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 - HE-004：新增 API 集成回归，覆盖 API Key、首次上报、缓存回放后的 duplicate 响应和 replayed batch 的模板摘要。
 - HE-004：确认 `tests/test_edge_agent_reporter.py` 覆盖断网缓存、服务恢复后 flush，以及 duplicate 回放清理。
 - HE-004：`docs/demo.md` 增加 Edge Agent 上报稳态与故障恢复说明。
+- HE-005：`docs/deployment.md` 收敛为 `stub`、Stage A YOLO、Stage A ONNX 三个试点 profile。
+- HE-005：`.env.example`、`docker-compose.yml` 与 `config/edge_agent.example.yaml` 对齐到 Stage A crack-only 模型路径。
+- HE-005：补充部署配置测试，守住 Compose 和 Edge Agent 示例的模型路径。
 
 当前 Stage B 本地 smoke 使用 checked-in sample images 生成 pending-annotation 空标签，只验证数据结构和流程；训练对比仍在 HE-007，必须等 reviewed pilot labels 后执行。
 
@@ -522,9 +527,8 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 下一步开发计划以根目录 `tasks.md` 为准。当前活跃队列：
 
-1. **HE-005 Pilot Deployment Runbook**：明确试点部署、模型挂载、观测与回滚步骤。
-2. **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型做同集对比。
-3. **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要和导出链路。
+1. **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要和导出链路。
+2. **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型做同集对比。
 
 非关键路径：MQTT、Rust/PyO3、DeepLab、Transformer 趋势分析、LLM 报告扩展均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
@@ -532,4 +536,4 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 **文档维护者**：Vision Analysis Pro Team  
 **最后更新**：2026-04-20
-**下次更新**：完成 HE-005 Pilot Deployment Runbook 后
+**下次更新**：完成 HE-008 Full Inspection Flow Hardening 后

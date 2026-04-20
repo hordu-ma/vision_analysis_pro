@@ -35,8 +35,8 @@ EXPOSE 8000
 ENV API_HOST=0.0.0.0 \
     API_PORT=8000 \
     INFERENCE_ENGINE=stub \
-    YOLO_MODEL_PATH=/app/models/best.pt \
-    ONNX_MODEL_PATH=/app/models/best.onnx
+    YOLO_MODEL_PATH=/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+    ONNX_MODEL_PATH=/app/models/stage_a_crack/best.onnx
 
 RUN mkdir -p /app/models /app/data /app/runs
 

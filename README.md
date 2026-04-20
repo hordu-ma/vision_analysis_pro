@@ -86,7 +86,7 @@ python examples/run_edge_agent.py --source-type folder --source-path data/images
 # 使用环境变量
 EDGE_AGENT_SOURCE_TYPE=folder \
 EDGE_AGENT_SOURCE_PATH=data/images/test \
-EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
+EDGE_AGENT_INFERENCE_MODEL_PATH=models/stage_a_crack/best.onnx \
 edge-agent
 ```
 
@@ -235,7 +235,7 @@ Grafana 默认账号密码来自 `.env`：
 ```bash
 docker run --rm -p 8000:8000 \
   -e INFERENCE_ENGINE=onnx \
-  -e ONNX_MODEL_PATH=/app/models/best.onnx \
+  -e ONNX_MODEL_PATH=/app/models/stage_a_crack/best.onnx \
   -v ./models:/app/models \
   vision-analysis-pro:onnx
 ```
@@ -272,7 +272,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 185 passed, 43 skipped）
+├── tests/                      # Python 测试（当前轻量基线 187 passed, 43 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -299,7 +299,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 185 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 187 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（53 passed）
 
 ### 提交规范
@@ -355,9 +355,8 @@ vision_analysis_pro/
 
 ### 📋 当前任务队列
 
-- **HE-005 Pilot Deployment Runbook**：收敛试点部署路径、模型挂载和回滚说明。
-- **HE-007 Stage B Model Comparison**：训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
 - **HE-008 Full Inspection Flow Hardening**：硬化上传/批量任务、推理、复核、报告摘要、导出这一完整工程流程。
+- **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型在同一试点验证集上对比。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

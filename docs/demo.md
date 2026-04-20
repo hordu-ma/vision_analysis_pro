@@ -142,7 +142,7 @@ python examples/run_edge_agent.py \
   --source-type folder \
   --source-path data/images/test \
   --engine onnx \
-  --model-path models/best.onnx \
+  --model-path models/stage_a_crack/best.onnx \
   --report-url http://localhost:8000/api/v1/report \
   --fps-limit 5
 ```
@@ -154,7 +154,7 @@ EDGE_AGENT_DEVICE_ID=edge-001 \
 EDGE_AGENT_SOURCE_TYPE=folder \
 EDGE_AGENT_SOURCE_PATH=data/images/test \
 EDGE_AGENT_INFERENCE_ENGINE=onnx \
-EDGE_AGENT_INFERENCE_MODEL_PATH=models/best.onnx \
+EDGE_AGENT_INFERENCE_MODEL_PATH=models/stage_a_crack/best.onnx \
 edge-agent
 ```
 
@@ -182,7 +182,7 @@ source:
 
 inference:
   engine: onnx
-  model_path: models/best.onnx
+  model_path: models/stage_a_crack/best.onnx
   confidence: 0.5
   iou: 0.5
 
@@ -351,7 +351,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：185 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：187 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：53 passed ✅
 
 ---
@@ -387,7 +387,9 @@ uv pip install -e .
 
 ```bash
 # 导出 ONNX 模型
-uv run python scripts/export_onnx.py --output models/best.onnx
+uv run python scripts/export_onnx.py \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --output models/stage_a_crack/best.onnx
 ```
 
 ### 问题 3: 端口 8000 被占用

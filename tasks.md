@@ -6,7 +6,7 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-005 / Pilot Deployment Runbook**; Stage B data intake is complete and model comparison remains gated on reviewed pilot labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-008 / Full Inspection Flow Hardening**; HE-007 remains gated on reviewed pilot labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -109,7 +109,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-003 added optional keyframe mode for `video` Edge Agent sources while preserving raw-frame mode.
 - HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
 - HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
-- Current backend baseline: `185 passed, 43 skipped`.
+- HE-005 aligned the pilot deployment runbook, Compose model paths, Edge Agent sample config, smoke commands, and rollback steps.
+- Current backend baseline: `187 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
@@ -313,34 +314,38 @@ uv run pytest tests/test_edge_agent.py tests/test_api_inference.py tests/test_ed
 INFERENCE_ENGINE=stub uv run pytest -q
 ```
 
-## Active Task
-
 ### HE-005 Pilot Deployment Runbook
 
-Status: Next
+Status: Done
 Priority: P1
 
 Scope:
 - Make the local pilot path explicit: API, frontend, optional observability, model volume, Edge Agent config.
 - Document which inference engine is expected in each profile.
 
+Result:
+- `.env.example`, `docker-compose.yml`, and `config/edge_agent.example.yaml` now agree on Stage A crack-only YOLO/ONNX model paths.
+- `docs/deployment.md` defines `stub`, Stage A YOLO, and Stage A ONNX profiles, including Compose smoke commands and rollback steps.
+- Deployment config tests guard the Stage A model paths and Edge Agent sample config.
+
 Acceptance criteria:
-- `docs/deployment.md` has one clear crack-only Stage A path.
-- `.env.example` and `docker-compose.yml` agree on model paths.
-- Smoke commands and rollback steps are included.
+- [x] `docs/deployment.md` has one clear crack-only Stage A path.
+- [x] `.env.example` and `docker-compose.yml` agree on model paths.
+- [x] Smoke commands and rollback steps are included.
 
 Validation commands:
 
 ```bash
 docker compose config
 uv run ruff check .
+uv run pytest tests/test_deployment_config.py -q
 ```
 
 ## P1 Queue
 
 ### HE-007 Stage B Model Comparison
 
-Status: Planned
+Status: Gated on reviewed pilot labels
 Priority: P1
 
 Scope:
@@ -371,9 +376,11 @@ INFERENCE_ENGINE=stub uv run pytest -q
 Rollback:
 - Remove `runs/stage_b_pilot_crack/` and exported files under `models/stage_b_pilot_crack/`.
 
+## Active Task
+
 ### HE-008 Full Inspection Flow Hardening
 
-Status: Planned
+Status: Next
 Priority: P1
 
 Scope:

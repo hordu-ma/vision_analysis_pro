@@ -1,17 +1,20 @@
 # Vision Analysis Pro 部署说明（最小可部署版）
 
-本文档提供 `Vision Analysis Pro` 的最小部署说明，目标是让你可以在本地或单机环境中快速启动后端 API，并与当前 Dockerfile、CI 和边缘 Agent 上报约定保持一致。
+本文档提供 `Vision Analysis Pro` 的试点部署说明，目标是让你可以在本地或单机环境中快速启动 API、前端、可选观测栈和 Edge Agent 上报链路，并与当前 Stage A crack-only 模型路径保持一致。
 
 ## 1. 适用范围
 
 当前文档覆盖：
 
 - 后端 API 服务部署
+- 前端静态站点部署
 - 边缘 Agent 上报接收端
+- 可选 Prometheus/Grafana 本地观测栈
 - 模型文件准备
 - 环境变量配置
 - 本地直接运行
-- Docker 镜像运行约定
+- Docker Compose 统一部署
+- smoke 验证与回滚步骤
 
 当前文档**不覆盖**：
 
@@ -46,12 +49,13 @@
 - `config/`：配置示例
 - `web/`：前端项目
 
-常见模型路径约定：
+当前试点模型路径约定：
 
-- YOLO：`runs/train/exp/weights/best.pt`
-- ONNX：`models/best.onnx`
+- Stage A YOLO：`runs/stage_a_crack/baseline_v0_1/weights/best.pt`
+- Stage A ONNX：`models/stage_a_crack/best.onnx`
+- Stage A 数据集：`data/stage_a_crack/data.yaml`
 
-如果你使用自定义模型路径，请通过环境变量覆盖。
+默认 Compose profile 使用 `INFERENCE_ENGINE=stub`，用于不依赖模型文件的链路验证。切换到 `yolo` 或 `onnx` 时，请先确认上面的 Stage A 模型文件已存在，或通过环境变量覆盖为其他已验证模型路径。
 
 ---
 
@@ -63,15 +67,17 @@
 
 - `INFERENCE_ENGINE`
   - 可选值：`yolo`、`onnx`、`stub`
-  - 默认值：`yolo`
+  - 试点部署默认值：`stub`
 
 - `YOLO_MODEL_PATH`
   - YOLO 模型路径
-  - 默认值：`runs/train/exp/weights/best.pt`
+  - 试点路径：`runs/stage_a_crack/baseline_v0_1/weights/best.pt`
+  - Compose 容器路径：`/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt`
 
 - `ONNX_MODEL_PATH`
   - ONNX 模型路径
-  - 默认值：`models/best.onnx`
+  - 试点路径：`models/stage_a_crack/best.onnx`
+  - Compose 容器路径：`/app/models/stage_a_crack/best.onnx`
 
 ### API 运行相关
 
@@ -136,6 +142,7 @@ bash scripts/bootstrap_trial.sh
 - 复制 `.env.example` 到 `.env`（如果尚不存在）
 - 创建 `data/`、`models/`、`runs/` 目录
 - 执行 `docker compose up --build -d`
+- 默认使用 `INFERENCE_ENGINE=stub` 启动，适合先验证 API、前端和上报链路
 
 适合：
 
@@ -187,43 +194,61 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 
 ## 6. 模型文件准备
 
-### 6.1 YOLO 模型
+### 6.1 当前试点 profile
 
-如果你使用 YOLO 推理，请确保模型文件存在，例如：
+本地试点建议按以下顺序切换：
 
-```/dev/null/text.txt#L1-1
-runs/train/exp/weights/best.pt
+| Profile | 环境变量 | 用途 | 模型依赖 |
+|---------|----------|------|----------|
+| 链路 smoke | `INFERENCE_ENGINE=stub` | API、前端、Edge 上报、报告摘要联调 | 无 |
+| Stage A YOLO | `INFERENCE_ENGINE=yolo` | 训练产物验证和实验 | `runs/stage_a_crack/baseline_v0_1/weights/best.pt` |
+| Stage A ONNX | `INFERENCE_ENGINE=onnx` + `COMPOSE_INSTALL_ONNX=true` | 试点部署和边缘推理优先路径 | `models/stage_a_crack/best.onnx` |
+
+### 6.2 Stage A YOLO 模型
+
+如果你使用 YOLO 推理，请确保模型文件存在：
+
+```text
+runs/stage_a_crack/baseline_v0_1/weights/best.pt
 ```
 
 启动前可设置：
 
-```/dev/null/bash.sh#L1-2
+```bash
 export INFERENCE_ENGINE=yolo
-export YOLO_MODEL_PATH=runs/train/exp/weights/best.pt
+export YOLO_MODEL_PATH=runs/stage_a_crack/baseline_v0_1/weights/best.pt
 ```
 
-说明：仓库历史中的 `runs/train/exp/weights/best.pt` / `last.pt` 当前不可用。如需继续使用 YOLO，请重新训练或替换为新的自训练权重并保持 `YOLO_MODEL_PATH` 指向有效文件。
+如果本地缺少该权重，请按 `docs/stage-a-yolo-baseline-v0.1.md` 中记录的训练命令重新生成。仓库历史中的 `runs/train/exp/weights/best.pt` 不再是当前试点主线。
 
-### 6.2 ONNX 模型
+### 6.3 Stage A ONNX 模型
 
-如果你使用 ONNX 推理，请确保模型文件存在，例如：
+如果你使用 ONNX 推理，请确保模型文件存在：
 
-```/dev/null/text.txt#L1-1
-models/best.onnx
+```text
+models/stage_a_crack/best.onnx
 ```
 
 启动前可设置：
 
-```/dev/null/bash.sh#L1-2
+```bash
 export INFERENCE_ENGINE=onnx
-export ONNX_MODEL_PATH=models/best.onnx
+export ONNX_MODEL_PATH=models/stage_a_crack/best.onnx
 ```
 
-### 6.3 Stub 模式
+如需重新导出：
+
+```bash
+uv run python scripts/export_onnx.py \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --output models/stage_a_crack/best.onnx
+```
+
+### 6.4 Stub 模式
 
 如果你只是验证 API 链路，不依赖真实模型，可以使用：
 
-```/dev/null/bash.sh#L1-1
+```bash
 export INFERENCE_ENGINE=stub
 ```
 
@@ -287,7 +312,7 @@ YOLO 模式示例：
 docker run --rm \
   -p 8000:8000 \
   -e INFERENCE_ENGINE=yolo \
-  -e YOLO_MODEL_PATH=/app/runs/train/exp/weights/best.pt \
+  -e YOLO_MODEL_PATH=/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt \
   -e API_HOST=0.0.0.0 \
   -e API_PORT=8000 \
   -e API_RELOAD=false \
@@ -301,7 +326,7 @@ ONNX 模式示例：
 docker run --rm \
   -p 8000:8000 \
   -e INFERENCE_ENGINE=onnx \
-  -e ONNX_MODEL_PATH=/app/models/best.onnx \
+  -e ONNX_MODEL_PATH=/app/models/stage_a_crack/best.onnx \
   -e API_HOST=0.0.0.0 \
   -e API_PORT=8000 \
   -e API_RELOAD=false \
@@ -332,6 +357,9 @@ docker compose up --build
 
 - `WEB_PORT`：前端对外端口，默认 `4173`
 - `COMPOSE_INSTALL_ONNX`：是否在 API 镜像中安装 ONNX 依赖，默认 `false`
+- `INFERENCE_ENGINE`：默认 `stub`；真实模型 profile 使用 `yolo` 或 `onnx`
+- `YOLO_MODEL_PATH`：默认 `/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt`
+- `ONNX_MODEL_PATH`：默认 `/app/models/stage_a_crack/best.onnx`
 - `CORS_ALLOW_ORIGINS`：生产前端来源白名单
 - `LOG_FORMAT`：日志输出格式，默认 `json`
 
@@ -406,14 +434,16 @@ curl http://localhost:8000/api/v1/health
 
 预期返回类似：
 
-```/dev/null/json.json#L1-6
+```json
 {
   "status": "healthy",
   "version": "0.1.0",
   "model_loaded": true,
-  "engine": "YOLOInferenceEngine"
+  "engine": "StubInferenceEngine"
 }
 ```
+
+如果 `INFERENCE_ENGINE=yolo` 或 `INFERENCE_ENGINE=onnx`，`engine` 会分别变为真实推理引擎名称。
 
 ### 9.2 OpenAPI 页面
 
@@ -473,7 +503,59 @@ curl -X POST "http://localhost:8000/api/v1/report" \
   }'
 ```
 
-### 9.5 指标与告警
+### 9.5 试点 smoke 与回滚
+
+最小试点 smoke：
+
+```bash
+cp .env.example .env
+docker compose config
+docker compose up --build -d
+
+curl http://localhost:8000/api/v1/health
+curl http://localhost:8000/api/v1/metrics
+curl -X POST "http://localhost:8000/api/v1/report" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-smoke",
+    "report_time": 1700000000.0,
+    "results": []
+  }'
+curl "http://localhost:8000/api/v1/report/edge-agent-001-smoke/summary"
+```
+
+Stage A ONNX profile smoke：
+
+```bash
+test -f models/stage_a_crack/best.onnx
+INFERENCE_ENGINE=onnx \
+ONNX_MODEL_PATH=/app/models/stage_a_crack/best.onnx \
+COMPOSE_INSTALL_ONNX=true \
+docker compose up --build -d api
+
+curl http://localhost:8000/api/v1/health
+```
+
+回滚步骤：
+
+```bash
+# 链路优先回滚：不用模型，恢复 API、前端和上报链路
+INFERENCE_ENGINE=stub docker compose up -d api
+
+# 模型文件回滚：恢复上一版本地模型后重启 API
+cp models/stage_a_crack/previous.onnx models/stage_a_crack/best.onnx
+INFERENCE_ENGINE=onnx \
+ONNX_MODEL_PATH=/app/models/stage_a_crack/best.onnx \
+docker compose up -d api
+
+# 完整停止
+docker compose down
+```
+
+如果回滚到 `stub`，前端和 Edge Agent 上报链路仍可 smoke；真实检测结果只在切回 `yolo` 或 `onnx` 且模型文件有效后恢复。
+
+### 9.6 指标与告警
 
 当前 `metrics` 端点已包含以下新增指标：
 
@@ -582,11 +664,10 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 
 当前最小部署完成后，建议继续推进：
 
-1. `docker-compose` 示例
-2. 生产环境反向代理配置
-3. CORS allowlist 生产配置
-4. metrics 告警示例与结构化日志采集
-5. 前后端统一部署说明
+1. 生产环境反向代理配置
+2. 生产域名的 `CORS_ALLOW_ORIGINS` 收敛
+3. 模型版本目录与 `previous.onnx` 回滚文件的发布约定
+4. 集中日志采集与告警阈值调优
 
 ---
 

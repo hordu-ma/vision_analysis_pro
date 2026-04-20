@@ -37,6 +37,8 @@ def test_dockerfile_supports_optional_onnx_install() -> None:
 
     assert "ARG INSTALL_ONNX=false" in dockerfile
     assert "uv sync --frozen --extra onnx" in dockerfile
+    assert "/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt" in dockerfile
+    assert "/app/models/stage_a_crack/best.onnx" in dockerfile
 
 
 def test_cors_allow_origins_defaults_to_local_frontends() -> None:
@@ -58,6 +60,26 @@ def test_docker_compose_provides_api_and_web_services() -> None:
     assert "web:" in compose_file
     assert "CORS_ALLOW_ORIGINS" in compose_file
     assert "./web" in compose_file
+    assert "/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt" in compose_file
+    assert "/app/models/stage_a_crack/best.onnx" in compose_file
+
+
+def test_env_example_uses_stage_a_crack_model_paths() -> None:
+    """测试本地部署环境示例指向当前 Stage A crack-only 模型路径。"""
+    env_file = Path(".env.example").read_text(encoding="utf-8")
+
+    assert "INFERENCE_ENGINE=stub" in env_file
+    assert "YOLO_MODEL_PATH=runs/stage_a_crack/baseline_v0_1/weights/best.pt" in env_file
+    assert "ONNX_MODEL_PATH=models/stage_a_crack/best.onnx" in env_file
+    assert "EDGE_AGENT_INFERENCE_MODEL_PATH=models/stage_a_crack/best.onnx" in env_file
+
+
+def test_edge_agent_example_uses_stage_a_onnx_model_path() -> None:
+    """测试 Edge Agent 示例配置默认指向 Stage A ONNX 模型。"""
+    config_file = Path("config/edge_agent.example.yaml").read_text(encoding="utf-8")
+
+    assert 'engine: "onnx"' in config_file
+    assert 'model_path: "models/stage_a_crack/best.onnx"' in config_file
 
 
 def test_frontend_dockerfile_builds_static_bundle() -> None:
