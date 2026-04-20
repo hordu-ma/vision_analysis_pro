@@ -546,6 +546,7 @@ def _create_replayed_task(
 )
 async def list_inference_tasks(
     limit: int = Query(20, ge=1, le=100, description="返回任务数量上限"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
     status_filter: str | None = Query(
         None,
         alias="status",
@@ -555,7 +556,7 @@ async def list_inference_tasks(
 ) -> list[schemas.InferenceTaskResponse]:
     """列出最近的批量推理任务。"""
     task_manager = get_inference_task_manager()
-    records = task_manager.list_tasks(limit=limit, status_filter=status_filter)
+    records = task_manager.list_tasks(limit=limit, offset=offset, status_filter=status_filter)
     return [_task_record_to_response(record) for record in records]
 
 

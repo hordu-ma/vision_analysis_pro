@@ -164,6 +164,7 @@ class SQLiteReportStore:
         self,
         *,
         limit: int = 20,
+        offset: int = 0,
         device_id: str | None = None,
     ) -> list[ReportBatchSummary]:
         """列出最近接收的上报批次。"""
@@ -182,10 +183,10 @@ class SQLiteReportStore:
                             created_at
                         FROM edge_report_batches
                         WHERE device_id = ?
-                        ORDER BY created_at DESC
-                        LIMIT ?
+                        ORDER BY created_at DESC, batch_id DESC
+                        LIMIT ? OFFSET ?
                         """,
-                        (device_id, limit),
+                        (device_id, limit, offset),
                     ).fetchall()
                 else:
                     rows = conn.execute(
@@ -198,15 +199,31 @@ class SQLiteReportStore:
                             total_detections,
                             created_at
                         FROM edge_report_batches
-                        ORDER BY created_at DESC
-                        LIMIT ?
+                        ORDER BY created_at DESC, batch_id DESC
+                        LIMIT ? OFFSET ?
                         """,
-                        (limit,),
+                        (limit, offset),
                     ).fetchall()
 
         return [_row_to_batch_summary(row) for row in rows]
 
-    def list_devices(self, *, limit: int = 20) -> list[ReportDeviceSummary]:
+    def count_batches(self, *, device_id: str | None = None) -> int:
+        """返回上报批次总数（与 list_batches 非事务一致，为近似值）。"""
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                if device_id:
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM edge_report_batches WHERE device_id = ?",
+                        (device_id,),
+                    ).fetchone()
+                else:
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM edge_report_batches",
+                    ).fetchone()
+        return int(row[0]) if row else 0
+
+    def list_devices(self, *, limit: int = 20, offset: int = 0) -> list[ReportDeviceSummary]:
         """按设备聚合最近上报情况。"""
         with self._lock:
             self._ensure_schema()
@@ -236,13 +253,23 @@ class SQLiteReportStore:
                     LEFT JOIN edge_device_metadata AS m
                       ON m.device_id = b.device_id
                     GROUP BY b.device_id
-                    ORDER BY latest.created_at DESC
-                    LIMIT ?
+                    ORDER BY latest.created_at DESC, b.device_id DESC
+                    LIMIT ? OFFSET ?
                     """,
-                    (limit,),
+                    (limit, offset),
                 ).fetchall()
 
         return [_row_to_device_summary(row) for row in rows]
+
+    def count_devices(self) -> int:
+        """返回有上报记录的设备总数（与 list_devices 非事务一致，为近似值）。"""
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                row = conn.execute(
+                    "SELECT COUNT(DISTINCT device_id) FROM edge_report_batches",
+                ).fetchone()
+        return int(row[0]) if row else 0
 
     def upsert_device_metadata(
         self,

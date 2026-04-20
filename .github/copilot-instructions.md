@@ -27,8 +27,8 @@
 - Main API routes: `/api/v1/health`, `/api/v1/health/live`, `/api/v1/health/ready`, `/api/v1/metrics`, `/api/v1/inference/image`, `/api/v1/report`.
 - Edge Agent HTTP reports use `ReportPayload.to_dict()` and are accepted by `POST /api/v1/report` with `202 Accepted`.
 - Minimal observability already exists: request IDs, process-time headers, live/ready health checks, and Prometheus-style counters.
-- Current lightweight local backend baseline is `192 passed, 44 skipped`; skips are expected when `models/best.onnx` and `data/images/*` are absent.
-- Current frontend baseline is `53 passed`.
+- Current lightweight local backend baseline is `198 passed, 44 skipped`; skips are expected when `models/best.onnx` and `data/images/*` are absent.
+- Current frontend baseline is `85 passed`.
 
 ## How to Approach Tasks
 - First build a context map: target file, direct dependencies, related tests, existing patterns.

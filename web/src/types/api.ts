@@ -133,6 +133,7 @@ export interface ReportRecordResponse {
 export interface ReportBatchListResponse {
   status: string
   count: number
+  total?: number
   items: ReportBatchSummary[]
   request_id?: string
 }
@@ -153,6 +154,7 @@ export interface ReportDeviceSummary {
 export interface ReportDeviceListResponse {
   status: string
   count: number
+  total?: number
   items: ReportDeviceSummary[]
   request_id?: string
 }

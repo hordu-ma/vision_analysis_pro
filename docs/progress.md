@@ -7,9 +7,9 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ## 📊 项目概览
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
-**最后更新**：2026-04-20
-**后端测试**：192 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
-**前端测试**：53 passed（vitest）
+**最后更新**：2026-04-21
+**后端测试**：198 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**前端测试**：85 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 browser smoke 通过
 
 ---
@@ -31,6 +31,26 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - 视觉识别主线保持 YOLO/ONNX 目标检测；DeepLab 语义分割仅在需要像素级裂缝面积/长度估计时作为后续 refinement。
 - Transformer 趋势分析依赖连续批次与设备历史数据，后置到数据积累之后。
 - LLM 只作为报告解释层，输入结构化检测结果、人工复核状态和设备元数据，不参与检测判定。
+
+## 🗓️ 2026-04-21：API 分页、X-Trace-ID、前端组件测试（P1/P2）✅
+
+### 核心成果
+
+- ✅ 后端列表接口支持 `offset` 分页：`/reports/batches`、`/reports/devices`、`/inference/images/tasks`
+- ✅ 响应增加 `total` 字段（`int | None`，向后兼容）；ORDER BY 添加确定性 tie-breaker（`batch_id DESC`/`task_id DESC`）
+- ✅ 中间件透传 `X-Trace-ID`：请求携带时在响应头回显，不自动生成
+- ✅ 新增 6 个后端分页 & trace-id 测试（pagination_offset × 3 + invalid_offset + trace_id_echoed + trace_id_absent）
+- ✅ 新增 4 个前端组件 spec 文件：`ImageUpload.spec.ts`（7 tests）、`BatchTaskStatus.spec.ts`（11 tests）、`ReportBatchList.spec.ts`（7 tests）、`ReportDetailDrawer.spec.ts`（6 tests）
+- ✅ 前端服务层 `api.ts` 所有列表方法支持 `offset` 参数
+
+### 当前验证
+
+- ✅ `uv run ruff check .`
+- ✅ `uv run pytest -q`：198 passed, 44 skipped
+- ✅ `cd web && npm run lint`
+- ✅ `cd web && npm run test -- --run`：85 passed
+
+---
 
 ## 🗓️ 2026-04-19：路线收敛、关键帧与模板报告 ✅
 

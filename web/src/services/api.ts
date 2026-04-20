@@ -320,9 +320,10 @@ class ApiService {
 
   async listBatchTasks(
     limit = 20,
-    status?: InferenceTaskStatus | ''
+    status?: InferenceTaskStatus | '',
+    offset = 0
   ): Promise<InferenceTaskResponse[]> {
-    const params = new URLSearchParams({ limit: String(limit) })
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (status) {
       params.set('status', status)
     }
@@ -413,8 +414,12 @@ class ApiService {
   /**
    * 查询最近批次
    */
-  async listReportBatches(limit = 20, deviceId?: string): Promise<ReportBatchListResponse> {
-    const params = new URLSearchParams({ limit: String(limit) })
+  async listReportBatches(
+    limit = 20,
+    deviceId?: string,
+    offset = 0
+  ): Promise<ReportBatchListResponse> {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (deviceId) {
       params.set('device_id', deviceId)
     }
@@ -425,10 +430,9 @@ class ApiService {
   /**
    * 查询设备概览
    */
-  async listReportDevices(limit = 20): Promise<ReportDeviceListResponse> {
-    const response = await this.client.get<ReportDeviceListResponse>(
-      `/reports/devices?limit=${limit}`
-    )
+  async listReportDevices(limit = 20, offset = 0): Promise<ReportDeviceListResponse> {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
+    const response = await this.client.get<ReportDeviceListResponse>(`/reports/devices?${params}`)
     return response.data
   }
 

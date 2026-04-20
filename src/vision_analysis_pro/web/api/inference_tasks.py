@@ -89,17 +89,20 @@ class SQLiteInferenceTaskStore:
         return _row_to_record(row) if row else None
 
     def list_tasks(
-        self, *, limit: int = 20, status_filter: str | None = None
+        self, *, limit: int = 20, offset: int = 0, status_filter: str | None = None
     ) -> list[InferenceTaskRecord]:
-        query = "SELECT * FROM inference_tasks"
-        params: tuple[Any, ...]
         if status_filter is not None:
-            query += " WHERE status = ?"
-            params = (status_filter, limit)
-            query += " ORDER BY created_at DESC LIMIT ?"
+            query = (
+                "SELECT * FROM inference_tasks WHERE status = ?"
+                " ORDER BY created_at DESC, task_id DESC LIMIT ? OFFSET ?"
+            )
+            params: tuple[Any, ...] = (status_filter, limit, offset)
         else:
-            query += " ORDER BY created_at DESC LIMIT ?"
-            params = (limit,)
+            query = (
+                "SELECT * FROM inference_tasks"
+                " ORDER BY created_at DESC, task_id DESC LIMIT ? OFFSET ?"
+            )
+            params = (limit, offset)
 
         with self._lock, self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
@@ -230,9 +233,9 @@ class InferenceTaskManager:
         return self._store.get_task(task_id)
 
     def list_tasks(
-        self, *, limit: int = 20, status_filter: str | None = None
+        self, *, limit: int = 20, offset: int = 0, status_filter: str | None = None
     ) -> list[InferenceTaskRecord]:
-        records = self._store.list_tasks(limit=limit, status_filter=status_filter)
+        records = self._store.list_tasks(limit=limit, offset=offset, status_filter=status_filter)
         with self._lock:
             queue_positions = {
                 queued_task_id: index + 1

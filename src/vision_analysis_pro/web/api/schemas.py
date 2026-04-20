@@ -386,6 +386,7 @@ class ReportBatchListResponse(BaseModel):
 
     status: str = Field(..., description="查询状态")
     count: int = Field(..., ge=0, description="返回条数")
+    total: int | None = Field(None, ge=0, description="匹配记录总数（近似值）")
     items: list[ReportBatchSummaryResponse] = Field(
         default_factory=list,
         description="批次摘要列表",
@@ -493,6 +494,7 @@ class ReportDeviceListResponse(BaseModel):
 
     status: str = Field(..., description="查询状态")
     count: int = Field(..., ge=0, description="返回条数")
+    total: int | None = Field(None, ge=0, description="设备总数（近似值）")
     items: list[ReportDeviceSummaryResponse] = Field(
         default_factory=list,
         description="设备聚合摘要列表",

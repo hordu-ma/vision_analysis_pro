@@ -9,8 +9,8 @@
 - Main API endpoints: `GET /api/v1/health`, `GET /api/v1/health/live`, `GET /api/v1/health/ready`, `GET /api/v1/metrics`, `POST /api/v1/inference/image`, `POST /api/v1/report`.
 - `POST /api/v1/report` is the cloud-side receiver for Edge Agent `ReportPayload.to_dict()` batches; it returns `202 Accepted` with batch and count metadata.
 - Minimal observability is already present: request ID propagation, process-time response header, live/ready health checks, and Prometheus-style metrics.
-- Current lightweight local backend baseline is `192 passed, 44 skipped`; skips are expected when `models/best.onnx` and `data/images/*` are absent.
-- Frontend baseline is `53 passed`; `npm run lint` is read-only, and `npm run lint:fix` performs automatic fixes.
+- Current lightweight local backend baseline is `198 passed, 44 skipped`; skips are expected when `models/best.onnx` and `data/images/*` are absent.
+- Frontend baseline is `85 passed`; `npm run lint` is read-only, and `npm run lint:fix` performs automatic fixes.
 - `ruff.toml` is the authoritative Ruff config; do not duplicate Ruff settings in `pyproject.toml`.
 
 ## Build, Test, and Development Commands

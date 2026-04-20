@@ -1904,3 +1904,135 @@ async def test_full_inspection_flow_covers_task_report_review_summary_and_export
     assert report_csv_resp.status_code == 200
     assert "flow-batch-001" in report_csv_resp.text
     assert "confirmed" in report_csv_resp.text
+
+
+# ---------------------------------------------------------------------------
+# 分页 & X-Trace-ID 测试
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_report_batches_pagination_offset() -> None:
+    """测试批次列表接口支持 offset 分页，total 字段反映总数。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for i in range(1, 6):
+            await client.post(
+                "/api/v1/report",
+                json=_create_report_payload(
+                    batch_id=f"pg-batch-{i:03d}", device_id="pg-device"
+                ),
+            )
+        page1 = await client.get("/api/v1/reports/batches?limit=2&offset=0")
+        page2 = await client.get("/api/v1/reports/batches?limit=2&offset=2")
+        page3 = await client.get("/api/v1/reports/batches?limit=2&offset=4")
+
+    assert page1.status_code == 200
+    d1 = page1.json()
+    assert d1["count"] == 2
+    assert d1["total"] >= 5
+    # DESC 排序，最新批次优先
+    assert d1["items"][0]["batch_id"] == "pg-batch-005"
+    assert d1["items"][1]["batch_id"] == "pg-batch-004"
+
+    assert page2.status_code == 200
+    d2 = page2.json()
+    assert d2["count"] == 2
+    assert d2["items"][0]["batch_id"] == "pg-batch-003"
+    assert d2["items"][1]["batch_id"] == "pg-batch-002"
+
+    assert page3.status_code == 200
+    d3 = page3.json()
+    assert d3["count"] == 1
+    assert d3["items"][0]["batch_id"] == "pg-batch-001"
+
+
+@pytest.mark.asyncio
+async def test_report_batches_invalid_offset_returns_422() -> None:
+    """测试 offset 负数返回 422。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/reports/batches?offset=-1")
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_report_devices_pagination_offset() -> None:
+    """测试设备概览接口支持 offset 分页，total 字段反映设备总数。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for dev in ["dev-x", "dev-y", "dev-z"]:
+            await client.post(
+                "/api/v1/report",
+                json=_create_report_payload(
+                    batch_id=f"{dev}-001", device_id=dev
+                ),
+            )
+        page1 = await client.get("/api/v1/reports/devices?limit=2&offset=0")
+        page2 = await client.get("/api/v1/reports/devices?limit=2&offset=2")
+
+    assert page1.status_code == 200
+    d1 = page1.json()
+    assert d1["count"] == 2
+    assert d1["total"] >= 3
+
+    assert page2.status_code == 200
+    d2 = page2.json()
+    assert d2["count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_inference_tasks_pagination_offset() -> None:
+    """测试推理任务列表接口支持 offset 分页。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # 创建 4 个批次任务
+        for _ in range(4):
+            create_resp = await client.post(
+                "/api/v1/inference/images/tasks?visualize=false",
+                files=[("files", ("f.jpg", _create_test_image(), "image/jpeg"))],
+            )
+            assert create_resp.status_code == 202
+            task_id = create_resp.json()["task_id"]
+            # 等待任务完成，确保状态稳定
+            for _ in range(20):
+                t = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+                if t.json()["status"] == "completed":
+                    break
+                await asyncio.sleep(0.01)
+
+        page1 = await client.get("/api/v1/inference/images/tasks?limit=2&offset=0")
+        page2 = await client.get("/api/v1/inference/images/tasks?limit=2&offset=2")
+        bad = await client.get("/api/v1/inference/images/tasks?offset=-1")
+
+    assert page1.status_code == 200
+    assert len(page1.json()) == 2
+
+    assert page2.status_code == 200
+    assert len(page2.json()) == 2
+
+    assert bad.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_x_trace_id_echoed_when_present() -> None:
+    """当请求携带 x-trace-id 时，响应头应回显 X-Trace-ID。"""
+    trace_id = "trace-abc-123"
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get(
+            "/api/v1/health",
+            headers={"x-trace-id": trace_id},
+        )
+    assert resp.status_code == 200
+    assert resp.headers.get("x-trace-id") == trace_id
+
+
+@pytest.mark.asyncio
+async def test_x_trace_id_absent_when_not_sent() -> None:
+    """当请求不携带 x-trace-id 时，响应头不应包含 X-Trace-ID。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/health")
+    assert resp.status_code == 200
+    assert "x-trace-id" not in resp.headers

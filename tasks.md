@@ -2,7 +2,7 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-20
+Last updated: 2026-04-21
 
 ## Operating Rules
 
@@ -112,8 +112,11 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
 - HE-005 aligned the pilot deployment runbook, Compose model paths, Edge Agent sample config, smoke commands, and rollback steps.
 - HE-009 added a versioned LLM report contract with deterministic template fallback and local provider mode.
-- Current backend baseline: `192 passed, 44 skipped`.
-- Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
+- HE-P1A added `offset` pagination + `total` field to `/reports/batches`, `/reports/devices`, and `/inference/images/tasks` list endpoints; ORDER BY uses deterministic tie-breakers.
+- HE-P1B added X-Trace-ID propagation middleware: reads `x-trace-id` request header and echoes it as `X-Trace-ID` response header.
+- HE-P1C added 4 new frontend component spec files (ImageUpload, BatchTaskStatus, ReportBatchList, ReportDetailDrawer) and 6 new backend pagination/trace-id tests.
+- Current backend baseline: `198 passed, 44 skipped`.
+- Current frontend baseline: `85 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
 
@@ -457,6 +460,95 @@ Rollback:
 - Keep `/api/v1/report/{batch_id}/summary` on deterministic template output only.
 - Disable the LLM provider path by configuration without changing stored reports.
 
+### HE-P1A API Pagination (offset + total)
+
+Status: Done
+Priority: P1
+
+Scope:
+- Add `offset` query parameter and `total` count field to list endpoints: `/reports/batches`, `/reports/devices`, `/inference/images/tasks`.
+- Use deterministic ORDER BY (e.g., `batch_id DESC` as tie-breaker) to make LIMIT/OFFSET stable.
+- Keep backward compatibility: `total` is `int | None` (absent from existing consumers).
+
+Result:
+- `report_store.py`: `list_batches`/`list_devices` support `offset`; new `count_batches()`/`count_devices()` methods.
+- `inference_tasks.py`: `list_tasks` supports `offset` with stable `task_id DESC` ordering.
+- `schemas.py`: `ReportBatchListResponse` and `ReportDeviceListResponse` gain `total: int | None`.
+- `routers/reports.py` and `routers/inference.py`: expose `offset: int = Query(0, ge=0)`.
+- `web/src/services/api.ts`: `listBatchTasks`, `listReportBatches`, `listReportDevices` accept `offset` param.
+- `web/src/types/api.ts`: interfaces updated with `total?: number`.
+
+Acceptance criteria:
+- [x] `GET /reports/batches?limit=2&offset=2` returns the correct second page with `total >= count`.
+- [x] `GET /reports/batches?offset=-1` returns 422.
+- [x] Pagination tests cover batches, devices, and inference tasks.
+
+Validation commands:
+
+```bash
+uv run ruff check .
+uv run pytest tests/test_api_inference.py -q -k "pagination"
+cd web && npm run test -- --run
+```
+
+Rollback:
+- Remove `offset` Query param and `count_*` method calls; remove `total` from schemas.
+
+### HE-P1B X-Trace-ID Propagation
+
+Status: Done
+Priority: P1
+
+Scope:
+- Read `x-trace-id` header in middleware and echo it as `X-Trace-ID` response header.
+- Only echo when present in the request; do not auto-generate (unlike `request_id`).
+
+Result:
+- `main.py` middleware stores `request.state.trace_id` and adds `X-Trace-ID` to response headers when present.
+
+Acceptance criteria:
+- [x] Response includes `X-Trace-ID` when request carries `x-trace-id`.
+- [x] Response omits `X-Trace-ID` when request does not carry it.
+
+Validation commands:
+
+```bash
+uv run pytest tests/test_api_inference.py -q -k "trace_id"
+```
+
+Rollback:
+- Remove the two-line trace_id block from the `add_process_time_header` middleware.
+
+### HE-P1C Frontend Component Tests
+
+Status: Done
+Priority: P1
+
+Scope:
+- Add unit test coverage for the four highest-risk interactive components.
+- Bring frontend spec count from 53 to ≥ 85 passed.
+
+Result:
+- `web/src/components/ImageUpload.spec.ts`: 7 tests (upload mode toggle, file validation, clearFile, batch upload trigger).
+- `web/src/components/BatchTaskStatus.spec.ts`: 11 tests (all status variants, button visibility, retry/cancel emit).
+- `web/src/components/ReportBatchList.spec.ts`: 7 tests (list render, empty state, event emit for refresh/detail/filter).
+- `web/src/components/ReportDetailDrawer.spec.ts`: 6 tests (drawer visibility, export emit, content display).
+
+Acceptance criteria:
+- [x] 85 frontend tests pass with lint clean.
+- [x] All 4 new spec files are lint-clean (prettier/eslint).
+
+Validation commands:
+
+```bash
+cd web
+npm run lint
+npm run test -- --run
+```
+
+Rollback:
+- Remove the 4 new spec files; revert `api.spec.ts` URL assertions to drop `offset=0`.
+
 ## P2 Backlog
 
 ### HE-010 Segmentation Refinement
@@ -489,3 +581,38 @@ Scope:
 - No DeepLab/Transformer chain as a prerequisite for Stage A.
 - No committed model weights or public dataset archives.
 - No Rust/PyO3 work until profiling shows Python preprocessing or postprocessing is the bottleneck.
+
+## 下一步开发建议
+
+优先级参考如下。短期目标以完成 Stage C 工程闭环为主，中期补齐多 worker 运维能力。
+
+### 短期（Immediate）
+
+1. **解锁 HE-007 Stage B 模型对比**
+   - 当前阻塞因素：缺少 reviewed positive pilot crack labels。
+   - 行动项：确认标注获取路径（手工标注一批试点帧 or 审阅 Stage A 自动预测结果），完成后直接执行 `scripts/train.py`。
+
+2. **Stage C E2E 自动化试点**
+   - 当前 Playwright E2E 只有 1 个 happy path 测试。
+   - 建议补：批次任务创建 → 推理 → 报告上报 → 复核全链路 E2E，在 `web/e2e/` 下扩展。
+
+3. **Pilot Deployment Runbook 演练**
+   - 在 Docker Compose 环境完整跑一次 HE-005 runbook（Stage A ONNX 模型路径 + Edge Agent）。
+   - 补充部署验收 checklist 至 `docs/deployment.md`。
+
+### 中期（Next Sprint）
+
+4. **指标系统升级**（对应原 P2 建议 #6）
+   - 当前 `app.state.metrics` 是普通 dict，多 worker 下存在竞态。
+   - 用 `prometheus_client.Counter/Histogram` 替换，减少 `main.py` 中的样板代码，支持 Grafana histogram 分桶。
+
+5. **结构化日志 trace_id 透传**
+   - X-Trace-ID 已在响应头回显，下一步将 `trace_id` 注入 Python 结构化日志（使用 `structlog` 或 `logging.LoggerAdapter`），方便跨服务链路追踪。
+
+6. **Report Store 分页前端集成**
+   - 后端已完成 `offset`+`total` 分页，前端 `api.ts` 已暴露参数，但 `ReportBatchList` 组件尚未驱动分页 UI（下一页/上一页按钮）。
+
+### 长期（Backlog）
+
+- HE-010 分割细化（DeepLab/SAM）：仅在需要像素级裂缝面积/长度估计时推进。
+- HE-011 趋势分析：依赖多批次历史数据积累，Transformer 路线在数据足够后再评估。

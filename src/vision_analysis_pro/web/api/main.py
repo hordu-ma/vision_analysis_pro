@@ -126,7 +126,9 @@ async def request_context_middleware(
 ) -> Response:
     """为每个请求注入 request_id 并记录最小请求指标。"""
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
+    trace_id = request.headers.get("x-trace-id")
     request.state.request_id = request_id
+    request.state.trace_id = trace_id
 
     metrics: dict[str, Any] = app.state.metrics
     metrics["requests_total"] += 1
@@ -162,6 +164,8 @@ async def request_context_middleware(
     )
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Process-Time-Ms"] = str(duration_ms)
+    if trace_id:
+        response.headers["X-Trace-ID"] = trace_id
 
     logger.info(
         "request_completed",

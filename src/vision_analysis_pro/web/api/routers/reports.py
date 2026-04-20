@@ -359,6 +359,7 @@ async def export_report_csv(
 async def list_report_batches(
     request: Request,
     limit: int = Query(20, ge=1, le=100, description="返回批次数量上限"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
     device_id: str | None = Query(None, description="按设备 ID 过滤"),
     settings: Settings = Depends(get_settings),
 ) -> schemas.ReportBatchListResponse:
@@ -367,11 +368,13 @@ async def list_report_batches(
     request_id = getattr(request.state, "request_id", None)
     request.app.state.metrics["report_query_requests_total"] += 1
     store = get_report_store(str(settings.report_store_db_path))
-    items = store.list_batches(limit=limit, device_id=device_id)
+    items = store.list_batches(limit=limit, offset=offset, device_id=device_id)
+    total = store.count_batches(device_id=device_id)
 
     return schemas.ReportBatchListResponse(
         status="ok",
         count=len(items),
+        total=total,
         items=[
             schemas.ReportBatchSummaryResponse(
                 batch_id=item.batch_id,
@@ -395,6 +398,7 @@ async def list_report_batches(
 async def list_report_devices(
     request: Request,
     limit: int = Query(20, ge=1, le=100, description="返回设备数量上限"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
     settings: Settings = Depends(get_settings),
 ) -> schemas.ReportDeviceListResponse:
     """列出最近有上报的设备聚合概览。"""
@@ -402,11 +406,13 @@ async def list_report_devices(
     request_id = getattr(request.state, "request_id", None)
     request.app.state.metrics["report_query_requests_total"] += 1
     store = get_report_store(str(settings.report_store_db_path))
-    items = store.list_devices(limit=limit)
+    items = store.list_devices(limit=limit, offset=offset)
+    total = store.count_devices()
 
     return schemas.ReportDeviceListResponse(
         status="ok",
         count=len(items),
+        total=total,
         items=[
             schemas.ReportDeviceSummaryResponse(
                 device_id=item.device_id,

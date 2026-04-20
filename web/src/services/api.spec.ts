@@ -262,7 +262,7 @@ describe('API Service', () => {
       const result = await apiService.listBatchTasks(10)
 
       expect(result).toEqual(mockResponse)
-      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10')
+      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10&offset=0')
     })
 
     it('应该按状态筛选批量任务列表', async () => {
@@ -272,7 +272,9 @@ describe('API Service', () => {
       const result = await apiService.listBatchTasks(10, 'failed')
 
       expect(result).toEqual(mockResponse)
-      expect(mockGet).toHaveBeenCalledWith('/inference/images/tasks?limit=10&status=failed')
+      expect(mockGet).toHaveBeenCalledWith(
+        '/inference/images/tasks?limit=10&offset=0&status=failed'
+      )
     })
 
     it('应该重试失败任务', async () => {
@@ -510,7 +512,7 @@ describe('API Service', () => {
       const result = await apiService.listReportBatches(20, 'device-a')
 
       expect(result).toEqual(mockResponse)
-      expect(mockGet).toHaveBeenCalledWith('/reports/batches?limit=20&device_id=device-a')
+      expect(mockGet).toHaveBeenCalledWith('/reports/batches?limit=20&offset=0&device_id=device-a')
     })
 
     it('应该获取设备概览列表', async () => {
@@ -538,7 +540,7 @@ describe('API Service', () => {
       const result = await apiService.listReportDevices(10)
 
       expect(result).toEqual(mockResponse)
-      expect(mockGet).toHaveBeenCalledWith('/reports/devices?limit=10')
+      expect(mockGet).toHaveBeenCalledWith('/reports/devices?limit=10&offset=0')
     })
 
     it('应该获取设备元数据', async () => {
