@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
 **最后更新**：2026-04-20
-**后端测试**：191 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：192 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：53 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 browser smoke 通过
 
@@ -48,7 +48,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ### 当前验证
 
 - ✅ `uv run ruff check .`
-- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：191 passed, 43 skipped
+- ✅ `INFERENCE_ENGINE=stub uv run pytest -q`：192 passed, 44 skipped
 - ✅ `cd web && npm run lint`
 - ✅ `cd web && npm run test -- --run`：53 passed
 - ✅ `cd web && npm run build`
@@ -424,7 +424,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 191 passed, 43 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 192 passed, 44 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账

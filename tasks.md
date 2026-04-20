@@ -6,7 +6,7 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-007 / Stage B Model Comparison**, gated on reviewed pilot labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-007 / Stage B Model Comparison**, gated on reviewed positive pilot crack labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -50,8 +50,8 @@ Exit criteria:
 
 Status:
 - HE-006 completed the repeatable Stage B data intake loop and generated `data/stage_b_pilot_crack/` locally.
-- The current local Stage B smoke dataset uses checked-in sample images with empty pending-annotation labels to validate structure only.
-- HE-007 remains the model-comparison step once reviewed pilot labels exist.
+- The current local Stage B smoke dataset uses readable checked-in sample images with reviewed-negative empty labels to validate structure only.
+- HE-007 remains the model-comparison step once reviewed positive pilot crack labels exist.
 
 ### Stage C Engineering Pilot
 
@@ -108,10 +108,11 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-002 browser E2E smoke now covers upload -> inference -> visible result state with deterministic `stub`.
 - HE-003 added optional keyframe mode for `video` Edge Agent sources while preserving raw-frame mode.
 - HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
+- Local Stage B smoke labels now distinguish reviewed negative empty labels from pending annotation, and dataset validation rejects unreadable image files.
 - HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
 - HE-005 aligned the pilot deployment runbook, Compose model paths, Edge Agent sample config, smoke commands, and rollback steps.
 - HE-009 added a versioned LLM report contract with deterministic template fallback and local provider mode.
-- Current backend baseline: `191 passed, 43 skipped`.
+- Current backend baseline: `192 passed, 44 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
@@ -346,7 +347,7 @@ uv run pytest tests/test_deployment_config.py -q
 
 ### HE-007 Stage B Model Comparison
 
-Status: Gated on reviewed pilot labels
+Status: Gated on reviewed positive pilot crack labels
 Priority: P1
 
 Scope:

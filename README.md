@@ -280,7 +280,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 191 passed, 43 skipped）
+├── tests/                      # Python 测试（当前轻量基线 192 passed, 44 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -307,7 +307,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 191 passed, 43 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 192 passed, 44 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（53 passed）
 
 ### 提交规范
