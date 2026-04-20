@@ -63,7 +63,7 @@ async def receive_report(
             "batch_id": save_result.batch_id,
             "result_count": save_result.result_count,
             "total_detections": save_result.total_detections,
-            "created": save_result.created,
+            "batch_created": save_result.created,
         },
     )
 

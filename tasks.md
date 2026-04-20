@@ -6,7 +6,7 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-004 / Edge Agent Reporting Steady State**; Stage B data intake is complete and model comparison remains gated on reviewed pilot labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-005 / Pilot Deployment Runbook**; Stage B data intake is complete and model comparison remains gated on reviewed pilot labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -108,7 +108,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-002 browser E2E smoke now covers upload -> inference -> visible result state with deterministic `stub`.
 - HE-003 added optional keyframe mode for `video` Edge Agent sources while preserving raw-frame mode.
 - HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
-- Current backend baseline: `184 passed, 43 skipped`.
+- HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
+- Current backend baseline: `185 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
@@ -286,34 +287,37 @@ Rollback:
 - Remove `data/stage_b_pilot_crack/` and any corresponding `runs/stage_b_pilot_crack/` outputs.
 - No tracked five-class config should be modified.
 
-## Active Task
-
 ### HE-004 Edge Agent Reporting Steady State
 
-Status: Next
+Status: Done
 Priority: P1
 
 Scope:
 - Exercise network failure, cache replay, duplicate batch, API key, and report summary paths together.
 - Confirm cloud API idempotency with realistic Edge Agent payloads.
 
+Result:
+- `tests/test_edge_agent_reporter.py` covers HTTP reporter offline caching, cache flush after recovery, and duplicate replay cleanup.
+- `tests/test_api_inference.py` covers realistic Edge Agent payload idempotency, API Key protection, replayed duplicate batches, and `/api/v1/report/{batch_id}/summary`.
+- `docs/demo.md` documents the steady-state failure modes and recovery commands.
+
 Acceptance criteria:
-- Tests cover offline cache replay and duplicate batch acceptance.
-- `/api/v1/report/{batch_id}/summary` works for replayed batches.
-- Failure modes are documented in `docs/demo.md` or deployment runbook.
+- [x] Tests cover offline cache replay and duplicate batch acceptance.
+- [x] `/api/v1/report/{batch_id}/summary` works for replayed batches.
+- [x] Failure modes are documented in `docs/demo.md` or deployment runbook.
 
 Validation commands:
 
 ```bash
-uv run pytest tests/test_edge_agent.py tests/test_api_inference.py -q
+uv run pytest tests/test_edge_agent.py tests/test_api_inference.py tests/test_edge_agent_reporter.py -q
 INFERENCE_ENGINE=stub uv run pytest -q
 ```
 
-## P1 Queue
+## Active Task
 
 ### HE-005 Pilot Deployment Runbook
 
-Status: Planned
+Status: Next
 Priority: P1
 
 Scope:
@@ -331,6 +335,8 @@ Validation commands:
 docker compose config
 uv run ruff check .
 ```
+
+## P1 Queue
 
 ### HE-007 Stage B Model Comparison
 

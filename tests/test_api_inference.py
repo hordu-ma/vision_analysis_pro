@@ -1290,6 +1290,66 @@ async def test_report_endpoint_requires_api_key_when_configured(
 
 
 @pytest.mark.asyncio
+async def test_report_replay_duplicate_summary_and_api_key_steady_state(
+    tmp_path: Path,
+) -> None:
+    """测试缓存回放后的重复批次、摘要查询和 API Key 鉴权能协同工作。"""
+    payload = _create_report_payload(
+        batch_id="edge-agent-001-replay-batch",
+        device_id="edge-agent-001",
+    )
+    api_key = "steady-state-secret"
+
+    def _secure_settings() -> Settings:
+        return Settings.model_validate(
+            {
+                "model_path": "models/fake.pt",
+                "confidence_threshold": 0.5,
+                "iou_threshold": 0.5,
+                "cloud_api_key": api_key,
+                "report_store_db_path": str(tmp_path / "steady-reports.db"),
+            }
+        )
+
+    app.dependency_overrides[get_settings] = _secure_settings
+    clear_report_store_cache()
+    start_duplicates = app.state.metrics["report_duplicates_total"]
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        unauthorized_resp = await client.get(
+            f"/api/v1/report/{payload['batch_id']}/summary"
+        )
+        first_resp = await client.post(
+            "/api/v1/report",
+            headers={"x-api-key": api_key},
+            json=payload,
+        )
+        replay_resp = await client.post(
+            "/api/v1/report",
+            headers={"authorization": f"Bearer {api_key}"},
+            json=payload,
+        )
+        summary_resp = await client.get(
+            f"/api/v1/report/{payload['batch_id']}/summary",
+            headers={"x-api-key": api_key},
+        )
+
+    assert unauthorized_resp.status_code == 401
+    assert first_resp.status_code == 202
+    assert first_resp.json()["status"] == "accepted"
+    assert replay_resp.status_code == 202
+    assert replay_resp.json()["status"] == "duplicate"
+    assert app.state.metrics["report_duplicates_total"] == start_duplicates + 1
+
+    assert summary_resp.status_code == 200
+    summary = summary_resp.json()
+    assert summary["generated_by"] == "template"
+    assert summary["total_detections"] == 1
+    assert summary["llm_context"]["batch_id"] == payload["batch_id"]
+
+
+@pytest.mark.asyncio
 async def test_report_endpoint_returns_not_found_for_missing_batch() -> None:
     """测试查询不存在的上报批次返回统一 404 错误"""
     transport = ASGITransport(app=app)

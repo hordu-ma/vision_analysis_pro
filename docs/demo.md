@@ -235,6 +235,41 @@ curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary"
 
 该接口返回整体风险等级、缺陷发现项、建议动作和 `llm_context`。`llm_context` 是后续接入自然语言大模型生成正式报告的结构化输入。
 
+### 上报稳态与故障恢复
+
+Edge Agent 的 HTTP reporter 会在网络不可用、连接超时或服务端临时错误时重试；仍失败且 `cache.enabled=true` 时，批次会写入本地 SQLite 缓存。服务恢复后，reporter 会按 FIFO 顺序 flush 缓存。
+
+稳态行为：
+
+- 首次成功上报返回 `status=accepted`。
+- 同一 `batch_id` 再次上报返回 `status=duplicate`，云端不会重复累加结果数或检测数。
+- duplicate 也视为缓存回放成功，Edge Agent 可清理本地缓存条目。
+- 对 replayed batch 调用 `GET /api/v1/report/{batch_id}/summary` 仍会基于首次持久化的批次生成模板摘要。
+- 配置 `CLOUD_API_KEY` 后，上报、详情查询、summary、导出和设备视图都需要携带 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
+
+常用排查命令：
+
+```bash
+# 查看本地缓存文件是否存在
+ls -lh cache/edge_agent.db
+
+# 确认云端已接收批次
+curl "http://localhost:8000/api/v1/report/edge-agent-001-demo"
+
+# 确认 replayed batch 的摘要仍可生成
+curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary"
+
+# 启用 API Key 时
+curl "http://localhost:8000/api/v1/report/edge-agent-001-demo/summary" \
+  -H "Authorization: Bearer ${CLOUD_API_KEY}"
+```
+
+失败模式：
+
+- `401 UNAUTHORIZED`：云端配置了 `CLOUD_API_KEY`，但请求缺少密钥或密钥不匹配；修正 Edge Agent `reporter.api_key` 或 `EDGE_AGENT_REPORTER_API_KEY` 后再回放缓存。
+- `404 REPORT_NOT_FOUND`：该 `batch_id` 尚未被云端持久化；检查 Edge Agent 日志、上报 URL 和本地缓存。
+- 本地缓存持续增长：通常表示云端不可达、URL 错误、API Key 错误或服务端持续返回非 2xx；先恢复云端连通性，再等待 reporter flush。
+
 ### 视频关键帧抽取
 
 如需先从巡检视频提取待检测图片，可使用 OpenCV 关键帧工具：
@@ -316,7 +351,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：176 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：185 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：53 passed ✅
 
 ---
@@ -329,7 +364,7 @@ cd web && npm run test -- --run
 
 2. **边缘 Agent**：
    - MQTT 上报器尚未实现（当前使用 HTTP）
-   - 关键帧抽取尚未接入视频源主流程，当前通过独立 CLI 验证
+   - 视频源默认逐帧读取；可通过 `source.keyframes.enabled=true` 启用关键帧模式
 
 3. **可视化**：
    - 当检测结果为空时不生成可视化图像
@@ -376,4 +411,4 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload --port 8001
 
 ---
 
-**最后更新**：2026-04-19
+**最后更新**：2026-04-20

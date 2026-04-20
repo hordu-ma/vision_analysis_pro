@@ -4,7 +4,7 @@
 
 本文档保留系统级计划与里程碑背景。当前可执行任务、验收标准、验证命令与非目标以根目录 `tasks.md` 为准；项目进度与变更记录请参见 `docs/progress.md`。
 
-**当前进度快照（截至 2026-04-19）**
+**当前进度快照（截至 2026-04-20）**
 
 | 里程碑 | 状态 | 说明 |
 |--------|------|------|
@@ -13,9 +13,9 @@
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
 | M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
-- **后端测试**：176 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
+- **后端测试**：185 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
 - **前端测试**：53 passed（vitest），ESLint 全绿，生产构建通过
-- **下一步**：按 `tasks.md` 执行 HE-001 Stage A YOLO Baseline v0.1；随后推进 Stage B Pilot Data Loop、浏览器 E2E、关键帧接入 Edge Agent 与完整工程流程硬化
+- **下一步**：按 `tasks.md` 执行 HE-005 Pilot Deployment Runbook；HE-007 Stage B Model Comparison 需等待 reviewed pilot labels 后再推进
 
 **路线决策（2026-04-19）**
 
@@ -81,14 +81,14 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 176 passed, 43 skipped
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 185 passed, 43 skipped
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
 - ✅ 前端 Web：Vue3 + TS 页面闭环，53 个前端测试通过
 
 ### 4.2 剩余差距
 
-- 数据与训练：公开 crack-only 数据集已能转换并训练；下一步需要正式 Stage A baseline 训练、评估报告（mAP/PR）、ONNX 导出与推理接入验证；Stage B 负责自有数据集建设和模型对比
+- 数据与训练：Stage A baseline 训练、评估报告、ONNX 导出与推理烟测已完成；Stage B 数据 intake 已完成，模型对比等待 reviewed pilot labels
 - 生产化：CI/Docker/API CLI/最小 metrics/上报持久化与幂等已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
 - 可选优化：关键帧策略接入 Edge Agent、MQTT 上报器、Rust/PyO3 加速
 
