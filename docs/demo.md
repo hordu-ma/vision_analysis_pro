@@ -116,6 +116,70 @@ uv run python examples/demo_request.py test_image.jpg
 
 ---
 
+## 🧭 完整巡检主流程
+
+HE-008 后，Demo 的单一 happy path 固定为：上传/批量任务 → 推理与可视化 → 上报批次 → 人工复核 → 模板摘要 → 导出。
+
+### Happy path
+
+1. 启动 API 和前端：
+
+```bash
+INFERENCE_ENGINE=stub uv run uvicorn vision_analysis_pro.web.api.main:app --reload
+cd web
+npm run dev
+```
+
+2. 在前端上传一张图片或多张图片，确认结果区展示检测数量、首要缺陷和可视化图。
+3. 对批量任务确认任务状态为 `completed`，按需导出 CSV、JSON 或 ZIP。
+4. Edge Agent 或外部系统将同一巡检批次上报到云端：
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/report" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "device_id": "edge-agent-001",
+    "batch_id": "edge-agent-001-demo",
+    "report_time": 1700000000.0,
+    "results": [
+      {
+        "frame_id": 1,
+        "timestamp": 1700000000.0,
+        "source_id": "edge-agent-001",
+        "detections": [
+          {
+            "label": "crack",
+            "confidence": 0.95,
+            "bbox": [100.0, 150.0, 300.0, 400.0]
+          }
+        ],
+        "inference_time_ms": 12.4,
+        "metadata": {"image_name": "tower_001.jpg"}
+      }
+    ]
+  }'
+```
+
+5. 复核单帧结果，生成摘要并导出报告 CSV：
+
+```bash
+curl -X PUT "http://127.0.0.1:8000/api/v1/report/edge-agent-001-demo/reviews/1" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "confirmed", "note": "人工确认裂缝", "reviewer": "qa"}'
+
+curl "http://127.0.0.1:8000/api/v1/report/edge-agent-001-demo/summary"
+curl "http://127.0.0.1:8000/api/v1/report/edge-agent-001-demo/export.csv" \
+  -o edge-agent-001-demo.csv
+```
+
+### Recovery path
+
+- 批量任务 `failed` 时查看任务详情后重试；`partial_failed` 时优先 retry-failed；已完成但需要复验时 rerun；导出结果可用于离线比对。
+- Edge Agent 上报失败时会先按配置重试，仍失败且 `cache.enabled=true` 时写入本地 SQLite；云端恢复后自动回放。同一 `batch_id` 回放返回 `duplicate`，不会重复累计结果数或检测数。
+- 配置 `CLOUD_API_KEY` 后，report、summary、detail、export 和设备视图都需要携带 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
+
+---
+
 ## 🤖 边缘 Agent 演示
 
 边缘 Agent 支持从多种数据源采集图像，执行推理，并将结果上报到云端。
@@ -351,7 +415,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：187 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
+- 后端：188 passed, 43 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
 - 前端：53 passed ✅
 
 ---

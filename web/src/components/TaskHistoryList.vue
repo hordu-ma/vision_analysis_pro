@@ -17,6 +17,7 @@
           <el-option label="执行中" value="running" />
           <el-option label="已完成" value="completed" />
           <el-option label="失败" value="failed" />
+          <el-option label="已取消" value="cancelled" />
         </el-select>
         <div class="action-row">
           <WorkspaceActionButton
@@ -84,7 +85,9 @@
             导出
           </button>
           <button
-            v-if="task.status === 'completed' || task.status === 'failed'"
+            v-if="
+              task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled'
+            "
             class="inline-button subtle"
             @click="emit('delete', task.task_id)"
           >
@@ -155,6 +158,8 @@ const statusText = (status: string): string => {
       return '失败'
     case 'partial_failed':
       return '部分失败'
+    case 'cancelled':
+      return '已取消'
     default:
       return '待开始'
   }
@@ -164,6 +169,7 @@ const taskSummary = (task: InferenceTaskResponse): string => {
   if (task.status === 'completed') return '任务已完成，可查看详情或直接导出结果。'
   if (task.status === 'partial_failed') return '存在失败文件，建议优先重试失败项。'
   if (task.status === 'failed') return '执行异常终止，建议查看详情后重试。'
+  if (task.status === 'cancelled') return '任务已取消，可删除记录后重新创建。'
   if (task.status === 'running') return '任务仍在执行，页面会持续展示最新状态。'
   return '任务已进入队列，等待开始处理。'
 }
@@ -229,7 +235,8 @@ const taskMeta = (task: InferenceTaskResponse) => {
   color: #15803d;
 }
 
-.status-failed {
+.status-failed,
+.status-cancelled {
   background: rgba(239, 68, 68, 0.12);
   color: #b91c1c;
 }

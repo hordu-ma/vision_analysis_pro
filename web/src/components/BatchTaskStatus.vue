@@ -99,6 +99,8 @@ const statusLabel = computed(() => {
       return '失败'
     case 'partial_failed':
       return '部分失败'
+    case 'cancelled':
+      return '已取消'
     default:
       return '待开始'
   }
@@ -112,6 +114,8 @@ const tagType = computed(() => {
       return 'danger'
     case 'partial_failed':
       return 'warning'
+    case 'cancelled':
+      return 'danger'
     case 'running':
       return 'warning'
     default:

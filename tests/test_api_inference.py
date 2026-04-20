@@ -1765,3 +1765,93 @@ async def test_report_csv_export_endpoint_returns_attachment() -> None:
     assert "export-batch-001" in resp.text
     assert "false_positive" in resp.text
     assert "误报" in resp.text
+
+
+@pytest.mark.asyncio
+async def test_full_inspection_flow_covers_task_report_review_summary_and_exports() -> (
+    None
+):
+    """覆盖 HE-008 主路径：批量任务、推理可视化、复核、摘要和导出。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        create_resp = await client.post(
+            "/api/v1/inference/images/tasks?visualize=true",
+            files=[
+                ("files", ("tower-a.jpg", _create_test_image(), "image/jpeg")),
+                ("files", ("tower-b.jpg", _create_test_image(), "image/jpeg")),
+            ],
+        )
+        assert create_resp.status_code == 202
+        task_id = create_resp.json()["task_id"]
+
+        for _ in range(20):
+            task_resp = await client.get(f"/api/v1/inference/images/tasks/{task_id}")
+            assert task_resp.status_code == 200
+            task_data = task_resp.json()
+            if task_data["status"] == "completed":
+                break
+            await asyncio.sleep(0.01)
+        else:
+            pytest.fail("完整巡检批量任务未在预期时间内完成")
+
+        task_csv_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.csv"
+        )
+        task_json_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.json"
+        )
+        task_zip_resp = await client.get(
+            f"/api/v1/inference/images/tasks/{task_id}/export.zip"
+        )
+
+        report_payload = _create_report_payload(
+            batch_id="flow-batch-001",
+            device_id="flow-device-001",
+            label="crack",
+        )
+        report_resp = await client.post("/api/v1/report", json=report_payload)
+        review_resp = await client.put(
+            "/api/v1/report/flow-batch-001/reviews/1",
+            json={"status": "confirmed", "note": "HE-008 主流程确认", "reviewer": "qa"},
+        )
+        summary_resp = await client.get("/api/v1/report/flow-batch-001/summary")
+        report_detail_resp = await client.get("/api/v1/report/flow-batch-001")
+        report_csv_resp = await client.get("/api/v1/report/flow-batch-001/export.csv")
+
+    assert task_data["file_count"] == 2
+    assert task_data["completed_files"] == 2
+    assert task_data["progress"] == 100
+    assert len(task_data["results"]) == 2
+    assert task_data["results"][0]["visualization"].startswith(
+        "data:image/jpeg;base64,"
+    )
+
+    assert task_csv_resp.status_code == 200
+    assert task_csv_resp.headers["content-type"].startswith("text/csv")
+    assert task_id in task_csv_resp.text
+    assert "tower-a.jpg" in task_csv_resp.text
+
+    assert task_json_resp.status_code == 200
+    assert task_json_resp.json()["task_id"] == task_id
+
+    assert task_zip_resp.status_code == 200
+    assert task_zip_resp.headers["content-type"] == "application/zip"
+
+    assert report_resp.status_code == 202
+    assert report_resp.json()["status"] == "accepted"
+
+    assert review_resp.status_code == 200
+    assert review_resp.json()["review"]["status"] == "confirmed"
+
+    assert summary_resp.status_code == 200
+    summary_data = summary_resp.json()
+    assert summary_data["generated_by"] == "template"
+    assert summary_data["total_detections"] == 1
+    assert summary_data["llm_context"]["batch_id"] == "flow-batch-001"
+
+    assert report_detail_resp.status_code == 200
+    assert report_detail_resp.json()["results"][0]["review"]["reviewer"] == "qa"
+
+    assert report_csv_resp.status_code == 200
+    assert "flow-batch-001" in report_csv_resp.text
+    assert "confirmed" in report_csv_resp.text

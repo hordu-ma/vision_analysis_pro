@@ -30,7 +30,7 @@ export interface BatchInferenceResponse {
 
 export interface InferenceTaskResponse {
   task_id: string
-  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial_failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'partial_failed' | 'cancelled'
   created_at: number
   updated_at: number
   file_count: number
@@ -71,7 +71,13 @@ export interface InferenceTaskDetailResponse extends InferenceTaskResponse {
   files: InferenceTaskFileResult[]
 }
 
-export type InferenceTaskStatus = 'pending' | 'running' | 'completed' | 'failed' | 'partial_failed'
+export type InferenceTaskStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'partial_failed'
+  | 'cancelled'
 
 export interface HealthResponse {
   status: string

@@ -6,7 +6,7 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-008 / Full Inspection Flow Hardening**; HE-007 remains gated on reviewed pilot labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-009 / LLM Report Extension**; HE-007 remains gated on reviewed pilot labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -84,7 +84,7 @@ The conversation started with four candidate directions. They map to the current
 | Data layer: OpenCV keyframes from video | Mainline data ingestion path; CLI and optional Edge Agent keyframe mode are in place | HE-003, HE-006 |
 | Vision recognition: DeepLab, YOLO, Transformer | YOLO is the active detector; segmentation and trend analysis are follow-up tasks gated by evidence | HE-001, HE-007, HE-010, HE-011 |
 | Language extension: LLM explanations/reports | Template report exists now; LLM is report-only and must not change detection decisions | HE-004, HE-009 |
-| Backend/frontend: full inspection flow | Current app already has API, frontend, batch tasks, report summary; browser/Edge steady-state checks remain | HE-002, HE-004, HE-008 |
+| Backend/frontend: full inspection flow | Current app has API, frontend, batch tasks, report summary, browser smoke, and backend flow coverage | HE-002, HE-004, HE-008 |
 
 ## Current Decision
 
@@ -110,7 +110,7 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
 - HE-004 added steady-state coverage for Edge Agent cache replay, duplicate batch handling, API Key protection, and report summary access.
 - HE-005 aligned the pilot deployment runbook, Compose model paths, Edge Agent sample config, smoke commands, and rollback steps.
-- Current backend baseline: `187 passed, 43 skipped`.
+- Current backend baseline: `188 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
 ## Accepted Tasks
@@ -376,11 +376,11 @@ INFERENCE_ENGINE=stub uv run pytest -q
 Rollback:
 - Remove `runs/stage_b_pilot_crack/` and exported files under `models/stage_b_pilot_crack/`.
 
-## Active Task
+## Completed Task
 
 ### HE-008 Full Inspection Flow Hardening
 
-Status: Next
+Status: Done
 Priority: P1
 
 Scope:
@@ -395,17 +395,30 @@ Acceptance criteria:
 Validation commands:
 
 ```bash
+uv run ruff check .
 INFERENCE_ENGINE=stub uv run pytest tests/test_api_inference.py tests/test_reporting.py -q
+INFERENCE_ENGINE=stub uv run pytest -q
 cd web
 npm run lint
 npm run test -- --run
+npm run build
+npm run test:e2e
 ```
 
-## P2 Backlog
+Result:
+- Frontend task status types now include backend `cancelled` tasks, and task history/status UI renders cancelled tasks explicitly.
+- `tests/test_api_inference.py` now covers the HE-008 happy path across async batch task creation, inference visualization, task CSV/JSON/ZIP export, cloud report intake, review update, report summary, report detail, and report CSV export.
+- README and demo docs describe one happy path and one recovery path for the full inspection flow.
+
+Rollback:
+- Revert the HE-008 frontend status type/UI changes and the full-flow test if the task contract is narrowed.
+- Revert the README/demo/progress wording if the accepted demo path changes.
+
+## Active Task
 
 ### HE-009 LLM Report Extension
 
-Status: Backlog
+Status: Next
 Priority: P2
 
 Promote only after HE-001 and HE-004 are stable.
@@ -418,6 +431,19 @@ Acceptance criteria:
 - Report generation has deterministic template fallback.
 - LLM prompt and output schema are versioned.
 - Tests cover missing metadata and low-confidence detections.
+
+Validation commands:
+
+```bash
+uv run ruff check .
+INFERENCE_ENGINE=stub uv run pytest tests/test_api_inference.py tests/test_reporting.py -q
+```
+
+Rollback:
+- Keep `/api/v1/report/{batch_id}/summary` on deterministic template output only.
+- Disable the LLM provider path by configuration without changing stored reports.
+
+## P2 Backlog
 
 ### HE-010 Segmentation Refinement
 
