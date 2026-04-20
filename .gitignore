@@ -70,3 +70,4 @@ web/.output/
 
 # Serena (AI 工具工作目录)
 .serena/
+.codex
