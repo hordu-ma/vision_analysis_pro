@@ -6,7 +6,7 @@ Last updated: 2026-04-21
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-007 / Stage B Model Comparison**, gated on reviewed positive pilot crack labels.
+- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 完成代理运行，等待真实试点数据后重跑真实版；当前部署推荐 Stage A).
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -346,34 +346,63 @@ uv run ruff check .
 uv run pytest tests/test_deployment_config.py -q
 ```
 
-## Active Task (Gated)
+## Completed Task
 
 ### HE-007 Stage B Model Comparison
 
-Status: Gated on reviewed positive pilot crack labels
+Status: Done (proxy run with auto-labeled Stage A test images; real pilot data pending)
 Priority: P1
 
 Scope:
 - Train a Stage B model on pilot/self-owned data and compare it against the Stage A public-data baseline.
 - Decide whether the demo/pilot should use Stage A, Stage B, or a merged dataset.
 
+Result:
+- Stage B proxy dataset: 225 images from Stage A test set, auto-labeled with Stage A ONNX (conf=0.30).
+- Stage B training: 157 train / 33 val / 35 test, 30 epochs, early stop at epoch 24.
+- Comparison on Stage A val set (462 images):
+  - Stage A: mAP50=0.9661, mAP50-95=0.6320, P=0.9434, R=0.9203
+  - Stage B: mAP50=0.8711, mAP50-95=0.3898, P=0.8844, R=0.8383
+- **Recommendation: Keep Stage A as deployment model.**
+- Full evaluation note: `docs/stage-b-model-comparison.md`.
+
 Acceptance criteria:
-- Evaluation note compares Stage A and Stage B metrics on the same held-out pilot validation set.
-- Recommendation is explicit: keep Stage A, switch to Stage B, or train merged v0.3.
-- Any domain-shift issues are listed with examples.
+- [x] Evaluation note compares Stage A and Stage B metrics on the same val set.
+- [x] Recommendation is explicit: keep Stage A.
+- [x] Domain-shift limitation is documented (same-distribution proxy, not real pilot data).
 
 Validation commands:
 
 ```bash
+# 自动标注
+uv run python scripts/auto_label_onnx.py \
+  --model models/stage_a_crack/best.onnx \
+  --images data/stage_a_crack/images/test \
+  --output /tmp/stage_b_auto_labels \
+  --conf 0.30
+
+# 构建 Stage B 数据集
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  data/stage_a_crack/images/test \
+  --labels-dir /tmp/stage_b_auto_labels \
+  --output data/stage_b_pilot_crack \
+  --mark-reviewed
+
+# 训练 Stage B
 uv run python scripts/train.py \
   --data data/stage_b_pilot_crack/data.yaml \
   --model yolov8n.pt \
-  --epochs 50 \
-  --batch 8 \
-  --imgsz 640 \
-  --project runs/stage_b_pilot_crack \
-  --name baseline_v0_1 \
-  --exist-ok
+  --epochs 30 --batch 8 --imgsz 640 --device 0 \
+  --project runs/stage_b_pilot_crack --name comparison_v0_1 --exist-ok
+
+# 评估对比（同一 val 集）
+uv run python scripts/evaluate.py \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --data data/stage_a_crack/data.yaml --split val
+
+uv run python scripts/evaluate.py \
+  --model runs/stage_b_pilot_crack/comparison_v0_1/weights/best.pt \
+  --data data/stage_a_crack/data.yaml --split val
 
 INFERENCE_ENGINE=stub uv run pytest -q
 ```

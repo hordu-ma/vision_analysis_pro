@@ -84,6 +84,7 @@ def test_prepare_stage_b_dataset_copies_images_labels_and_manifest(
         manifest = json.load(f)
     assert manifest["split_counts"] == {"train": 2, "val": 1, "test": 1}
     assert manifest["annotation_status"]["labeled_images"] == 4
+    assert manifest["annotation_status"]["reviewed_images"] == 0
 
 
 def test_prepare_stage_b_dataset_requires_labels_unless_allowed(
@@ -107,6 +108,56 @@ def test_prepare_stage_b_dataset_requires_labels_unless_allowed(
     label_files = list((tmp_path / "stage_b_unlabeled").glob("labels/*/*.txt"))
     assert len(label_files) == 1
     assert label_files[0].read_text(encoding="utf-8") == ""
+
+
+def test_prepare_stage_b_dataset_can_mark_empty_labels_reviewed(
+    tmp_path: Path,
+) -> None:
+    module = load_prepare_module()
+    source = tmp_path / "pilot"
+    output = tmp_path / "stage_b_reviewed"
+    source.mkdir()
+    write_image(source / "negative_0.jpg")
+    write_image(source / "negative_1.jpg")
+
+    summary = module.prepare_dataset(
+        [source],
+        output,
+        allow_unlabeled=True,
+        mark_reviewed=True,
+        train_ratio=0.5,
+        val_ratio=0.5,
+        test_ratio=0.0,
+    )
+
+    assert summary.total_images == 2
+    assert summary.empty_label_images == 2
+    assert summary.reviewed_images == 2
+    assert summary.reviewed_empty_label_images == 2
+
+    with (output / "manifest.json").open("r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    assert manifest["settings"]["mark_reviewed"] is True
+    assert manifest["annotation_status"]["pending_annotation_empty_label_images"] == 0
+    assert manifest["annotation_status"]["reviewed_images"] == 2
+    assert manifest["annotation_status"]["reviewed_negative_empty_label_images"] == 2
+    assert {item["annotation_status"] for item in manifest["items"]} == {
+        "reviewed_negative_empty_label"
+    }
+
+
+def test_prepare_stage_b_dataset_rejects_unreadable_image(
+    tmp_path: Path,
+) -> None:
+    module = load_prepare_module()
+    source = tmp_path / "pilot"
+    source.mkdir()
+    bad_image = source / "bad.jpg"
+    bad_image.write_text("<html>not an image</html>", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="not a readable image"):
+        module.prepare_dataset([source], tmp_path / "stage_b", allow_unlabeled=True)
 
 
 def test_prepare_stage_b_dataset_resets_generated_files(tmp_path: Path) -> None:

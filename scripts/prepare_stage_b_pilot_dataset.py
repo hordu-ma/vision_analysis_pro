@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import cv2
+
 from vision_analysis_pro.core.preprocessing.keyframes import (
     KeyframeOptions,
     extract_keyframes,
@@ -38,6 +40,8 @@ class PreparedDataset:
     total_images: int
     labeled_images: int
     empty_label_images: int
+    reviewed_images: int
+    reviewed_empty_label_images: int
     split_counts: dict[str, int]
 
 
@@ -64,6 +68,14 @@ def parse_args() -> argparse.Namespace:
         "--allow-unlabeled",
         action="store_true",
         help="Create empty label files for images that are still pending annotation",
+    )
+    parser.add_argument(
+        "--mark-reviewed",
+        action="store_true",
+        help=(
+            "Mark supplied labels, or empty labels created with --allow-unlabeled, "
+            "as human reviewed in manifest.json"
+        ),
     )
     parser.add_argument(
         "--extract-videos",
@@ -112,6 +124,7 @@ def prepare_dataset(
     *,
     labels_dir: Path | None = None,
     allow_unlabeled: bool = False,
+    mark_reviewed: bool = False,
     extract_videos: bool = False,
     interval_seconds: float = 1.0,
     min_scene_delta: float = 20.0,
@@ -150,6 +163,8 @@ def prepare_dataset(
 
     labeled_images = 0
     empty_label_images = 0
+    reviewed_images = 0
+    reviewed_empty_label_images = 0
     copied_sources: list[dict[str, object]] = []
 
     for split, split_candidates_ in split_map.items():
@@ -163,11 +178,20 @@ def prepare_dataset(
                 validate_label_file(candidate.label_path)
                 shutil.copy2(candidate.label_path, label_target)
                 labeled_images += 1
-                annotation_status = "labeled"
+                if mark_reviewed:
+                    reviewed_images += 1
+                    annotation_status = "reviewed_label"
+                else:
+                    annotation_status = "labeled"
             elif allow_unlabeled:
                 label_target.write_text("", encoding="utf-8")
                 empty_label_images += 1
-                annotation_status = "pending_annotation_empty_label"
+                if mark_reviewed:
+                    reviewed_images += 1
+                    reviewed_empty_label_images += 1
+                    annotation_status = "reviewed_negative_empty_label"
+                else:
+                    annotation_status = "pending_annotation_empty_label"
             else:
                 raise FileNotFoundError(
                     "missing YOLO label for "
@@ -192,6 +216,7 @@ def prepare_dataset(
         inputs=inputs,
         labels_dir=labels_dir,
         allow_unlabeled=allow_unlabeled,
+        mark_reviewed=mark_reviewed,
         extract_videos=extract_videos,
         interval_seconds=interval_seconds,
         min_scene_delta=min_scene_delta,
@@ -201,6 +226,8 @@ def prepare_dataset(
         split_counts=split_counts,
         labeled_images=labeled_images,
         empty_label_images=empty_label_images,
+        reviewed_images=reviewed_images,
+        reviewed_empty_label_images=reviewed_empty_label_images,
         copied_sources=copied_sources,
     )
     validate_prepared_dataset(output)
@@ -210,6 +237,8 @@ def prepare_dataset(
         total_images=sum(split_counts.values()),
         labeled_images=labeled_images,
         empty_label_images=empty_label_images,
+        reviewed_images=reviewed_images,
+        reviewed_empty_label_images=reviewed_empty_label_images,
         split_counts=split_counts,
     )
 
@@ -305,8 +334,18 @@ def validate_prepared_dataset(output: Path) -> None:
         if orphan_labels:
             raise ValueError(f"{split} labels missing images: {sorted(orphan_labels)}")
 
+        for image_path in _iter_images(image_dir):
+            validate_image_file(image_path)
+
         for label_path in label_dir.glob("*.txt"):
             validate_label_file(label_path)
+
+
+def validate_image_file(image_path: Path) -> None:
+    """Validate that a dataset image is readable by OpenCV."""
+    image = cv2.imread(str(image_path))
+    if image is None:
+        raise ValueError(f"{image_path} is not a readable image")
 
 
 def validate_label_file(label_path: Path) -> None:
@@ -352,6 +391,7 @@ def write_manifest(
     inputs: list[Path],
     labels_dir: Path | None,
     allow_unlabeled: bool,
+    mark_reviewed: bool,
     extract_videos: bool,
     interval_seconds: float,
     min_scene_delta: float,
@@ -361,6 +401,8 @@ def write_manifest(
     split_counts: dict[str, int],
     labeled_images: int,
     empty_label_images: int,
+    reviewed_images: int,
+    reviewed_empty_label_images: int,
     copied_sources: list[dict[str, object]],
 ) -> None:
     """Write dataset manifest for auditability."""
@@ -375,6 +417,7 @@ def write_manifest(
         "labels_dir": str(labels_dir) if labels_dir else None,
         "settings": {
             "allow_unlabeled": allow_unlabeled,
+            "mark_reviewed": mark_reviewed,
             "seed": seed,
             "extract_videos": extract_videos,
             "keyframes": {
@@ -387,7 +430,11 @@ def write_manifest(
         "split_counts": split_counts,
         "annotation_status": {
             "labeled_images": labeled_images,
-            "pending_annotation_empty_label_images": empty_label_images,
+            "pending_annotation_empty_label_images": (
+                empty_label_images - reviewed_empty_label_images
+            ),
+            "reviewed_images": reviewed_images,
+            "reviewed_negative_empty_label_images": reviewed_empty_label_images,
         },
         "items": copied_sources,
     }
@@ -504,6 +551,7 @@ def main() -> None:
         Path(args.output),
         labels_dir=Path(args.labels_dir) if args.labels_dir else None,
         allow_unlabeled=args.allow_unlabeled,
+        mark_reviewed=args.mark_reviewed,
         extract_videos=args.extract_videos,
         interval_seconds=args.interval_seconds,
         min_scene_delta=args.min_scene_delta,
@@ -518,7 +566,14 @@ def main() -> None:
     print(f"prepared Stage B dataset: {prepared.output}")
     print(f"total_images={prepared.total_images}")
     print(f"labeled_images={prepared.labeled_images}")
-    print(f"pending_annotation_empty_label_images={prepared.empty_label_images}")
+    print(
+        "pending_annotation_empty_label_images="
+        f"{prepared.empty_label_images - prepared.reviewed_empty_label_images}"
+    )
+    print(f"reviewed_images={prepared.reviewed_images}")
+    print(
+        f"reviewed_negative_empty_label_images={prepared.reviewed_empty_label_images}"
+    )
     print(f"split_counts={prepared.split_counts}")
 
 

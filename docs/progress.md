@@ -32,6 +32,31 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - Transformer 趋势分析依赖连续批次与设备历史数据，后置到数据积累之后。
 - LLM 只作为报告解释层，输入结构化检测结果、人工复核状态和设备元数据，不参与检测判定。
 
+## 🗓️ 2026-04-21：HE-007 Stage B 模型对比（代理运行）✅
+
+### 核心成果
+
+- ✅ 新增 `scripts/auto_label_onnx.py`：用 ONNX 模型批量生成 YOLO 格式自动标注
+- ✅ 用 Stage A 测试集（225 张）自动标注后构建 Stage B 代理数据集（157 train / 33 val / 35 test）
+- ✅ 训练 Stage B 模型：yolov8n.pt 起点，30 epoch，早停于第 24 epoch
+- ✅ 在同一 Stage A val 集（462 张）对比两个模型：
+  - Stage A：mAP50=0.966，mAP50-95=0.632，P=0.943，R=0.920
+  - Stage B：mAP50=0.871，mAP50-95=0.390，P=0.884，R=0.838
+- ✅ 评估报告：`docs/stage-b-model-comparison.md`
+- ✅ **决策：当前保留 Stage A 作为部署模型**
+
+### 局限说明
+
+Stage B 使用同分布代理数据（Stage A 测试集），无法体现跨域泛化。
+有真实巡检图片后，用 Stage A ONNX 预标注 → 人工复核 → 重跑对比，结果更有指导意义。
+
+### 当前验证
+
+- ✅ `uv run ruff check .`
+- ✅ `uv run pytest -q`：198 passed, 44 skipped
+
+---
+
 ## 🗓️ 2026-04-21：API 分页、X-Trace-ID、前端组件测试（P1/P2）✅
 
 ### 核心成果

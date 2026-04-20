@@ -53,6 +53,18 @@ uv run python scripts/prepare_stage_b_pilot_dataset.py \
   --output data/stage_b_pilot_crack
 ```
 
+After human review, empty labels that are confirmed to contain no `crack` target can be marked as reviewed negatives:
+
+```bash
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  path/to/pilot_images \
+  --allow-unlabeled \
+  --mark-reviewed \
+  --output data/stage_b_pilot_crack
+```
+
+Reviewed labels supplied through `--labels-dir` can also be marked with `--mark-reviewed`. The manifest then records `reviewed_images`, `reviewed_negative_empty_label_images`, and per-item `annotation_status`.
+
 The script writes:
 
 - `data/stage_b_pilot_crack/data.yaml`
@@ -63,7 +75,7 @@ The script writes:
 
 ## Local Smoke Intake
 
-The current local smoke generated the Stage B directory from checked-in sample images to validate the data-loop mechanics:
+The first local smoke generated the Stage B directory from checked-in sample images to validate the data-loop mechanics:
 
 ```bash
 uv run python scripts/prepare_stage_b_pilot_dataset.py \
@@ -86,6 +98,34 @@ split_counts={'train': 3, 'val': 1, 'test': 1}
 ```
 
 This smoke dataset validates structure only. It is not a pilot-quality crack training set because all labels are pending.
+
+## Local Reviewed-Negative Smoke Labels
+
+2026-04-20 update: local sample review removed one invalid image (`data/samples/web_rust_bolt.jpg`, an HTML error page saved with `.jpg`) and regenerated the local Stage B smoke dataset from four readable sample images:
+
+```bash
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  data/samples/web_rust_iron.jpg \
+  data/samples/web_spalling_concrete.jpg \
+  data/samples/web_flaking_rust.jpg \
+  data/samples/web_rust_chain.jpg \
+  --output data/stage_b_pilot_crack \
+  --allow-unlabeled \
+  --mark-reviewed
+```
+
+Result:
+
+```text
+total_images=4
+labeled_images=0
+pending_annotation_empty_label_images=0
+reviewed_images=4
+reviewed_negative_empty_label_images=4
+split_counts={'train': 2, 'val': 1, 'test': 1}
+```
+
+These are reviewed negative smoke labels. They prove the manifest can distinguish reviewed empty labels from pending annotation and keep invalid image files out of the dataset. They do not satisfy HE-007 training needs by themselves because there are no reviewed positive `crack` boxes in the local sample set.
 
 ## Validation
 
@@ -119,6 +159,8 @@ names:
 Before model training or HE-007 comparison:
 
 - replace pending empty labels with reviewed crack annotations
+- keep reviewed negative images as empty `.txt` labels with `--mark-reviewed`
+- ensure the training split includes reviewed positive `crack` boxes, not only reviewed negatives
 - keep the same image stem for each `.txt` label file
 - keep target-environment videos/images out of git
 - rerun `--validate-only`
