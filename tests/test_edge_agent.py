@@ -34,6 +34,11 @@ EDGE_AGENT_ENV_KEYS = [
     "EDGE_AGENT_SOURCE_FPS_LIMIT",
     "EDGE_AGENT_SOURCE_LOOP",
     "EDGE_AGENT_SOURCE_SKIP_FRAMES",
+    "EDGE_AGENT_SOURCE_KEYFRAMES_ENABLED",
+    "EDGE_AGENT_SOURCE_KEYFRAMES_INTERVAL_SECONDS",
+    "EDGE_AGENT_SOURCE_KEYFRAMES_MIN_SCENE_DELTA",
+    "EDGE_AGENT_SOURCE_KEYFRAMES_BLUR_THRESHOLD",
+    "EDGE_AGENT_SOURCE_KEYFRAMES_MAX_FRAMES",
     "EDGE_AGENT_INFERENCE_ENGINE",
     "EDGE_AGENT_INFERENCE_MODEL_PATH",
     "EDGE_AGENT_INFERENCE_CONFIDENCE",
@@ -55,6 +60,21 @@ def _clear_edge_agent_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """清理测试会用到的 Edge Agent 环境变量。"""
     for key in EDGE_AGENT_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
+
+
+def _create_test_video(path: Path, *, fps: float = 2.0) -> None:
+    """创建用于视频源测试的短视频。"""
+    import cv2
+
+    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    writer = cv2.VideoWriter(str(path), fourcc, fps, (64, 64))
+    assert writer.isOpened()
+    try:
+        for value in [0, 0, 255, 255, 128]:
+            frame = np.full((64, 64, 3), value, dtype=np.uint8)
+            writer.write(frame)
+    finally:
+        writer.release()
 
 
 # ============================================================================
@@ -277,6 +297,29 @@ class TestSourceConfig:
         assert config.fps_limit == 10.0
         assert config.loop is True
 
+    def test_from_dict_keyframes(self) -> None:
+        """测试从字典创建视频关键帧配置"""
+        data = {
+            "type": "video",
+            "path": "/path/to/video.mp4",
+            "keyframes": {
+                "enabled": True,
+                "interval_seconds": 1.5,
+                "min_scene_delta": 20,
+                "blur_threshold": 5,
+                "max_frames": 10,
+            },
+        }
+
+        config = SourceConfig.from_dict(data)
+
+        assert config.type == SourceType.VIDEO
+        assert config.keyframes.enabled is True
+        assert config.keyframes.interval_seconds == 1.5
+        assert config.keyframes.min_scene_delta == 20
+        assert config.keyframes.blur_threshold == 5
+        assert config.keyframes.max_frames == 10
+
 
 class TestInferenceConfig:
     """InferenceConfig 配置测试"""
@@ -358,12 +401,22 @@ inference:
         monkeypatch.setenv("EDGE_AGENT_LOG_LEVEL", "ERROR")
         monkeypatch.setenv("EDGE_AGENT_SOURCE_TYPE", "rtsp")
         monkeypatch.setenv("EDGE_AGENT_SOURCE_PATH", "rtsp://example.com/stream")
+        monkeypatch.setenv("EDGE_AGENT_SOURCE_KEYFRAMES_ENABLED", "true")
+        monkeypatch.setenv("EDGE_AGENT_SOURCE_KEYFRAMES_INTERVAL_SECONDS", "2.5")
+        monkeypatch.setenv("EDGE_AGENT_SOURCE_KEYFRAMES_MIN_SCENE_DELTA", "30")
+        monkeypatch.setenv("EDGE_AGENT_SOURCE_KEYFRAMES_BLUR_THRESHOLD", "12")
+        monkeypatch.setenv("EDGE_AGENT_SOURCE_KEYFRAMES_MAX_FRAMES", "8")
 
         config = EdgeAgentConfig.from_env()
         assert config.device_id == "env-device"
         assert config.log_level == "ERROR"
         assert config.source.type == SourceType.RTSP
         assert config.source.path == "rtsp://example.com/stream"
+        assert config.source.keyframes.enabled is True
+        assert config.source.keyframes.interval_seconds == 2.5
+        assert config.source.keyframes.min_scene_delta == 30
+        assert config.source.keyframes.blur_threshold == 12
+        assert config.source.keyframes.max_frames == 8
 
     def test_load_preserves_yaml_values_without_env(
         self,
@@ -498,6 +551,28 @@ cache:
         assert len(errors) > 0
         assert any("置信度" in e for e in errors)
         assert any("模型文件" in e for e in errors)
+
+    def test_validate_invalid_keyframe_config(self, tmp_path: Path) -> None:
+        """测试验证无效关键帧配置。"""
+        model_file = tmp_path / "model.onnx"
+        model_file.touch()
+        video_file = tmp_path / "sample.avi"
+        _create_test_video(video_file)
+
+        config = EdgeAgentConfig(
+            inference=InferenceConfig(model_path=str(model_file)),
+            source=SourceConfig.from_dict(
+                {
+                    "type": "video",
+                    "path": str(video_file),
+                    "keyframes": {"enabled": True, "interval_seconds": -1},
+                }
+            ),
+        )
+
+        errors = config.validate()
+
+        assert any("关键帧间隔" in error for error in errors)
 
 
 # ============================================================================
@@ -718,6 +793,48 @@ class TestFolderSource:
             source.read_frame()
             source.read_frame()
             assert source.progress == 1.0
+
+
+class TestVideoSource:
+    """VideoSource 数据源测试"""
+
+    def test_raw_mode_reads_all_frames(self, tmp_path: Path) -> None:
+        """测试默认逐帧模式读取所有帧。"""
+        video_path = tmp_path / "sample.avi"
+        _create_test_video(video_path)
+        config = SourceConfig(type=SourceType.VIDEO, path=str(video_path))
+        source = VideoSource(config, "test-video")
+
+        with source:
+            frames = list(source)
+
+        assert len(frames) == 5
+        assert frames[0].metadata["frame_selection_mode"] == "raw"
+
+    def test_keyframe_mode_reads_selected_frames(self, tmp_path: Path) -> None:
+        """测试关键帧模式仅读取符合规则的帧。"""
+        video_path = tmp_path / "sample.avi"
+        _create_test_video(video_path)
+        config = SourceConfig.from_dict(
+            {
+                "type": "video",
+                "path": str(video_path),
+                "keyframes": {
+                    "enabled": True,
+                    "interval_seconds": 1.0,
+                    "min_scene_delta": 30.0,
+                },
+            }
+        )
+        source = VideoSource(config, "test-video")
+
+        with source:
+            frames = list(source)
+
+        assert [frame.frame_id for frame in frames] == [0, 2, 4]
+        assert frames[0].metadata["frame_selection_mode"] == "keyframes"
+        assert frames[1].metadata["keyframe_reason"] == "scene_change"
+        assert frames[1].metadata["keyframe_timestamp_seconds"] == pytest.approx(1.0)
 
 
 class TestCreateSource:

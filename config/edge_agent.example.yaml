@@ -34,6 +34,14 @@ source:
   # 跳帧数 (0 表示不跳帧, 1 表示每隔1帧处理1帧)
   skip_frames: 0
 
+  # 视频关键帧模式 (仅对 video 数据源有效；默认关闭以保留逐帧路径)
+  keyframes:
+    enabled: false
+    interval_seconds: 1.0
+    min_scene_delta: 20.0
+    blur_threshold: 10.0
+    # max_frames: 100
+
   # 支持的图像扩展名 (仅对 folder 有效)
   extensions:
     - ".jpg"

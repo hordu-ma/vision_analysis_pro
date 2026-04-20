@@ -6,7 +6,7 @@ Last updated: 2026-04-20
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **HE-002 / Browser E2E Smoke**; Stage B is already planned but starts after HE-001 acceptance.
+- Keep exactly one active delivery focus at a time. The current active focus is **HE-004 / Edge Agent Reporting Steady State**; Stage B data intake is complete and model comparison remains gated on reviewed pilot labels.
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -48,6 +48,11 @@ Exit criteria:
 - Stage B model is trained and compared against Stage A on a held-out pilot validation set.
 - Deployment docs identify whether Stage A or Stage B is the recommended demo/pilot model.
 
+Status:
+- HE-006 completed the repeatable Stage B data intake loop and generated `data/stage_b_pilot_crack/` locally.
+- The current local Stage B smoke dataset uses checked-in sample images with empty pending-annotation labels to validate structure only.
+- HE-007 remains the model-comparison step once reviewed pilot labels exist.
+
 ### Stage C Engineering Pilot
 
 Goal:
@@ -76,7 +81,7 @@ The conversation started with four candidate directions. They map to the current
 
 | Direction | Current handling | Tasks |
 |-----------|------------------|-------|
-| Data layer: OpenCV keyframes from video | Mainline data ingestion path; CLI exists, Edge Agent integration pending | HE-003, HE-006 |
+| Data layer: OpenCV keyframes from video | Mainline data ingestion path; CLI and optional Edge Agent keyframe mode are in place | HE-003, HE-006 |
 | Vision recognition: DeepLab, YOLO, Transformer | YOLO is the active detector; segmentation and trend analysis are follow-up tasks gated by evidence | HE-001, HE-007, HE-010, HE-011 |
 | Language extension: LLM explanations/reports | Template report exists now; LLM is report-only and must not change detection decisions | HE-004, HE-009 |
 | Backend/frontend: full inspection flow | Current app already has API, frontend, batch tasks, report summary; browser/Edge steady-state checks remain | HE-002, HE-004, HE-008 |
@@ -100,10 +105,13 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-001 Stage A formal YOLO baseline completed from `data/stage_a_crack/data.yaml`.
 - Best Stage A validation metrics at epoch 26: precision `0.92581`, recall `0.91344`, mAP50 `0.95556`, mAP50-95 `0.63521`.
 - Local artifacts created: `runs/stage_a_crack/baseline_v0_1/weights/best.pt` and `models/stage_a_crack/best.onnx`.
-- Current backend baseline: `176 passed, 43 skipped`.
+- HE-002 browser E2E smoke now covers upload -> inference -> visible result state with deterministic `stub`.
+- HE-003 added optional keyframe mode for `video` Edge Agent sources while preserving raw-frame mode.
+- HE-006 added Stage B pilot dataset preparation, manifesting, and validation under `data/stage_b_pilot_crack/`.
+- Current backend baseline: `184 passed, 43 skipped`.
 - Current frontend baseline: `53 passed`, lint and production build passing from the latest full validation run.
 
-## Accepted Task
+## Accepted Tasks
 
 ### HE-001 Stage A YOLO Baseline v0.1
 
@@ -168,11 +176,9 @@ Rollback:
 - Remove `runs/stage_a_crack/baseline_v0_1/` and exported files under `models/stage_a_crack/`.
 - Leave `scripts/prepare_stage_a_crack_dataset.py` and `data/stage_a_crack/data.yaml` intact unless the dataset source changes.
 
-## Active Task
-
 ### HE-002 Browser E2E Smoke
 
-Status: Next
+Status: Done
 Priority: P0
 
 Scope:
@@ -180,10 +186,14 @@ Scope:
 - Use `INFERENCE_ENGINE=stub` as the deterministic default.
 - Keep the test independent of local model weights.
 
+Result:
+- `web/e2e/app.spec.ts` uploads an image, waits for the result panel, asserts detection count, and checks the primary defect heading.
+- `web/playwright.config.ts` starts the API with `INFERENCE_ENGINE=stub` and proxies the frontend to it.
+
 Acceptance criteria:
-- The test starts or targets the local API and frontend dev server.
-- It uploads a small image, waits for completion, and asserts visible result state.
-- It can run from `web/` with a documented command.
+- [x] The test starts or targets the local API and frontend dev server.
+- [x] It uploads a small image, waits for completion, and asserts visible result state.
+- [x] It can run from `web/` with a documented command.
 
 Validation commands:
 
@@ -195,11 +205,9 @@ npm run build
 npm run test:e2e
 ```
 
-## P0 Queue
-
 ### HE-003 Keyframes Into Edge Agent
 
-Status: Planned
+Status: Done
 Priority: P0
 
 Scope:
@@ -207,10 +215,15 @@ Scope:
 - Preserve the current raw-frame path for compatibility.
 - Add config options for interval, scene delta, and blur threshold.
 
+Result:
+- `SourceConfig.source.keyframes` controls optional video keyframe mode.
+- `VideoSource` keeps raw-frame mode by default and uses `extract_keyframes()` only when enabled.
+- `config/edge_agent.example.yaml` documents the new options.
+
 Acceptance criteria:
-- Video source can run in raw-frame mode and keyframe mode.
-- Tests cover fixed interval extraction, scene filtering, and missing/invalid video behavior.
-- Example config documents the new options.
+- [x] Video source can run in raw-frame mode and keyframe mode.
+- [x] Tests cover fixed interval extraction, scene filtering, and missing/invalid video behavior.
+- [x] Example config documents the new options.
 
 Validation commands:
 
@@ -221,7 +234,7 @@ uv run ruff check .
 
 ### HE-006 Stage B Pilot Data Loop
 
-Status: Planned
+Status: Done
 Priority: P0
 
 Scope:
@@ -235,23 +248,33 @@ Implementation notes:
 - Use the same class id as Stage A: `0 crack`.
 - Keep raw videos, extracted images, labels, and trained weights out of git.
 
+Result:
+- `scripts/prepare_stage_b_pilot_dataset.py` builds a crack-only YOLO dataset from local images and optional video keyframes.
+- `data/stage_b_pilot_crack/data.yaml` and `data/stage_b_pilot_crack/manifest.json` were generated locally and remain ignored by git.
+- `docs/stage-b-pilot-data.md` documents the intake, validation, pending annotation, and HE-007 handoff.
+
 Acceptance criteria:
-- `data/stage_b_pilot_crack/data.yaml` is generated locally.
-- A manifest records source videos/images, extraction settings, split counts, and annotation status.
-- At least one validation command checks image/label pairing and YOLO label format.
-- Documentation explains how Stage B data is added without overwriting Stage A.
+- [x] `data/stage_b_pilot_crack/data.yaml` is generated locally.
+- [x] A manifest records source videos/images, extraction settings, split counts, and annotation status.
+- [x] At least one validation command checks image/label pairing and YOLO label format.
+- [x] Documentation explains how Stage B data is added without overwriting Stage A.
 
 Validation commands:
 
 ```bash
-uv run python scripts/extract_keyframes.py path/to/pilot_video.mp4 \
-  --output-dir data/stage_b_pilot_crack/raw_keyframes \
+uv run python scripts/prepare_stage_b_pilot_dataset.py path/to/pilot_video.mp4 \
+  --extract-videos \
+  --output data/stage_b_pilot_crack \
   --interval-seconds 1.0 \
   --min-scene-delta 20 \
   --blur-threshold 10
 
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  --output data/stage_b_pilot_crack \
+  --validate-only
+
 uv run ruff check .
-uv run pytest tests/test_keyframes.py -q
+uv run pytest tests/test_keyframes.py tests/test_prepare_stage_b_dataset.py -q
 ```
 
 Artifacts:
@@ -263,11 +286,11 @@ Rollback:
 - Remove `data/stage_b_pilot_crack/` and any corresponding `runs/stage_b_pilot_crack/` outputs.
 - No tracked five-class config should be modified.
 
-## P1 Queue
+## Active Task
 
 ### HE-004 Edge Agent Reporting Steady State
 
-Status: Planned
+Status: Next
 Priority: P1
 
 Scope:
@@ -285,6 +308,8 @@ Validation commands:
 uv run pytest tests/test_edge_agent.py tests/test_api_inference.py -q
 INFERENCE_ENGINE=stub uv run pytest -q
 ```
+
+## P1 Queue
 
 ### HE-005 Pilot Deployment Runbook
 

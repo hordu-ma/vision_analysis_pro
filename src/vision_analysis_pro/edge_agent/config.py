@@ -17,6 +17,29 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class KeyframeSelectionConfig:
+    """视频关键帧选择配置"""
+
+    enabled: bool = False
+    interval_seconds: float = 1.0
+    min_scene_delta: float = 0.0
+    blur_threshold: float = 0.0
+    max_frames: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "KeyframeSelectionConfig":
+        """从字典创建配置"""
+        max_frames = data.get("max_frames")
+        return cls(
+            enabled=bool(data.get("enabled", False)),
+            interval_seconds=float(data.get("interval_seconds", 1.0)),
+            min_scene_delta=float(data.get("min_scene_delta", 0.0)),
+            blur_threshold=float(data.get("blur_threshold", 0.0)),
+            max_frames=int(max_frames) if max_frames is not None else None,
+        )
+
+
+@dataclass
 class SourceConfig:
     """数据源配置
 
@@ -27,6 +50,7 @@ class SourceConfig:
         loop: 是否循环播放（仅对视频和文件夹有效）
         skip_frames: 跳帧数，0 表示不跳帧
         extensions: 支持的图像扩展名（仅对文件夹有效）
+        keyframes: 视频关键帧选择配置（仅对 video 有效）
     """
 
     type: SourceType = SourceType.VIDEO
@@ -37,6 +61,7 @@ class SourceConfig:
     extensions: list[str] = field(
         default_factory=lambda: [".jpg", ".jpeg", ".png", ".bmp"]
     )
+    keyframes: KeyframeSelectionConfig = field(default_factory=KeyframeSelectionConfig)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SourceConfig":
@@ -52,6 +77,7 @@ class SourceConfig:
             loop=bool(data.get("loop", False)),
             skip_frames=int(data.get("skip_frames", 0)),
             extensions=data.get("extensions", [".jpg", ".jpeg", ".png", ".bmp"]),
+            keyframes=KeyframeSelectionConfig.from_dict(data.get("keyframes", {})),
         )
 
 
@@ -298,6 +324,21 @@ class EdgeAgentConfig:
             if not source_path.exists():
                 errors.append(f"数据源路径不存在: {source_path}")
 
+        # 验证视频关键帧配置
+        keyframes = self.source.keyframes
+        if keyframes.interval_seconds < 0:
+            errors.append(
+                f"关键帧间隔必须大于等于 0: {keyframes.interval_seconds}"
+            )
+        if keyframes.min_scene_delta < 0:
+            errors.append(
+                f"关键帧场景变化阈值必须大于等于 0: {keyframes.min_scene_delta}"
+            )
+        if keyframes.blur_threshold < 0:
+            errors.append(f"关键帧清晰度阈值必须大于等于 0: {keyframes.blur_threshold}")
+        if keyframes.max_frames is not None and keyframes.max_frames <= 0:
+            errors.append(f"关键帧最大帧数必须大于 0: {keyframes.max_frames}")
+
         # 验证上报器配置
         if self.reporter.retry_max < 0:
             errors.append(f"最大重试次数不能为负: {self.reporter.retry_max}")
@@ -330,6 +371,19 @@ def _env_to_dict(prefix: str = "EDGE_AGENT") -> dict[str, Any]:
         source_data["loop"] = env_val.lower() in ("true", "1", "yes")
     if env_val := os.getenv(f"{prefix}_SOURCE_SKIP_FRAMES"):
         source_data["skip_frames"] = int(env_val)
+    keyframe_data: dict[str, Any] = {}
+    if env_val := os.getenv(f"{prefix}_SOURCE_KEYFRAMES_ENABLED"):
+        keyframe_data["enabled"] = env_val.lower() in ("true", "1", "yes")
+    if env_val := os.getenv(f"{prefix}_SOURCE_KEYFRAMES_INTERVAL_SECONDS"):
+        keyframe_data["interval_seconds"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_SOURCE_KEYFRAMES_MIN_SCENE_DELTA"):
+        keyframe_data["min_scene_delta"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_SOURCE_KEYFRAMES_BLUR_THRESHOLD"):
+        keyframe_data["blur_threshold"] = float(env_val)
+    if env_val := os.getenv(f"{prefix}_SOURCE_KEYFRAMES_MAX_FRAMES"):
+        keyframe_data["max_frames"] = int(env_val)
+    if keyframe_data:
+        source_data["keyframes"] = keyframe_data
     if source_data:
         data["source"] = source_data
 
@@ -389,6 +443,13 @@ def _config_to_dict(config: EdgeAgentConfig) -> dict[str, Any]:
             "loop": config.source.loop,
             "skip_frames": config.source.skip_frames,
             "extensions": config.source.extensions,
+            "keyframes": {
+                "enabled": config.source.keyframes.enabled,
+                "interval_seconds": config.source.keyframes.interval_seconds,
+                "min_scene_delta": config.source.keyframes.min_scene_delta,
+                "blur_threshold": config.source.keyframes.blur_threshold,
+                "max_frames": config.source.keyframes.max_frames,
+            },
         },
         "inference": {
             "engine": config.inference.engine,
