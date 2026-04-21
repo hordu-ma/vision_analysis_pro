@@ -19,6 +19,8 @@ data/stage_b_pilot_crack/
 
 This directory is ignored by git because raw pilot images, labels, videos, and generated train/val/test files must stay local.
 
+When real pilot media is not available yet, the repository now also supports a **public surrogate** path based on SDNET2018 and RDD2022. That path is for engineering validation only and must not be described as real pilot evidence.
+
 ## Dataset Builder
 
 Use `scripts/prepare_stage_b_pilot_dataset.py` to create a crack-only YOLO dataset.
@@ -72,6 +74,41 @@ The script writes:
 - `data/stage_b_pilot_crack/images/{train,val,test}/`
 - `data/stage_b_pilot_crack/labels/{train,val,test}/`
 - `data/stage_b_pilot_crack/raw_keyframes/` when video extraction is used
+
+## Public Surrogate Intake (SDNET2018 + RDD2022)
+
+If you do not have self-owned pilot videos/images yet, use the public surrogate builder first:
+
+```bash
+uv run python scripts/prepare_public_surrogate_crack_dataset.py \
+  --sdnet2018-source data/public/SDNET2018 \
+  --rdd2022-source data/public/RDD2022 \
+  --output data/stage_b_public_surrogate_crack
+```
+
+Source references:
+
+- SDNET2018 official page: <https://digitalcommons.usu.edu/all_datasets/48/>
+- RDD2022 official DOI / Figshare: <https://doi.org/10.6084/m9.figshare.21431547>
+
+Behavior:
+
+- `SDNET2018/NonCrack` images are imported as reviewed negative empty labels.
+- `SDNET2018/Crack` images are skipped by default because SDNET2018 is a classification dataset, not a detection-box dataset.
+- `RDD2022` images use Pascal VOC XML; `D00` / `D10` / `D20` are mapped to class `0 crack`.
+- `RDD2022` images that only contain non-crack damage classes remain as negative images for crack-only training.
+
+If local Stage A ONNX weights are available, SDNET2018 crack images can be used as proxy positives:
+
+```bash
+uv run python scripts/prepare_public_surrogate_crack_dataset.py \
+  --sdnet2018-source data/public/SDNET2018 \
+  --sdnet2018-crack-auto-label-model models/stage_a_crack/best.onnx \
+  --rdd2022-source data/public/RDD2022 \
+  --output data/stage_b_public_surrogate_crack
+```
+
+This still counts as **public surrogate / proxy** validation. It does not replace the self-owned Stage B intake loop documented above.
 
 ## Local Smoke Intake
 

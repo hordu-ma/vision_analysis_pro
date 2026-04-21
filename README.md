@@ -138,6 +138,39 @@ uv run python scripts/train.py \
 默认数据源为 Hugging Face `senthilsk/crack_detection_dataset`，许可证为 CC BY 4.0，原始标注为 COCO 格式。准备脚本会将 `crack`、`stairstep_crack`、`cracked` 映射为目标类 `0 crack`，并保留少量空标签负样本用于降低误报风险。
 非 Apple Silicon 环境可将 `--device mps` 改为 `--device cpu` 或 CUDA 设备号。
 
+### 阶段 B 公开代理数据（SDNET2018 + RDD2022）
+
+当手头还没有真实试点图片/视频时，可先用公开数据继续推进 crack-only 开发验证，但这条路径**只算 public surrogate，不等同真实试点数据**。
+
+- SDNET2018（官方页）：<https://digitalcommons.usu.edu/all_datasets/48/>
+- RDD2022（官方 DOI / Figshare）：<https://doi.org/10.6084/m9.figshare.21431547>
+
+仓库新增 `scripts/prepare_public_surrogate_crack_dataset.py`，用于把两套数据接进当前 Stage B 代理流程：
+
+```bash
+uv run python scripts/prepare_public_surrogate_crack_dataset.py \
+  --sdnet2018-source data/public/SDNET2018 \
+  --rdd2022-source data/public/RDD2022 \
+  --output data/stage_b_public_surrogate_crack
+```
+
+默认行为：
+
+- `SDNET2018`：纳入 `NonCrack` 负样本；`Crack` 图像默认跳过，避免把分类正样本误当作检测框 ground truth。
+- `RDD2022`：读取 Pascal VOC XML，自动把 `D00` / `D10` / `D20` 映射到单类 `0 crack`；仅含非裂缝病害的图像作为负样本保留。
+
+如果本地已有 Stage A ONNX 权重，也可以把 SDNET2018 的 `Crack` 图像作为代理正样本自动预标：
+
+```bash
+uv run python scripts/prepare_public_surrogate_crack_dataset.py \
+  --sdnet2018-source data/public/SDNET2018 \
+  --sdnet2018-crack-auto-label-model models/stage_a_crack/best.onnx \
+  --rdd2022-source data/public/RDD2022 \
+  --output data/stage_b_public_surrogate_crack
+```
+
+生成后可继续走当前 crack-only YOLO 流程；但文档和结论必须明确标记为“公开代理验证”，不能写成真实试点已完成。
+
 ## 工程化与部署
 
 ### 持续集成（CI）
@@ -366,6 +399,7 @@ vision_analysis_pro/
 
 - **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
 - **分支 B：真实试点标签暂未到位（已完成）**。指标系统已升级为 `prometheus_client.Counter/Histogram/Gauge`，`/api/v1/metrics` 已暴露 histogram 分桶；审计日志列表也已补齐 `offset` / `total` 与前端分页控件。
+- **公开代理补位（新增）**。当真实试点媒体尚未到位时，可先用 `SDNET2018 + RDD2022` 通过 `scripts/prepare_public_surrogate_crack_dataset.py` 构建 public surrogate 数据集，继续做非真实试点开发验证。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

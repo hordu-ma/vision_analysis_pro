@@ -6,7 +6,7 @@ Last updated: 2026-04-21
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 完成代理运行，等待真实试点数据后重跑真实版；当前部署推荐 Stage A).
+- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 完成代理运行，等待真实试点数据后重跑真实版；公开代理数据入口已补齐；当前部署推荐 Stage A).
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -51,7 +51,8 @@ Exit criteria:
 Status:
 - HE-006 completed the repeatable Stage B data intake loop and generated `data/stage_b_pilot_crack/` locally.
 - The current local Stage B smoke dataset uses readable checked-in sample images with reviewed-negative empty labels to validate structure only.
-- HE-007 remains the model-comparison step once reviewed positive pilot crack labels exist.
+- `scripts/prepare_public_surrogate_crack_dataset.py` now supports SDNET2018 + RDD2022 as public surrogate inputs while real pilot media is still unavailable.
+- HE-007 real-pilot rerun remains the model-comparison step once reviewed positive pilot crack labels exist.
 
 ### Stage C Engineering Pilot
 
@@ -121,7 +122,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - API metrics now use `prometheus_client.Counter/Histogram/Gauge`, while `/api/v1/metrics` keeps the Prometheus scrape contract and exposes request/inference histogram buckets.
 - Audit logs now support `offset` pagination, `total`, and actor filtering in the API; the device page includes matching audit-log pagination controls.
 - X-Trace-ID is now included in request completion/failure structured log records.
-- Current backend baseline: `202 passed, 44 skipped`.
+- Public surrogate crack-data support now includes `scripts/prepare_public_surrogate_crack_dataset.py`, which uses SDNET2018 negatives plus RDD2022 crack boxes to build a crack-only proxy dataset.
+- Current backend baseline: `204 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 
 ## Accepted Tasks
@@ -371,6 +373,7 @@ Result:
   - Stage B: mAP50=0.8711, mAP50-95=0.3898, P=0.8844, R=0.8383
 - **Recommendation: Keep Stage A as deployment model.**
 - Full evaluation note: `docs/stage-b-model-comparison.md`.
+- Repository support now also includes a second public surrogate intake path (`SDNET2018 + RDD2022`) for non-real-pilot validation before self-owned media arrives.
 
 Acceptance criteria:
 - [x] Evaluation note compares Stage A and Stage B metrics on the same val set.
@@ -415,6 +418,47 @@ INFERENCE_ENGINE=stub uv run pytest -q
 
 Rollback:
 - Remove `runs/stage_b_pilot_crack/` and exported files under `models/stage_b_pilot_crack/`.
+
+## Completed Task
+
+### HE-012 Public Surrogate Crack Data Support
+
+Status: Done
+Priority: P1
+
+Scope:
+- Provide a reproducible fallback path when real pilot media is unavailable.
+- Support SDNET2018 and RDD2022 as public surrogate sources without claiming real pilot readiness.
+- Keep the workflow crack-only and compatible with the existing Stage B dataset/validation path.
+
+Result:
+- `src/vision_analysis_pro/core/crack_yolo_dataset.py` centralizes crack-only YOLO dataset validation and `data.yaml` writing.
+- `scripts/prepare_public_surrogate_crack_dataset.py` builds `data/stage_b_public_surrogate_crack/` from local SDNET2018 and RDD2022 downloads.
+- SDNET2018 contributes reviewed negative `NonCrack` images by default; optional Stage A ONNX auto-labeling can turn `Crack` images into proxy positives.
+- RDD2022 Pascal VOC XML is converted into crack-only YOLO labels by mapping `D00` / `D10` / `D20` to class `0 crack`.
+- Documentation now marks this path as public surrogate / proxy, not real pilot evidence.
+
+Acceptance criteria:
+- [x] Repository provides one documented command to prepare a crack-only public surrogate dataset from SDNET2018 and RDD2022.
+- [x] Tests cover SDNET2018 negative intake and RDD2022 crack XML conversion.
+- [x] Documentation explains the proxy/public-surrogate limitation explicitly.
+
+Validation commands:
+
+```bash
+uv run ruff check .
+uv run pytest tests/test_prepare_stage_b_dataset.py tests/test_prepare_public_surrogate_dataset.py tests/test_deployment_config.py -q
+uv run pytest
+
+cd web
+npm run lint
+npm run test -- --run
+npm run build
+```
+
+Rollback:
+- Remove `data/stage_b_public_surrogate_crack/` and any related local downloads under `data/public/`.
+- Keep the real-pilot Stage B path and Stage A baseline intact.
 
 ## Completed Task
 

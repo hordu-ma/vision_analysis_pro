@@ -8,7 +8,7 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
 **最后更新**：2026-04-21
-**后端测试**：202 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**后端测试**：204 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
 **前端测试**：90 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 3 条 browser E2E 通过
 
@@ -31,6 +31,31 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - 视觉识别主线保持 YOLO/ONNX 目标检测；DeepLab 语义分割仅在需要像素级裂缝面积/长度估计时作为后续 refinement。
 - Transformer 趋势分析依赖连续批次与设备历史数据，后置到数据积累之后。
 - LLM 只作为报告解释层，输入结构化检测结果、人工复核状态和设备元数据，不参与检测判定。
+
+## 🗓️ 2026-04-21：公开代理数据入口（SDNET2018 + RDD2022）✅
+
+### 核心成果
+
+- ✅ 新增 `src/vision_analysis_pro/core/crack_yolo_dataset.py`，抽出 crack-only YOLO 数据集共享校验与 `data.yaml` 写入逻辑。
+- ✅ 新增 `scripts/prepare_public_surrogate_crack_dataset.py`，支持把 `SDNET2018` 与 `RDD2022` 接入当前 crack-only 代理数据流程。
+- ✅ `SDNET2018` 默认纳入 `NonCrack` 负样本；如提供 `--sdnet2018-crack-auto-label-model`，可对 `Crack` 图像做 ONNX 代理预标。
+- ✅ `RDD2022` 支持读取官方 Pascal VOC XML，并把 `D00` / `D10` / `D20` 自动映射到单类 `0 crack`；非裂缝病害图像按负样本保留。
+- ✅ 新增 `tests/test_prepare_public_surrogate_dataset.py`，并将后端轻量基线提升到 `204 passed, 44 skipped`。
+
+### 当前验证
+
+- ✅ `uv run ruff check .`
+- ✅ `uv run pytest`：204 passed, 44 skipped
+- ✅ `cd web && npm run lint`
+- ✅ `cd web && npm run test -- --run`：90 passed
+- ✅ `cd web && npm run build`
+
+### 口径说明
+
+- 这条路径用于 **public surrogate / 公开代理验证**，不是“真实试点数据”。
+- 真实试点版 HE-007 仍必须等待 reviewed positive pilot crack labels 到位后重跑。
+
+---
 
 ## 🗓️ 2026-04-21：Compose 下载阻塞修复、Prometheus 指标升级、审计日志分页 ✅
 
@@ -630,7 +655,7 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 - HE-005：`.env.example`、`docker-compose.yml` 与 `config/edge_agent.example.yaml` 对齐到 Stage A crack-only 模型路径。
 - HE-005：补充部署配置测试，守住 Compose 和 Edge Agent 示例的模型路径。
 
-当前 Stage B 本地 smoke 使用 checked-in sample images 生成 pending-annotation 空标签，只验证数据结构和流程；训练对比仍在 HE-007，必须等 reviewed pilot labels 后执行。
+当前 Stage B 本地 smoke 使用 checked-in sample images 生成 pending-annotation 空标签，只验证数据结构和流程；在真实试点媒体到位前，仓库现已支持用 `SDNET2018 + RDD2022` 继续做 public surrogate 验证，但真实版 HE-007 仍必须等 reviewed pilot labels 后执行。
 
 ## 最新进展：HE-008 Full Inspection Flow Hardening
 
@@ -656,6 +681,7 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 1. **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版），用 reviewed pilot labels 训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
 2. **分支 B：真实试点标签暂未到位（已完成）**。指标系统升级与审计日志分页增强均已完成；继续保持 Stage A 部署主线与证据门禁。
+3. **公开代理补位（已完成）**。`SDNET2018 + RDD2022` 已接入 public surrogate 数据入口，可在没有真实试点媒体时继续做 crack-only 开发验证。
 
 非关键路径：MQTT、Rust/PyO3、DeepLab 和 Transformer 趋势分析均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
@@ -663,4 +689,4 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 **文档维护者**：Vision Analysis Pro Team  
 **最后更新**：2026-04-21
-**下次更新**：HE-007 reviewed pilot labels 到位，或指标系统升级开始实施后
+**下次更新**：HE-007 reviewed pilot labels 到位，或 public surrogate 数据被实际下载并完成一次重跑后
