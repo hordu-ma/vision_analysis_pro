@@ -3,8 +3,15 @@
     <section class="device-overview-bar">
       <div class="overview-copy">
         <p class="overview-kicker">Device Control</p>
-        <h3>设备概览、告警摘要、审计记录</h3>
-        <p>首屏聚焦设备运维主流程。</p>
+        <h3>设备概览与审计留痕</h3>
+        <p>统一查看设备状态、告警摘要和操作记录。</p>
+      </div>
+      <div class="device-signal" aria-label="设备链路状态">
+        <span class="signal-node active">Edge</span>
+        <i></i>
+        <span class="signal-node">API</span>
+        <i></i>
+        <span class="signal-node">Review</span>
       </div>
       <div class="overview-stats">
         <div class="overview-stat">
@@ -96,8 +103,9 @@ const emit = defineEmits<{
 
 .device-overview-bar {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
-  gap: 18px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 0.7fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  align-items: stretch;
   padding: 4px 0 0;
 }
 
@@ -112,7 +120,7 @@ const emit = defineEmits<{
 
 .overview-copy h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -131,10 +139,44 @@ const emit = defineEmits<{
   align-self: center;
 }
 
+.device-signal {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(15, 23, 42, 0.04));
+  border: 1px solid var(--border-soft);
+}
+
+.signal-node {
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.signal-node.active {
+  color: #fff;
+  background: var(--brand);
+}
+
+.device-signal i {
+  height: 2px;
+  min-width: 28px;
+  background: linear-gradient(90deg, rgba(15, 118, 110, 0.45), rgba(15, 23, 42, 0.18));
+}
+
 .overview-stat {
   padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--surface-muted);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
   border: 1px solid var(--border-soft);
 }
 
@@ -166,6 +208,17 @@ const emit = defineEmits<{
 @media (max-width: 960px) {
   .device-overview-bar {
     grid-template-columns: 1fr;
+  }
+
+  .device-signal {
+    grid-template-columns: 1fr;
+  }
+
+  .device-signal i {
+    width: 2px;
+    height: 12px;
+    min-width: 0;
+    justify-self: center;
   }
 
   .overview-stats {

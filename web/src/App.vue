@@ -2,6 +2,9 @@
   <div class="app-shell">
     <aside class="app-sidebar">
       <div class="brand-block">
+        <div class="brand-mark" aria-hidden="true">
+          <span></span>
+        </div>
         <div>
           <p class="brand-en">Vision Analysis Pro</p>
           <h1>基础设施视觉智能运维平台</h1>
@@ -33,6 +36,17 @@
         </button>
       </nav>
 
+      <div class="sidebar-telemetry" aria-label="系统能力摘要">
+        <div>
+          <span>ENGINE</span>
+          <strong>YOLO / ONNX</strong>
+        </div>
+        <div>
+          <span>FLOW</span>
+          <strong>Review Ready</strong>
+        </div>
+      </div>
+
       <div class="sidebar-footnote product-shell-card">
         <p class="section-title">操作者</p>
         <p class="section-caption">所有变更与设备维护都会进入审计日志</p>
@@ -61,6 +75,13 @@
                 : '设备、告警与审计的统一运维视图。'
             }}
           </p>
+        </div>
+        <div class="ops-strip" aria-hidden="true">
+          <span class="ops-node active"></span>
+          <span class="ops-line"></span>
+          <span class="ops-node"></span>
+          <span class="ops-line"></span>
+          <span class="ops-node"></span>
         </div>
         <div class="topbar-status">
           <div class="status-chip">
@@ -588,24 +609,70 @@ onBeforeUnmount(() => {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: 24px;
-  padding: 24px;
+  grid-template-columns: 316px minmax(0, 1fr);
+  gap: 22px;
+  padding: 20px;
 }
 
 .app-sidebar {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 28px 24px;
-  border-radius: 32px;
-  background: linear-gradient(180deg, #0f172a 0%, #172554 100%);
+  min-height: calc(100vh - 40px);
+  padding: 26px 22px;
+  border-radius: 26px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.94), rgba(21, 34, 58, 0.98)),
+    repeating-linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.04) 0,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 14px
+    );
   color: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 24px 50px rgba(15, 23, 42, 0.22);
+  box-shadow: 0 26px 60px rgba(15, 23, 42, 0.24);
+  position: sticky;
+  top: 20px;
 }
 
 .brand-block {
   display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding-bottom: 22px;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.1);
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 15px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(20, 184, 166, 0.95), rgba(245, 158, 11, 0.92)), #14b8a6;
+  box-shadow: 0 14px 30px rgba(20, 184, 166, 0.22);
+}
+
+.brand-mark span {
+  width: 24px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.88);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  position: relative;
+}
+
+.brand-mark span::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  top: -7px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 6px 0 rgba(255, 255, 255, 0.74);
 }
 
 .brand-en {
@@ -618,14 +685,14 @@ onBeforeUnmount(() => {
 
 .brand-block h1 {
   margin: 0;
-  font-size: 20px;
-  line-height: 1.2;
-  white-space: nowrap;
+  font-size: 19px;
+  line-height: 1.28;
+  word-break: keep-all;
 }
 
 .product-nav {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .nav-item {
@@ -633,10 +700,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 18px;
-  border-radius: 20px;
+  min-height: 78px;
+  padding: 15px 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.035);
   color: inherit;
   text-align: left;
   transition:
@@ -645,14 +713,34 @@ onBeforeUnmount(() => {
     border-color 0.18s ease;
 }
 
+.nav-item::after {
+  content: '';
+  width: 8px;
+  height: 8px;
+  margin-left: auto;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.36);
+}
+
 .nav-item:hover,
 .nav-item.active {
   transform: translateY(-1px);
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(147, 197, 253, 0.28);
+  background: rgba(255, 255, 255, 0.095);
+  border-color: rgba(20, 184, 166, 0.34);
+}
+
+.nav-item.active::after {
+  background: #f59e0b;
+  box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.12);
 }
 
 .nav-kicker {
+  min-width: 34px;
+  min-height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
   font-size: 11px;
   line-height: 1;
   color: rgba(191, 219, 254, 0.78);
@@ -667,15 +755,44 @@ onBeforeUnmount(() => {
 .nav-item small {
   display: block;
   font-size: 12px;
+  line-height: 1.4;
   color: rgba(226, 232, 240, 0.68);
+}
+
+.sidebar-telemetry {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(2, 6, 23, 0.22);
+  border: 1px solid rgba(226, 232, 240, 0.08);
+}
+
+.sidebar-telemetry div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sidebar-telemetry span {
+  color: rgba(203, 213, 225, 0.58);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+
+.sidebar-telemetry strong {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 12px;
 }
 
 .sidebar-footnote {
   margin-top: auto;
-  padding: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.075);
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
+  border-radius: 18px;
 }
 
 .sidebar-footnote :deep(.el-input__wrapper) {
@@ -690,11 +807,11 @@ onBeforeUnmount(() => {
 }
 
 .topbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px auto;
   align-items: center;
   gap: 20px;
-  padding: 26px 28px;
+  padding: 24px 26px;
 }
 
 .topbar-kicker {
@@ -708,7 +825,7 @@ onBeforeUnmount(() => {
 
 .topbar-title {
   margin: 0;
-  font-size: 28px;
+  font-size: 30px;
   line-height: 1.15;
 }
 
@@ -722,15 +839,15 @@ onBeforeUnmount(() => {
 .topbar-status {
   display: flex;
   align-items: stretch;
-  gap: 12px;
+  gap: 10px;
 }
 
 .status-chip,
 .health-chip {
   min-width: 140px;
-  padding: 14px 16px;
-  border-radius: 18px;
-  background: var(--surface-muted);
+  padding: 13px 15px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
   border: 1px solid var(--border-soft);
 }
 
@@ -743,12 +860,38 @@ onBeforeUnmount(() => {
 
 .content-surface {
   min-height: 0;
-  padding: 24px;
+  padding: 22px;
 }
 
 .health-chip {
   display: flex;
   align-items: center;
+}
+
+.ops-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ops-node {
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 2px solid rgba(20, 184, 166, 0.4);
+  background: #fff;
+}
+
+.ops-node.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  box-shadow: 0 0 0 5px rgba(20, 184, 166, 0.12);
+}
+
+.ops-line {
+  width: 54px;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.32), rgba(245, 158, 11, 0.3));
 }
 
 @media (max-width: 1280px) {
@@ -758,6 +901,8 @@ onBeforeUnmount(() => {
 
   .app-sidebar {
     padding: 22px;
+    min-height: auto;
+    position: static;
   }
 
   .sidebar-footnote {
@@ -771,7 +916,7 @@ onBeforeUnmount(() => {
   }
 
   .topbar {
-    flex-direction: column;
+    grid-template-columns: 1fr;
     align-items: flex-start;
   }
 

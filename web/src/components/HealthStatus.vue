@@ -233,7 +233,8 @@ onUnmounted(() => {
   gap: 4px;
   padding: 0 14px;
   height: 38px;
-  border-radius: 999px;
+  border-radius: 10px;
+  font-weight: 800;
 }
 
 .status-tag .is-loading {
@@ -262,37 +263,33 @@ onUnmounted(() => {
   width: 34px;
   height: 34px;
   padding: 0;
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(241, 245, 249, 0.96));
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  color: #334155;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--border-soft);
+  color: var(--text-secondary);
+  box-shadow: none;
 }
 
 .refresh-button:hover {
   color: var(--brand);
-  border-color: rgba(59, 130, 246, 0.28);
-  background: rgba(239, 246, 255, 0.96);
-}
-
-.refresh-button:hover {
-  color: #409eff;
+  border-color: rgba(15, 118, 110, 0.28);
+  background: rgba(240, 253, 250, 0.96);
 }
 
 .info-icon {
   cursor: pointer;
-  color: #909399;
+  color: var(--text-muted);
   transition: color 0.2s ease;
   width: 34px;
   height: 34px;
   display: inline-grid;
   place-items: center;
-  border-radius: 999px;
+  border-radius: 10px;
   background: rgba(148, 163, 184, 0.12);
 }
 
 .info-icon:hover {
-  color: #409eff;
+  color: var(--brand);
 }
 
 .health-details {

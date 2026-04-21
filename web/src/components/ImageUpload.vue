@@ -24,10 +24,12 @@
         :file-list="fileList"
         :disabled="analyzing"
       >
-        <ProductIcon name="upload-panel" class="upload-icon" />
+        <div class="upload-visual">
+          <ProductIcon name="upload-panel" class="upload-icon" />
+        </div>
         <div class="upload-text">
-          <p>拖拽图片到此处或<em>点击上传</em></p>
-          <p class="upload-hint">支持 JPG/PNG/WEBP 格式，文件大小不超过 10MB</p>
+          <p>拖拽巡检图片或<em>点击选择</em></p>
+          <p class="upload-hint">JPG / PNG / WEBP，单文件 10MB 以内</p>
         </div>
       </el-upload>
     </div>
@@ -297,8 +299,8 @@ const handleAnalyze = async () => {
 <style scoped>
 .image-upload {
   width: 100%;
-  padding: 18px;
-  border-radius: 18px;
+  padding: 20px;
+  border-radius: 14px;
 }
 
 .upload-shell {
@@ -318,34 +320,54 @@ const handleAnalyze = async () => {
 }
 
 .upload-area:deep(.el-upload-dragger) {
-  border-radius: 16px;
-  border: 1px dashed rgba(148, 163, 184, 0.28);
-  background: #fbfdff;
-  transition: border-color 0.3s ease;
+  min-height: 238px;
+  border-radius: 14px;
+  border: 1px dashed rgba(15, 118, 110, 0.32);
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(245, 158, 11, 0.07)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 246, 242, 0.86));
+  transition:
+    border-color 0.24s ease,
+    transform 0.24s ease,
+    box-shadow 0.24s ease;
 }
 
 .upload-area:deep(.el-upload-dragger:hover) {
-  border-color: #409eff;
+  border-color: var(--brand);
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(15, 118, 110, 0.1);
 }
 
 .upload-area:deep(.el-upload-dragger.is-dragover) {
-  border-color: #409eff;
-  background-color: rgba(64, 158, 255, 0.06);
+  border-color: var(--brand);
+  background-color: rgba(15, 118, 110, 0.08);
+}
+
+.upload-visual {
+  width: 92px;
+  height: 92px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(245, 158, 11, 0.12)),
+    rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(15, 118, 110, 0.14);
 }
 
 .upload-icon {
   font-size: 58px;
-  color: #94a3b8;
-  margin-bottom: 12px;
+  color: var(--brand);
   transition: color 0.3s ease;
 }
 
 .upload-area:deep(.el-upload-dragger:hover) .upload-icon {
-  color: #409eff;
+  color: var(--accent);
 }
 
 .upload-text {
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .upload-text p {
@@ -353,13 +375,14 @@ const handleAnalyze = async () => {
 }
 
 .upload-text em {
-  color: #409eff;
+  color: var(--brand-strong);
   font-style: normal;
+  font-weight: 800;
 }
 
 .upload-hint {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .preview-section {
@@ -370,8 +393,8 @@ const handleAnalyze = async () => {
 .preview-image {
   max-width: 100%;
   max-height: 400px;
-  border: 1px solid rgba(148, 163, 184, 0.24);
-  border-radius: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
   margin-bottom: 10px;
 }
 
@@ -397,8 +420,8 @@ const handleAnalyze = async () => {
 .progress-section {
   margin: 20px 0;
   padding: 16px;
-  background-color: #f8fafc;
-  border-radius: 16px;
+  background-color: var(--surface-muted);
+  border-radius: 12px;
 }
 
 .progress-text {
@@ -434,7 +457,7 @@ const handleAnalyze = async () => {
   height: 48px;
   font-size: 16px;
   font-weight: 700;
-  border-radius: 16px;
+  border-radius: 12px;
 }
 
 .analyze-button .is-loading {
@@ -448,7 +471,7 @@ const handleAnalyze = async () => {
 /* 禁用状态样式 */
 .upload-area:deep(.is-disabled .el-upload-dragger) {
   cursor: not-allowed;
-  background-color: #f5f7fa;
+  background-color: #f5f7f2;
 }
 
 .upload-area:deep(.is-disabled .el-upload-dragger:hover) {

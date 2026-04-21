@@ -3,8 +3,17 @@
     <section class="workspace-overview">
       <div class="overview-copy">
         <p class="overview-kicker">Workspace</p>
-        <h3>检测发起、批次查看、任务重看</h3>
-        <p>首屏聚焦交付主流程。</p>
+        <h3>巡检交付链路</h3>
+        <p>从上传检测到复核导出，保持同一工作面。</p>
+      </div>
+      <div class="workflow-rail" aria-label="巡检流程">
+        <span>上传</span>
+        <i></i>
+        <span>检测</span>
+        <i></i>
+        <span>复核</span>
+        <i></i>
+        <span>导出</span>
       </div>
       <div class="overview-stats">
         <div class="overview-stat">
@@ -143,9 +152,10 @@ const emit = defineEmits<{
 
 .workspace-overview {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.9fr);
-  gap: 18px;
-  padding: 4px 0 0;
+  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.9fr) minmax(280px, 0.9fr);
+  gap: 16px;
+  align-items: stretch;
+  padding: 0;
 }
 
 .overview-kicker {
@@ -159,7 +169,7 @@ const emit = defineEmits<{
 
 .overview-copy h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 22px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -178,10 +188,40 @@ const emit = defineEmits<{
   align-self: center;
 }
 
+.workflow-rail {
+  display: grid;
+  grid-template-columns: auto 1fr auto 1fr auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(245, 158, 11, 0.08));
+  border: 1px solid var(--border-soft);
+}
+
+.workflow-rail span {
+  min-height: 28px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.workflow-rail i {
+  height: 2px;
+  min-width: 28px;
+  background: linear-gradient(90deg, rgba(15, 118, 110, 0.42), rgba(245, 158, 11, 0.42));
+}
+
 .overview-stat {
   padding: 12px 14px;
-  border-radius: 16px;
-  background: var(--surface-muted);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
   border: 1px solid var(--border-soft);
 }
 
@@ -230,6 +270,17 @@ const emit = defineEmits<{
 @media (max-width: 960px) {
   .workspace-overview {
     grid-template-columns: 1fr;
+  }
+
+  .workflow-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-rail i {
+    width: 2px;
+    height: 12px;
+    min-width: 0;
+    justify-self: center;
   }
 
   .overview-stats {

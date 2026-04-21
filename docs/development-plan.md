@@ -14,7 +14,7 @@
 | M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
 - **后端测试**：当前轻量环境基线为 204 passed, 44 skipped（缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试），ruff 全绿
-- **前端测试**：90 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过
+- **前端测试**：90 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过；2026-04-22 已完成产品化视觉提升并通过桌面/移动截图复核
 - **下一步**：若拿到 reviewed positive pilot crack labels，则推进 HE-007 真实试点版；否则维持当前 Stage A 部署主线，并使用 `SDNET2018 + RDD2022` 的 public surrogate 数据继续做非真实试点验证；HE-010/HE-011 仍保留在证据门禁后的长期能力。2026-04-22 已复核运行现有 Stage B 代理数据校验与同集评估，结论仍为保留 Stage A。
 
 **路线决策（2026-04-19）**
@@ -89,7 +89,7 @@
 ### 4.2 剩余差距
 
 - 数据与训练：Stage A baseline 训练、评估报告、ONNX 导出与推理烟测已完成；Stage B 数据 intake 工具已完成，现有本地 `data/stage_b_pilot_crack` 是 Stage A 测试集自动标注代理数据，不是真实试点数据；公开代理数据入口（SDNET2018 + RDD2022）已补齐，真实试点版模型对比仍等待 reviewed pilot labels
-- 生产化：CI/Docker/API CLI/最小 metrics/上报持久化与幂等已落地，仍需浏览器级 E2E、上报稳态测试、部署编排与告警示例
+- 生产化：CI/Docker/API CLI/最小 metrics/上报持久化与幂等已落地，浏览器级 E2E、上报稳态测试、部署编排与前端产品化视觉提升已完成，告警示例仍可继续细化
 - 可选优化：关键帧策略接入 Edge Agent、MQTT 上报器、Rust/PyO3 加速
 
 ---

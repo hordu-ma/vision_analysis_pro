@@ -118,6 +118,7 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-P1C added 4 new frontend component spec files (ImageUpload, BatchTaskStatus, ReportBatchList, ReportDetailDrawer) and 6 new backend pagination/trace-id tests.
 - Stage C browser E2E now covers single-image upload, completed batch task history, and report detail review save.
 - Frontend pagination UI now drives report batch, task history, and device overview page offsets.
+- HE-013 upgraded the frontend presentation layer: product shell, sidebar brand system, workflow rails, upload surface, Device Control header, HealthStatus controls, and global Element Plus skin overrides now read as a deliverable product rather than default component samples.
 - Compose API builds now pin `uv` to the official PyPI simple index by default, with `COMPOSE_UV_DEFAULT_INDEX` as an override for internal mirrors.
 - API metrics now use `prometheus_client.Counter/Histogram/Gauge`, while `/api/v1/metrics` keeps the Prometheus scrape contract and exposes request/inference histogram buckets.
 - Audit logs now support `offset` pagination, `total`, and actor filtering in the API; the device page includes matching audit-log pagination controls.
@@ -629,6 +630,41 @@ npm run test -- --run
 
 Rollback:
 - Remove the 4 new spec files; revert `api.spec.ts` URL assertions to drop `offset=0`.
+
+### HE-013 Frontend Product Polish
+
+Status: Done
+Priority: P1
+
+Scope:
+- Reduce Element Plus default/sample feel while preserving the current Vue + Element Plus implementation.
+- Improve the customer-facing product shell, workspace first screen, device management first screen, upload surface, health controls, and shared component skin.
+- Keep API contracts, component events, and existing tests unchanged.
+
+Result:
+- `web/src/App.vue` now has a branded dark operation rail, custom mark, telemetry block, refined nav states, topbar process indicator, and stronger status chips.
+- `web/src/style.css` defines a product-specific palette, typography, Element Plus primary color tokens, button/input/radio/table/card/alert/empty overrides, and less generic radius/shadow treatment.
+- `WorkspacePage.vue` and `DeviceManagementView.vue` now expose workflow/signal rails so the first screen reads as an inspection operations product.
+- `ImageUpload.vue` and `HealthStatus.vue` now use custom surfaces and controls instead of stock Element Plus visual defaults.
+- Desktop and mobile Playwright screenshots were reviewed for layout, text fit, and visible overlap.
+
+Acceptance criteria:
+- [x] Workspace and Device pages no longer rely on raw Element Plus default appearance as the main visual identity.
+- [x] Existing frontend tests remain green.
+- [x] Production build succeeds.
+- [x] Browser screenshots show the revised UI at desktop and mobile widths.
+
+Validation commands:
+
+```bash
+cd web
+npm run lint
+npm run test -- --run
+npm run build
+```
+
+Rollback:
+- Revert the HE-013 changes in `web/src/App.vue`, `web/src/style.css`, `web/src/views/WorkspacePage.vue`, `web/src/components/DeviceManagementView.vue`, `web/src/components/ImageUpload.vue`, and `web/src/components/HealthStatus.vue`.
 
 ## P2 Backlog
 

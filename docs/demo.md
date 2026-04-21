@@ -366,6 +366,8 @@ uv run python scripts/extract_keyframes.py path/to/video.mp4 \
 
 ## 🌐 前端演示
 
+当前前端已完成一轮产品化视觉提升：工作台和设备页保留 Element Plus 组件能力，但主要视觉身份来自自有品牌侧栏、流程条、操作状态、上传面板和全局组件皮肤。
+
 ### 启动前端
 
 ```bash
