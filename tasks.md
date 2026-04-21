@@ -117,9 +117,12 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-P1C added 4 new frontend component spec files (ImageUpload, BatchTaskStatus, ReportBatchList, ReportDetailDrawer) and 6 new backend pagination/trace-id tests.
 - Stage C browser E2E now covers single-image upload, completed batch task history, and report detail review save.
 - Frontend pagination UI now drives report batch, task history, and device overview page offsets.
+- Compose API builds now pin `uv` to the official PyPI simple index by default, with `COMPOSE_UV_DEFAULT_INDEX` as an override for internal mirrors.
+- API metrics now use `prometheus_client.Counter/Histogram/Gauge`, while `/api/v1/metrics` keeps the Prometheus scrape contract and exposes request/inference histogram buckets.
+- Audit logs now support `offset` pagination, `total`, and actor filtering in the API; the device page includes matching audit-log pagination controls.
 - X-Trace-ID is now included in request completion/failure structured log records.
-- Current backend baseline: `199 passed, 44 skipped`.
-- Current frontend baseline: `86 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
+- Current backend baseline: `202 passed, 44 skipped`.
+- Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 
 ## Accepted Tasks
 
@@ -616,7 +619,7 @@ Scope:
 
 ## 后续开发两项分支
 
-当前 Stage C 工程闭环和 Pilot Deployment Runbook 演练已完成到可记录状态。下一步只保留两条分支，按真实试点标签是否到位选择。
+当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的后续工作均已完成到可记录状态。下一步只剩真实试点标签到位后的条件分支；否则保持当前部署主线并回到长期 backlog。
 
 ### 分支 A：真实试点标签到位
 
@@ -627,14 +630,14 @@ Scope:
 
 ### 分支 B：真实试点标签暂未到位
 
-1. **指标系统升级**（对应原 P2 建议 #6）
-   - 当前 `app.state.metrics` 是普通 dict，多 worker 下存在竞态。
-   - 用 `prometheus_client.Counter/Histogram` 替换，减少 `main.py` 中的样板代码，支持 Grafana histogram 分桶。
-   - 验收标准：`/api/v1/metrics` 继续兼容 Prometheus scrape，新增或更新测试覆盖请求计数、延迟分桶和推理指标。
+1. **指标系统升级** ✅ 已完成
+   - `app.state.metrics` 已替换为基于 `prometheus_client.Counter/Histogram/Gauge` 的封装。
+   - `/api/v1/metrics` 继续兼容 Prometheus scrape，并新增请求/推理耗时 histogram 分桶。
+   - 验证：`uv run pytest`、`tests/test_api_inference.py` 指标回归与 deployment config 回归均已覆盖。
 
-2. **审计日志分页与筛选增强**
-   - 当前核心 report/task/device 列表已接入 offset 分页；审计日志仍只有 limit 与 actor filter。
-   - 可按真实审计数据量决定是否补 `offset`、`total` 和前端分页控件。
+2. **审计日志分页与筛选增强** ✅ 已完成
+   - `/reports/audit-logs` 已支持 `offset`、`total` 和 `actor` 过滤。
+   - 前端设备页已补齐审计日志分页控件与服务层类型。
 
 ### 长期（Backlog）
 

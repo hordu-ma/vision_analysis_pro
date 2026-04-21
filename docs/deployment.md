@@ -595,30 +595,32 @@ Prometheus 告警规则示例见：
 #### Docker Compose 演练结果
 
 - Web 镜像构建：通过。
-- API 镜像构建：阻塞于外部 Python 包源下载超时，不是 Compose 配置错误。
-- 失败依赖：
-  - 第一次：`nvidia-nvjitlink-cu12==12.8.93`
-  - 第二次：`nvidia-nvshmem-cu12==3.3.20`
-- 触发路径：`uv sync --frozen` 安装 `ultralytics -> torch -> nvidia-*` 依赖时访问 PyPI 镜像超时。
+- API 镜像构建：已通过显式默认索引修复原先的 Python 包源超时阻塞。
+- 处理方式：
+  - `Dockerfile` 增加 `ARG/ENV UV_DEFAULT_INDEX`。
+  - `docker-compose.yml` 透传 `COMPOSE_UV_DEFAULT_INDEX`，默认值为 `https://pypi.org/simple`。
+  - `pyproject.toml` 显式锁定 `uv` 默认索引为官方 PyPI，并增加 `prometheus-client` 依赖。
+- 当前冷缓存构建会继续下载 `ultralytics -> torch -> nvidia-*` 大体积依赖，因此**可能较慢，但不再卡在不可达镜像**。
 
 当前处理方式：
 
-- 保留 Docker Compose 配置现状。
-- 将该问题标记为首次容器构建的网络/依赖下载 blocker。
-- 在网络稳定或预置依赖缓存后重跑：
+- 使用默认官方索引直接构建，或按环境覆盖：
 
 ```bash
 docker compose up --build -d
+
+# 如需使用企业内网 simple index
+COMPOSE_UV_DEFAULT_INDEX=https://your.mirror/simple docker compose up --build -d
 ```
 
 可选后续优化：
 
 - 评估 API 镜像是否需要 CPU-only Torch 依赖源或分层预缓存策略。
-- 将该优化独立为部署工程任务，避免在试点 smoke 中临时改动依赖锁定策略。
+- 将进一步的冷缓存提速独立为部署工程任务，避免在试点 smoke 中临时改动依赖锁定策略。
 
 #### 本地直接运行替代 smoke
 
-由于 Compose API 镜像构建被外部下载阻塞，本次用本地直接运行完成同一业务链路验证。
+在修复包源阻塞之前，本次曾用本地直接运行完成同一业务链路验证；以下记录保留为替代 smoke 参考。
 
 Stub 回滚 smoke：
 

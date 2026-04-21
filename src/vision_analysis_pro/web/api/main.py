@@ -11,11 +11,12 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 
 from vision_analysis_pro.logging_utils import configure_logging
 from vision_analysis_pro.settings import get_settings
 from vision_analysis_pro.web.api import schemas
+from vision_analysis_pro.web.api.metrics import ApiMetrics, create_api_metrics
 from vision_analysis_pro.web.api.routers import inference, reports
 
 configure_logging("vision_api", log_format=get_settings().log_format)
@@ -42,71 +43,13 @@ app = FastAPI(
     },
 )
 
-app.state.metrics = {
-    "requests_total": 0,
-    "requests_in_flight": 0,
-    "requests_failed_total": 0,
-    "request_duration_ms_sum": 0.0,
-    "request_duration_ms_count": 0,
-    "request_duration_ms_last": 0.0,
-    "inference_requests_total": 0,
-    "inference_failures_total": 0,
-    "inference_success_total": 0,
-    "inference_duration_ms_sum": 0.0,
-    "inference_duration_ms_count": 0,
-    "inference_duration_ms_last": 0.0,
-    "inference_detections_total": 0,
-    "inference_visualizations_total": 0,
-    "inference_input_bytes_total": 0,
-    "report_requests_total": 0,
-    "report_query_requests_total": 0,
-    "report_results_total": 0,
-    "report_detections_total": 0,
-    "report_duplicates_total": 0,
-    "report_not_found_total": 0,
-    "health_live_checks_total": 0,
-    "health_ready_checks_total": 0,
-    "health_ready_failures_total": 0,
-    "request_status_total": {},
-}
+app.state.metrics = create_api_metrics()
 
 
 def _matched_route_path(request: Request) -> str:
     """返回已匹配的路由模板，避免原始参数路径造成高基数。"""
     route = request.scope.get("route")
     return getattr(route, "path", request.url.path)
-
-
-def _record_request_status_metric(
-    metrics: dict[str, Any],
-    *,
-    method: str,
-    path: str,
-    status_code: int,
-) -> None:
-    key = (method, path, str(status_code))
-    request_status_total: dict[tuple[str, str, str], int] = metrics[
-        "request_status_total"
-    ]
-    request_status_total[key] = request_status_total.get(key, 0) + 1
-
-
-def _render_metric_lines(
-    name: str, help_text: str, metric_type: str, value: Any
-) -> list[str]:
-    return [
-        f"# HELP {name} {help_text}",
-        f"# TYPE {name} {metric_type}",
-        f"{name} {value}",
-    ]
-
-
-def _prometheus_labels(**labels: str) -> str:
-    escaped = []
-    for key, value in labels.items():
-        safe_value = value.replace("\\", "\\\\").replace('"', '\\"')
-        escaped.append(f'{key}="{safe_value}"')
-    return "{" + ",".join(escaped) + "}"
 
 
 # CORS 配置
@@ -130,16 +73,16 @@ async def request_context_middleware(
     request.state.request_id = request_id
     request.state.trace_id = trace_id
 
-    metrics: dict[str, Any] = app.state.metrics
-    metrics["requests_total"] += 1
-    metrics["requests_in_flight"] += 1
+    metrics: ApiMetrics = app.state.metrics
+    metrics.inc("requests_total")
+    metrics.inc_gauge("requests_in_flight")
     route_path = _matched_route_path(request)
 
     start_time = time.perf_counter()
     try:
         response = await call_next(request)
     except Exception:
-        metrics["requests_failed_total"] += 1
+        metrics.inc("requests_failed_total")
         logger.exception(
             "request_failed",
             extra={
@@ -151,14 +94,11 @@ async def request_context_middleware(
         )
         raise
     finally:
-        metrics["requests_in_flight"] -= 1
+        metrics.dec_gauge("requests_in_flight")
 
     duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
-    metrics["request_duration_ms_sum"] += duration_ms
-    metrics["request_duration_ms_count"] += 1
-    metrics["request_duration_ms_last"] = duration_ms
-    _record_request_status_metric(
-        metrics,
+    metrics.observe("request_duration_ms", duration_ms)
+    metrics.inc_request_status(
         method=request.method,
         path=route_path,
         status_code=response.status_code,
@@ -268,8 +208,8 @@ async def health() -> JSONResponse:
 @app.get("/api/v1/health/live", response_model=schemas.HealthResponse)
 async def health_live(request: Request) -> JSONResponse:
     """存活检查接口。"""
-    metrics: dict[str, Any] = app.state.metrics
-    metrics["health_live_checks_total"] += 1
+    metrics: ApiMetrics = app.state.metrics
+    metrics.inc("health_live_checks_total")
 
     payload = _get_health_payload()
     payload["status"] = "alive"
@@ -282,8 +222,8 @@ async def health_live(request: Request) -> JSONResponse:
 @app.get("/api/v1/health/ready", response_model=schemas.HealthResponse)
 async def health_ready(request: Request) -> JSONResponse:
     """就绪检查接口。"""
-    metrics: dict[str, Any] = app.state.metrics
-    metrics["health_ready_checks_total"] += 1
+    metrics: ApiMetrics = app.state.metrics
+    metrics.inc("health_ready_checks_total")
 
     payload = _get_health_payload()
     payload["check"] = "ready"
@@ -291,7 +231,7 @@ async def health_ready(request: Request) -> JSONResponse:
 
     if not payload["model_loaded"]:
         payload["status"] = "degraded"
-        metrics["health_ready_failures_total"] += 1
+        metrics.inc("health_ready_failures_total")
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             content=payload,
@@ -302,176 +242,13 @@ async def health_ready(request: Request) -> JSONResponse:
 
 
 @app.get("/api/v1/metrics")
-async def metrics() -> PlainTextResponse:
-    """最小 Prometheus 风格指标端点。"""
-    metrics_data: dict[str, Any] = app.state.metrics
-    lines: list[str] = []
-    for name, help_text, metric_type, value in [
-        (
-            "vision_api_requests_total",
-            "Total HTTP requests.",
-            "counter",
-            metrics_data["requests_total"],
-        ),
-        (
-            "vision_api_requests_in_flight",
-            "In-flight HTTP requests.",
-            "gauge",
-            metrics_data["requests_in_flight"],
-        ),
-        (
-            "vision_api_requests_failed_total",
-            "Total failed HTTP requests.",
-            "counter",
-            metrics_data["requests_failed_total"],
-        ),
-        (
-            "vision_api_request_duration_ms_sum",
-            "Total HTTP request duration in milliseconds.",
-            "counter",
-            metrics_data["request_duration_ms_sum"],
-        ),
-        (
-            "vision_api_request_duration_ms_count",
-            "Count of observed HTTP request durations.",
-            "counter",
-            metrics_data["request_duration_ms_count"],
-        ),
-        (
-            "vision_api_request_duration_ms_last",
-            "Last observed HTTP request duration in milliseconds.",
-            "gauge",
-            metrics_data["request_duration_ms_last"],
-        ),
-        (
-            "vision_api_inference_requests_total",
-            "Total inference requests.",
-            "counter",
-            metrics_data["inference_requests_total"],
-        ),
-        (
-            "vision_api_inference_failures_total",
-            "Total failed inference requests.",
-            "counter",
-            metrics_data["inference_failures_total"],
-        ),
-        (
-            "vision_api_inference_success_total",
-            "Total successful inference requests.",
-            "counter",
-            metrics_data["inference_success_total"],
-        ),
-        (
-            "vision_api_inference_duration_ms_sum",
-            "Total inference duration in milliseconds.",
-            "counter",
-            metrics_data["inference_duration_ms_sum"],
-        ),
-        (
-            "vision_api_inference_duration_ms_count",
-            "Count of observed inference durations.",
-            "counter",
-            metrics_data["inference_duration_ms_count"],
-        ),
-        (
-            "vision_api_inference_duration_ms_last",
-            "Last observed inference duration in milliseconds.",
-            "gauge",
-            metrics_data["inference_duration_ms_last"],
-        ),
-        (
-            "vision_api_inference_detections_total",
-            "Total detections returned by inference requests.",
-            "counter",
-            metrics_data["inference_detections_total"],
-        ),
-        (
-            "vision_api_inference_visualizations_total",
-            "Total inference requests returning visualizations.",
-            "counter",
-            metrics_data["inference_visualizations_total"],
-        ),
-        (
-            "vision_api_inference_input_bytes_total",
-            "Total input bytes accepted by inference requests.",
-            "counter",
-            metrics_data["inference_input_bytes_total"],
-        ),
-        (
-            "vision_api_report_requests_total",
-            "Total edge report requests.",
-            "counter",
-            metrics_data["report_requests_total"],
-        ),
-        (
-            "vision_api_report_query_requests_total",
-            "Total edge report query requests.",
-            "counter",
-            metrics_data["report_query_requests_total"],
-        ),
-        (
-            "vision_api_report_results_total",
-            "Total edge inference results received.",
-            "counter",
-            metrics_data["report_results_total"],
-        ),
-        (
-            "vision_api_report_detections_total",
-            "Total edge detections received.",
-            "counter",
-            metrics_data["report_detections_total"],
-        ),
-        (
-            "vision_api_report_duplicates_total",
-            "Total duplicate report batches ignored.",
-            "counter",
-            metrics_data["report_duplicates_total"],
-        ),
-        (
-            "vision_api_report_not_found_total",
-            "Total report queries that missed persisted batches.",
-            "counter",
-            metrics_data["report_not_found_total"],
-        ),
-        (
-            "vision_api_health_live_checks_total",
-            "Total live health checks.",
-            "counter",
-            metrics_data["health_live_checks_total"],
-        ),
-        (
-            "vision_api_health_ready_checks_total",
-            "Total ready health checks.",
-            "counter",
-            metrics_data["health_ready_checks_total"],
-        ),
-        (
-            "vision_api_health_ready_failures_total",
-            "Total failed ready health checks.",
-            "counter",
-            metrics_data["health_ready_failures_total"],
-        ),
-    ]:
-        lines.extend(_render_metric_lines(name, help_text, metric_type, value))
-
-    lines.extend(
-        [
-            "# HELP vision_api_request_status_total Total HTTP requests by method, route and status code.",
-            "# TYPE vision_api_request_status_total counter",
-        ]
+async def metrics() -> Response:
+    """Prometheus 指标端点。"""
+    metrics_data: ApiMetrics = app.state.metrics
+    return Response(
+        content=metrics_data.render(),
+        headers={"Content-Type": metrics_data.content_type},
     )
-    request_status_total: dict[tuple[str, str, str], int] = metrics_data[
-        "request_status_total"
-    ]
-    for (method, path, status_code), value in sorted(request_status_total.items()):
-        labels = _prometheus_labels(
-            method=method,
-            path=path,
-            status_code=status_code,
-        )
-        lines.append(f"vision_api_request_status_total{labels} {value}")
-
-    return PlainTextResponse("\n".join(lines) + "\n")
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:

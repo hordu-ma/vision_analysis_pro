@@ -228,6 +228,14 @@ export interface AuditLogResponse {
   created_at: number
 }
 
+export interface AuditLogListResponse {
+  status: string
+  count: number
+  total?: number
+  items: AuditLogResponse[]
+  request_id?: string
+}
+
 export interface ErrorResponse {
   code: string
   message: string

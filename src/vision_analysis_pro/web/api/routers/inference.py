@@ -31,6 +31,7 @@ from vision_analysis_pro.web.api.inference_tasks import (
     StoredUploadFile,
     get_inference_task_manager,
 )
+from vision_analysis_pro.web.api.metrics import ApiMetrics
 
 router = APIRouter(prefix="/api/v1/inference", tags=["inference"])
 logger = logging.getLogger(__name__)
@@ -41,7 +42,7 @@ ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
 
 def _record_inference_metrics(
-    metrics: dict[str, Any],
+    metrics: ApiMetrics,
     *,
     inference_time_ms: float,
     input_bytes: int,
@@ -49,15 +50,13 @@ def _record_inference_metrics(
     visualized: bool = False,
     success: bool,
 ) -> None:
-    metrics["inference_duration_ms_sum"] += inference_time_ms
-    metrics["inference_duration_ms_count"] += 1
-    metrics["inference_duration_ms_last"] = inference_time_ms
-    metrics["inference_input_bytes_total"] += input_bytes
+    metrics.observe("inference_duration_ms", inference_time_ms)
+    metrics.inc("inference_input_bytes_total", input_bytes)
     if success:
-        metrics["inference_success_total"] += 1
-        metrics["inference_detections_total"] += detection_count
+        metrics.inc("inference_success_total")
+        metrics.inc("inference_detections_total", detection_count)
         if visualized:
-            metrics["inference_visualizations_total"] += 1
+            metrics.inc("inference_visualizations_total")
 
 
 def _serialize_detections(result: Any) -> list[schemas.DetectionBox]:
@@ -138,7 +137,7 @@ def _run_inference(
     file_bytes: bytes,
     settings: Settings,
     engine: Any,
-    metrics: dict[str, Any],
+    metrics: ApiMetrics,
     visualize: bool,
 ) -> schemas.InferenceResponse:
     """执行单文件推理并更新指标。"""
@@ -154,7 +153,7 @@ def _run_inference(
         detections = _serialize_detections(raw_result)
     except RuntimeError as e:
         inference_time_ms = round((time.perf_counter() - start_time) * 1000, 2)
-        metrics["inference_failures_total"] += 1
+        metrics.inc("inference_failures_total")
         _record_inference_metrics(
             metrics,
             inference_time_ms=inference_time_ms,
@@ -265,8 +264,8 @@ async def inference_image(
 
     file_bytes = await _read_and_validate_upload(file)
 
-    metrics: dict[str, Any] = request.app.state.metrics
-    metrics["inference_requests_total"] += 1
+    metrics: ApiMetrics = request.app.state.metrics
+    metrics.inc("inference_requests_total")
     return _run_inference(
         request_id=request_id,
         file=file,
@@ -307,7 +306,7 @@ async def inference_images(
             },
         )
 
-    metrics: dict[str, Any] = request.app.state.metrics
+    metrics: ApiMetrics = request.app.state.metrics
     results: list[schemas.InferenceResponse] = []
 
     for file in files:
@@ -322,7 +321,7 @@ async def inference_images(
             },
         )
         file_bytes = await _read_and_validate_upload(file)
-        metrics["inference_requests_total"] += 1
+        metrics.inc("inference_requests_total")
         results.append(
             _run_inference(
                 request_id=request_id,
@@ -394,7 +393,7 @@ async def create_inference_task(
             )
         )
 
-    metrics: dict[str, Any] = request.app.state.metrics
+    metrics: ApiMetrics = request.app.state.metrics
     task_manager = get_inference_task_manager()
 
     def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -424,7 +423,7 @@ def _run_batch_task(
     stored_files: list[StoredUploadFile],
     settings: Settings,
     engine: Any,
-    metrics: dict[str, Any],
+    metrics: ApiMetrics,
     visualize: bool,
     progress_callback: Any,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -433,7 +432,7 @@ def _run_batch_task(
     file_records: list[dict[str, Any]] = []
     failed_files = 0
     for index, stored_file in enumerate(stored_files, start=1):
-        metrics["inference_requests_total"] += 1
+        metrics.inc("inference_requests_total")
         upload_file = SimpleNamespace(
             filename=stored_file.filename,
             content_type=stored_file.content_type,
@@ -508,7 +507,7 @@ def _create_replayed_task(
     request_id: str,
     settings: Settings,
     engine: Any,
-    metrics: dict[str, Any],
+    metrics: ApiMetrics,
 ) -> schemas.InferenceTaskResponse:
     task_manager = get_inference_task_manager()
     stored_files = list(source_record.input_files)
@@ -632,7 +631,7 @@ async def retry_failed_files_inference_task(
         item for item in record.input_files if item.filename in failed_filenames
     ]
     request_id = getattr(request.state, "request_id", "unknown")
-    metrics: dict[str, Any] = request.app.state.metrics
+    metrics: ApiMetrics = request.app.state.metrics
 
     def worker(progress_callback: Any) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         return _run_batch_task(
@@ -698,7 +697,7 @@ async def retry_inference_task(
         )
 
     request_id = getattr(request.state, "request_id", "unknown")
-    metrics: dict[str, Any] = request.app.state.metrics
+    metrics: ApiMetrics = request.app.state.metrics
     return _create_replayed_task(
         source_record=record,
         request_id=request_id,
@@ -737,7 +736,7 @@ async def rerun_inference_task(
         )
 
     request_id = getattr(request.state, "request_id", "unknown")
-    metrics: dict[str, Any] = request.app.state.metrics
+    metrics: ApiMetrics = request.app.state.metrics
     return _create_replayed_task(
         source_record=record,
         request_id=request_id,

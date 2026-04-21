@@ -14,7 +14,7 @@ import type {
   ReportDeviceMetadataResponse,
   AlertSummaryResponse,
   DetectionReportResponse,
-  AuditLogResponse,
+  AuditLogListResponse,
   ReportRecordResponse,
   ReportReviewRequest,
   ReportReviewResponse
@@ -459,12 +459,12 @@ class ApiService {
     return response.data
   }
 
-  async listAuditLogs(limit = 50, actor?: string): Promise<AuditLogResponse[]> {
-    const params = new URLSearchParams({ limit: String(limit) })
+  async listAuditLogs(limit = 50, actor?: string, offset = 0): Promise<AuditLogListResponse> {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
     if (actor) {
       params.set('actor', actor)
     }
-    const response = await this.client.get<AuditLogResponse[]>(`/reports/audit-logs?${params}`)
+    const response = await this.client.get<AuditLogListResponse>(`/reports/audit-logs?${params}`)
     return response.data
   }
 

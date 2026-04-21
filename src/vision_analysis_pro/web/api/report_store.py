@@ -354,7 +354,11 @@ class SQLiteReportStore:
                 conn.commit()
 
     def list_audit_logs(
-        self, *, limit: int = 50, actor: str | None = None
+        self,
+        *,
+        limit: int = 50,
+        offset: int = 0,
+        actor: str | None = None,
     ) -> list[AuditLogRecord]:
         with self._lock:
             self._ensure_schema()
@@ -366,9 +370,9 @@ class SQLiteReportStore:
                         FROM audit_logs
                         WHERE actor = ?
                         ORDER BY created_at DESC
-                        LIMIT ?
+                        LIMIT ? OFFSET ?
                         """,
-                        (actor, limit),
+                        (actor, limit, offset),
                     ).fetchall()
                 else:
                     rows = conn.execute(
@@ -376,11 +380,24 @@ class SQLiteReportStore:
                         SELECT event_type, resource_id, actor, request_id, detail_json, created_at
                         FROM audit_logs
                         ORDER BY created_at DESC
-                        LIMIT ?
+                        LIMIT ? OFFSET ?
                         """,
-                        (limit,),
+                        (limit, offset),
                     ).fetchall()
         return [_row_to_audit_log(row) for row in rows]
+
+    def count_audit_logs(self, *, actor: str | None = None) -> int:
+        with self._lock:
+            self._ensure_schema()
+            with self._connect() as conn:
+                if actor:
+                    row = conn.execute(
+                        "SELECT COUNT(*) FROM audit_logs WHERE actor = ?",
+                        (actor,),
+                    ).fetchone()
+                else:
+                    row = conn.execute("SELECT COUNT(*) FROM audit_logs").fetchone()
+        return int(row[0]) if row else 0
 
     def list_reviews(self, batch_id: str) -> dict[int, ReportFrameReview]:
         """读取指定批次的人工复核信息。"""

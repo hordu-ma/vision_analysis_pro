@@ -4,6 +4,7 @@ services:
       context: .
       args:
         INSTALL_ONNX: ${COMPOSE_INSTALL_ONNX:-false}
+        UV_DEFAULT_INDEX: ${COMPOSE_UV_DEFAULT_INDEX:-https://pypi.org/simple}
     environment:
       API_HOST: 0.0.0.0
       API_PORT: 8000

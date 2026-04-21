@@ -1118,9 +1118,47 @@ async def test_list_audit_logs_returns_recent_entries() -> None:
 
     assert audit_resp.status_code == 200
     data = audit_resp.json()
-    assert len(data) >= 1
-    assert data[0]["event_type"] == "device_metadata_updated"
-    assert data[0]["actor"] == "tester"
+    assert data["status"] == "ok"
+    assert data["count"] >= 1
+    assert data["total"] >= 1
+    assert data["items"][0]["event_type"] == "device_metadata_updated"
+    assert data["items"][0]["actor"] == "tester"
+
+
+@pytest.mark.asyncio
+async def test_list_audit_logs_supports_offset_and_actor_filter() -> None:
+    """测试审计日志支持 offset 分页与 actor 筛选。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for device_id, actor in [
+            ("edge-audit-11", "tester-a"),
+            ("edge-audit-12", "tester-b"),
+            ("edge-audit-13", "tester-a"),
+        ]:
+            update_resp = await client.put(
+                f"/api/v1/reports/devices/{device_id}",
+                headers={"x-actor": actor},
+                json={
+                    "site_name": f"站点-{device_id}",
+                    "display_name": f"设备-{device_id}",
+                    "note": f"日志-{actor}",
+                },
+            )
+            assert update_resp.status_code == 200
+
+        filtered_resp = await client.get("/api/v1/reports/audit-logs?limit=1&actor=tester-a")
+        paged_resp = await client.get("/api/v1/reports/audit-logs?limit=1&offset=1")
+
+    assert filtered_resp.status_code == 200
+    filtered = filtered_resp.json()
+    assert filtered["count"] == 1
+    assert filtered["total"] >= 2
+    assert filtered["items"][0]["actor"] == "tester-a"
+
+    assert paged_resp.status_code == 200
+    paged = paged_resp.json()
+    assert paged["count"] == 1
+    assert paged["total"] >= 3
 
 
 @pytest.mark.asyncio
@@ -1570,6 +1608,24 @@ async def test_metrics_endpoint_exposes_inference_observability_counters() -> No
     assert "vision_api_inference_detections_total" in body
     assert "vision_api_inference_visualizations_total" in body
     assert "vision_api_inference_input_bytes_total" in body
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint_exposes_histogram_buckets() -> None:
+    """测试 Prometheus Histogram 暴露请求与推理耗时分桶。"""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        await client.get("/api/v1/health")
+        await client.post(
+            "/api/v1/inference/image",
+            files={"file": ("test.jpg", _create_test_image(), "image/jpeg")},
+        )
+        resp = await client.get("/api/v1/metrics")
+
+    assert resp.status_code == 200
+    body = resp.text
+    assert "vision_api_request_duration_ms_bucket{" in body
+    assert "vision_api_inference_duration_ms_bucket{" in body
 
 
 @pytest.mark.asyncio

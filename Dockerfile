@@ -1,9 +1,12 @@
 FROM python:3.12-slim
 
+ARG UV_DEFAULT_INDEX=https://pypi.org/simple
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_PROJECT_ENVIRONMENT=/app/.venv \
+    UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX} \
     PATH="/app/.venv/bin:/root/.local/bin:${PATH}"
 
 WORKDIR /app

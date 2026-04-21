@@ -99,6 +99,9 @@
             :device-limit="deviceLimit"
             :device-offset="deviceOffset"
             :logs="auditLogs"
+            :audit-log-total="auditLogTotal"
+            :audit-log-limit="auditLogLimit"
+            :audit-log-offset="auditLogOffset"
             :actor-filter="auditActorFilter"
             @result="handleResult"
             @batch-result="handleBatchResult"
@@ -121,6 +124,7 @@
             @refresh-devices="loadReportData"
             @page-devices="handleDevicePageChange"
             @refresh-audit-logs="loadAuditLogs"
+            @page-audit-logs="handleAuditLogPageChange"
             @select-device="handleDeviceSelect"
             @edit-device="openDeviceMetadata"
             @update:actor-filter="handleAuditActorFilterChange"
@@ -200,6 +204,9 @@ const devices = ref<ReportDeviceSummary[]>([])
 const deviceLimit = 10
 const deviceOffset = ref(0)
 const deviceTotal = ref(0)
+const auditLogLimit = 20
+const auditLogOffset = ref(0)
+const auditLogTotal = ref(0)
 const selectedDeviceId = ref('')
 const deviceDrawerVisible = ref(false)
 const editingDeviceId = ref('')
@@ -476,7 +483,13 @@ const loadAlertSummary = async () => {
 
 const loadAuditLogs = async () => {
   try {
-    auditLogs.value = await apiService.listAuditLogs(20, auditActorFilter.value || undefined)
+    const response = await apiService.listAuditLogs(
+      auditLogLimit,
+      auditActorFilter.value || undefined,
+      auditLogOffset.value
+    )
+    auditLogs.value = response.items
+    auditLogTotal.value = response.total ?? response.count
   } catch (error) {
     apiService.showError(error as Error)
   }
@@ -484,6 +497,12 @@ const loadAuditLogs = async () => {
 
 const handleAuditActorFilterChange = (actor: string) => {
   auditActorFilter.value = actor
+  auditLogOffset.value = 0
+  void loadAuditLogs()
+}
+
+const handleAuditLogPageChange = (offset: number) => {
+  auditLogOffset.value = offset
   void loadAuditLogs()
 }
 

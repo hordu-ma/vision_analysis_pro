@@ -13,9 +13,9 @@
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
 | M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
-- **后端测试**：当前轻量环境基线为 199 passed, 44 skipped（缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
-- **前端测试**：86 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过
-- **下一步**：HE-007 真实试点版需等待 reviewed positive pilot crack labels；短期优先演练 Pilot Deployment Runbook；HE-010/HE-011 继续保持证据门禁
+- **后端测试**：当前轻量环境基线为 202 passed, 44 skipped（缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
+- **前端测试**：90 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过
+- **下一步**：若拿到 reviewed positive pilot crack labels，则推进 HE-007 真实试点版；否则维持当前 Stage A 部署主线，并继续仅保留证据门禁后的长期能力（HE-010/HE-011）
 
 **路线决策（2026-04-19）**
 

@@ -489,6 +489,16 @@ class AuditLogResponse(BaseModel):
     created_at: float = Field(..., description="创建时间")
 
 
+class AuditLogListResponse(BaseModel):
+    """审计日志列表响应。"""
+
+    status: str = Field(..., description="查询状态")
+    count: int = Field(..., ge=0, description="返回条数")
+    total: int | None = Field(None, ge=0, description="日志总数（近似值）")
+    items: list[AuditLogResponse] = Field(default_factory=list, description="审计日志列表")
+    request_id: str | None = Field(None, description="请求 ID")
+
+
 class ReportDeviceListResponse(BaseModel):
     """设备聚合列表响应。"""
 

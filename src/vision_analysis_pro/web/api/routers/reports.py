@@ -12,6 +12,7 @@ from fastapi.responses import Response
 from vision_analysis_pro.settings import Settings, get_settings
 from vision_analysis_pro.web.api import schemas
 from vision_analysis_pro.web.api.inference_tasks import get_inference_task_manager
+from vision_analysis_pro.web.api.metrics import ApiMetrics
 from vision_analysis_pro.web.api.report_store import (
     ReportFrameReview,
     ReportStoreSaveResult,
@@ -47,13 +48,13 @@ async def receive_report(
     store = get_report_store(str(settings.report_store_db_path))
     save_result = store.save(payload)
 
-    metrics: dict[str, int | dict[str, int] | float] = request.app.state.metrics
-    metrics["report_requests_total"] += 1
+    metrics: ApiMetrics = request.app.state.metrics
+    metrics.inc("report_requests_total")
     if save_result.created:
-        metrics["report_results_total"] += save_result.result_count
-        metrics["report_detections_total"] += save_result.total_detections
+        metrics.inc("report_results_total", save_result.result_count)
+        metrics.inc("report_detections_total", save_result.total_detections)
     else:
-        metrics["report_duplicates_total"] += 1
+        metrics.inc("report_duplicates_total")
 
     logger.info(
         "edge_report_received",
@@ -163,11 +164,11 @@ async def get_report(
     """查询已持久化的边缘 Agent 上报批次。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     record = store.get(batch_id)
     if record is None:
-        request.app.state.metrics["report_not_found_total"] += 1
+        request.app.state.metrics.inc("report_not_found_total")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -198,11 +199,11 @@ async def get_report_summary(
     """生成指定上报批次的模板报告摘要。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     record = store.get(batch_id)
     if record is None:
-        request.app.state.metrics["report_not_found_total"] += 1
+        request.app.state.metrics.inc("report_not_found_total")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -242,7 +243,7 @@ async def upsert_report_review(
     """写入指定批次中某帧的人工复核信息。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     review = store.upsert_review(
         batch_id=batch_id,
@@ -252,7 +253,7 @@ async def upsert_report_review(
         reviewer=payload.reviewer,
     )
     if review is None:
-        request.app.state.metrics["report_not_found_total"] += 1
+        request.app.state.metrics.inc("report_not_found_total")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -285,11 +286,11 @@ async def export_report_csv(
 ) -> Response:
     """导出指定批次的 CSV 报告。"""
     _authorize_report_request(request, settings)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     record = store.get(batch_id)
     if record is None:
-        request.app.state.metrics["report_not_found_total"] += 1
+        request.app.state.metrics.inc("report_not_found_total")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
@@ -366,7 +367,7 @@ async def list_report_batches(
     """列出最近接收的上报批次。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     items = store.list_batches(limit=limit, offset=offset, device_id=device_id)
     total = store.count_batches(device_id=device_id)
@@ -404,7 +405,7 @@ async def list_report_devices(
     """列出最近有上报的设备聚合概览。"""
     _authorize_report_request(request, settings)
     request_id = getattr(request.state, "request_id", None)
-    request.app.state.metrics["report_query_requests_total"] += 1
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
     items = store.list_devices(limit=limit, offset=offset)
     total = store.count_devices()
@@ -472,30 +473,40 @@ async def get_alert_summary(
 
 @router.get(
     "/reports/audit-logs",
-    response_model=list[schemas.AuditLogResponse],
-    responses={200: {"model": list[schemas.AuditLogResponse]}},
+    response_model=schemas.AuditLogListResponse,
+    responses={200: {"model": schemas.AuditLogListResponse}},
 )
 async def list_audit_logs(
     request: Request,
     limit: int = Query(50, ge=1, le=200, description="返回日志数量上限"),
+    offset: int = Query(0, ge=0, description="分页偏移量"),
     actor: str | None = Query(None, description="按操作者过滤"),
     settings: Settings = Depends(get_settings),
-) -> list[schemas.AuditLogResponse]:
+) -> schemas.AuditLogListResponse:
     """读取最近的审计日志。"""
     _authorize_report_request(request, settings)
+    request_id = getattr(request.state, "request_id", None)
+    request.app.state.metrics.inc("report_query_requests_total")
     store = get_report_store(str(settings.report_store_db_path))
-    logs = store.list_audit_logs(limit=limit, actor=actor)
-    return [
-        schemas.AuditLogResponse(
-            event_type=item.event_type,
-            resource_id=item.resource_id,
-            actor=item.actor,
-            request_id=item.request_id,
-            detail_json=item.detail_json,
-            created_at=item.created_at,
-        )
-        for item in logs
-    ]
+    logs = store.list_audit_logs(limit=limit, offset=offset, actor=actor)
+    total = store.count_audit_logs(actor=actor)
+    return schemas.AuditLogListResponse(
+        status="ok",
+        count=len(logs),
+        total=total,
+        items=[
+            schemas.AuditLogResponse(
+                event_type=item.event_type,
+                resource_id=item.resource_id,
+                actor=item.actor,
+                request_id=item.request_id,
+                detail_json=item.detail_json,
+                created_at=item.created_at,
+            )
+            for item in logs
+        ],
+        request_id=request_id,
+    )
 
 
 def _authorize_report_request(request: Request, settings: Settings) -> None:

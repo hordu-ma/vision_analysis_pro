@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import axios from 'axios'
 import type {
   AlertSummaryResponse,
+  AuditLogListResponse,
   AuditLogResponse,
   HealthResponse,
   InferenceResponse,
@@ -603,7 +604,7 @@ describe('API Service', () => {
     })
 
     it('应该获取审计日志', async () => {
-      const mockResponse: AuditLogResponse[] = [
+      const mockItems: AuditLogResponse[] = [
         {
           event_type: 'device_metadata_updated',
           resource_id: 'device-a',
@@ -613,13 +614,20 @@ describe('API Service', () => {
           created_at: 1700000001
         }
       ]
+      const mockResponse: AuditLogListResponse = {
+        status: 'ok',
+        count: 1,
+        total: 3,
+        items: mockItems,
+        request_id: 'req-audit-1'
+      }
 
       mockGet.mockResolvedValue({ data: mockResponse })
 
       const result = await apiService.listAuditLogs(20)
 
       expect(result).toEqual(mockResponse)
-      expect(mockGet).toHaveBeenCalledWith('/reports/audit-logs?limit=20')
+      expect(mockGet).toHaveBeenCalledWith('/reports/audit-logs?limit=20&offset=0')
     })
 
     it('应该获取批次详情', async () => {

@@ -44,7 +44,11 @@
       <AuditLogList
         :logs="logs"
         :actor-filter="actorFilter"
+        :total="auditLogTotal"
+        :limit="auditLogLimit"
+        :offset="auditLogOffset"
         @refresh="emit('refresh-audit-logs')"
+        @page="emit('page-audit-logs', $event)"
         @update:actor-filter="emit('update:actor-filter', $event)"
       />
     </section>
@@ -65,6 +69,9 @@ defineProps<{
   deviceLimit: number
   deviceOffset: number
   logs: AuditLogResponse[]
+  auditLogTotal: number
+  auditLogLimit: number
+  auditLogOffset: number
   actorFilter: string
 }>()
 
@@ -73,6 +80,7 @@ const emit = defineEmits<{
   'refresh-devices': []
   'page-devices': [offset: number]
   'refresh-audit-logs': []
+  'page-audit-logs': [offset: number]
   'select-device': [deviceId: string]
   'edit-device': [deviceId: string]
   'update:actor-filter': [actor: string]

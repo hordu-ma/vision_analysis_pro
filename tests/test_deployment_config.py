@@ -35,6 +35,8 @@ def test_dockerfile_supports_optional_onnx_install() -> None:
     """测试 Dockerfile 提供 ONNX Runtime 可选安装路径。"""
     dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
 
+    assert "ARG UV_DEFAULT_INDEX=https://pypi.org/simple" in dockerfile
+    assert "UV_DEFAULT_INDEX=${UV_DEFAULT_INDEX}" in dockerfile
     assert "ARG INSTALL_ONNX=false" in dockerfile
     assert "uv sync --frozen --extra onnx" in dockerfile
     assert "/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt" in dockerfile
@@ -58,6 +60,7 @@ def test_docker_compose_provides_api_and_web_services() -> None:
 
     assert "api:" in compose_file
     assert "web:" in compose_file
+    assert "COMPOSE_UV_DEFAULT_INDEX" in compose_file
     assert "CORS_ALLOW_ORIGINS" in compose_file
     assert "./web" in compose_file
     assert "/app/runs/stage_a_crack/baseline_v0_1/weights/best.pt" in compose_file
@@ -69,9 +72,19 @@ def test_env_example_uses_stage_a_crack_model_paths() -> None:
     env_file = Path(".env.example").read_text(encoding="utf-8")
 
     assert "INFERENCE_ENGINE=stub" in env_file
+    assert "COMPOSE_UV_DEFAULT_INDEX=https://pypi.org/simple" in env_file
     assert "YOLO_MODEL_PATH=runs/stage_a_crack/baseline_v0_1/weights/best.pt" in env_file
     assert "ONNX_MODEL_PATH=models/stage_a_crack/best.onnx" in env_file
     assert "EDGE_AGENT_INFERENCE_MODEL_PATH=models/stage_a_crack/best.onnx" in env_file
+
+
+def test_pyproject_pins_default_uv_index_and_prometheus_dependency() -> None:
+    """测试项目锁定稳定的 uv 默认索引，并显式声明 Prometheus 指标依赖。"""
+    pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+
+    assert '"prometheus-client"' in pyproject
+    assert 'url = "https://pypi.org/simple"' in pyproject
+    assert "default = true" in pyproject
 
 
 def test_edge_agent_example_uses_stage_a_onnx_model_path() -> None:

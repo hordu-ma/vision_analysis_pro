@@ -32,22 +32,60 @@
       </el-table-column>
       <el-table-column prop="detail_json" label="详情" min-width="220" show-overflow-tooltip />
     </el-table>
+
+    <div class="pagination-bar" data-testid="audit-pagination">
+      <span>{{ pageSummary }}</span>
+      <div class="pagination-actions">
+        <el-button size="small" :disabled="!canPrevious" @click="emitPage(offset - limit)">
+          上一页
+        </el-button>
+        <el-button size="small" :disabled="!canNext" @click="emitPage(offset + limit)">
+          下一页
+        </el-button>
+      </div>
+    </div>
   </el-card>
 </template>
 
 <script setup lang="ts">
 import { ElButton, ElCard, ElInput, ElTable, ElTableColumn } from 'element-plus'
+import { computed } from 'vue'
 import type { AuditLogResponse } from '@/types/api'
 
-defineProps<{
-  logs: AuditLogResponse[]
-  actorFilter: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    logs: AuditLogResponse[]
+    actorFilter: string
+    total?: number
+    limit?: number
+    offset?: number
+  }>(),
+  {
+    total: 0,
+    limit: 20,
+    offset: 0
+  }
+)
 
 const emit = defineEmits<{
   refresh: []
+  page: [offset: number]
   'update:actorFilter': [actor: string]
 }>()
+
+const offset = computed(() => props.offset)
+const limit = computed(() => props.limit)
+const canPrevious = computed(() => props.offset > 0)
+const canNext = computed(() => props.offset + props.logs.length < props.total)
+const pageSummary = computed(() => {
+  if (props.total === 0) return '0 / 0'
+  return `${props.offset + 1}-${props.offset + props.logs.length} / ${props.total}`
+})
+
+const emitPage = (nextOffset: number) => {
+  if (nextOffset < 0 || nextOffset === props.offset) return
+  emit('page', nextOffset)
+}
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString('zh-CN')
@@ -77,6 +115,24 @@ const formatTime = (timestamp: number): string => {
 
 .audit-log-card :deep(.el-card__header) {
   padding-bottom: 14px;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .empty-state {

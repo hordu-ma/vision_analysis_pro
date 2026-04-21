@@ -192,6 +192,7 @@ docker compose up --build
 - 后端 API：`http://localhost:8000`
 
 如需启用 ONNX 容器构建，可在 `.env` 中设置 `COMPOSE_INSTALL_ONNX=true`。
+如需覆盖默认 Python 包源，可在 `.env` 中设置 `COMPOSE_UV_DEFAULT_INDEX=<your-simple-index-url>`；默认使用 `https://pypi.org/simple`，避免首次构建卡在不可达镜像。首次冷启动仍可能因 `torch` / `nvidia-*` 大体积依赖下载而耗时较长。
 
 ### 试点环境一键启动
 
@@ -364,7 +365,7 @@ vision_analysis_pro/
 ### 📋 后续开发两项分支
 
 - **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
-- **分支 B：真实试点标签暂未到位**。推进指标系统升级：将当前 `app.state.metrics` 替换为 `prometheus_client.Counter/Histogram`，提升多 worker 稳定性和 Grafana 分桶能力；随后按真实审计数据量决定是否补审计日志分页与筛选增强。
+- **分支 B：真实试点标签暂未到位（已完成）**。指标系统已升级为 `prometheus_client.Counter/Histogram/Gauge`，`/api/v1/metrics` 已暴露 histogram 分桶；审计日志列表也已补齐 `offset` / `total` 与前端分页控件。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 
