@@ -429,8 +429,8 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：199 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）✅
-- 前端：86 passed，浏览器 E2E 3 passed ✅
+- 后端：204 passed, 44 skipped（当前轻量环境；缺少 legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
+- 前端：90 passed，浏览器 E2E 3 passed
 
 ---
 
@@ -491,4 +491,4 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload --port 8001
 
 ---
 
-**最后更新**：2026-04-21
+**最后更新**：2026-04-22

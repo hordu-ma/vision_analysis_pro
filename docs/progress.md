@@ -7,8 +7,8 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ## 📊 项目概览
 
 **当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
-**最后更新**：2026-04-21
-**后端测试**：204 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试）
+**最后更新**：2026-04-22
+**后端测试**：204 passed, 44 skipped（当前轻量环境；缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
 **前端测试**：90 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 3 条 browser E2E 通过
 
@@ -31,6 +31,29 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - 视觉识别主线保持 YOLO/ONNX 目标检测；DeepLab 语义分割仅在需要像素级裂缝面积/长度估计时作为后续 refinement。
 - Transformer 趋势分析依赖连续批次与设备历史数据，后置到数据积累之后。
 - LLM 只作为报告解释层，输入结构化检测结果、人工复核状态和设备元数据，不参与检测判定。
+
+## 🗓️ 2026-04-22：HE-007 代理路径复核与文档对齐 ✅
+
+### 核心结论
+
+- ✅ 已检查本地数据与模型产物：Stage A YOLO/ONNX、Stage B 代理模型与 `data/stage_b_pilot_crack/` 均存在。
+- ✅ 未发现新的真实试点媒体目录或人工复核正样本标签；真实试点版 HE-007 仍未触发。
+- ✅ `data/stage_b_pilot_crack/` 校验通过，确认当前本地 Stage B 是 Stage A 测试集自动标注代理数据。
+- ✅ Stage A 与 Stage B 代理模型在同一 Stage A val 集（462 张图像）上完成 CPU 复核评估，指标复现，结论仍为 **保留 Stage A 作为部署模型**。
+- ✅ 对齐 `AGENTS.md`、`README.md`、`tasks.md`、`docs/development-plan.md`、`docs/stage-b-model-comparison.md`、`docs/stage-b-pilot-data.md`、`docs/demo.md` 与 `docs/e2e-test-results.md`，统一下一步门禁与测试基线口径。
+
+### 当前验证
+
+- ✅ `uv run python scripts/prepare_stage_b_pilot_dataset.py --output data/stage_b_pilot_crack --validate-only`
+- ✅ `uv run python scripts/evaluate.py --model runs/stage_a_crack/baseline_v0_1/weights/best.pt --data data/stage_a_crack/data.yaml --split val --device cpu --batch 8`
+  - Stage A：mAP50=0.9661，mAP50-95=0.6320，P=0.9434，R=0.9203
+- ✅ `uv run python scripts/evaluate.py --model runs/stage_b_pilot_crack/comparison_v0_1/weights/best.pt --data data/stage_a_crack/data.yaml --split val --device cpu --batch 8`
+  - Stage B 代理：mAP50=0.8711，mAP50-95=0.3898，P=0.8844，R=0.8383
+
+### 口径说明
+
+- “完成 1-5”中真实数据收集与人工复核无法由仓库自动生成；本次完成的是可验证的现有代理数据校验、同集模型评估复核和文档对齐。
+- 下一步仍是获取 reviewed positive pilot crack labels 后重跑 HE-007 真实试点版；在此之前不切换部署模型、不宣称真实试点精度。
 
 ## 🗓️ 2026-04-21：公开代理数据入口（SDNET2018 + RDD2022）✅
 
@@ -557,7 +580,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 199 passed, 44 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 204 passed, 44 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账
@@ -655,7 +678,7 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 - HE-005：`.env.example`、`docker-compose.yml` 与 `config/edge_agent.example.yaml` 对齐到 Stage A crack-only 模型路径。
 - HE-005：补充部署配置测试，守住 Compose 和 Edge Agent 示例的模型路径。
 
-当前 Stage B 本地 smoke 使用 checked-in sample images 生成 pending-annotation 空标签，只验证数据结构和流程；在真实试点媒体到位前，仓库现已支持用 `SDNET2018 + RDD2022` 继续做 public surrogate 验证，但真实版 HE-007 仍必须等 reviewed pilot labels 后执行。
+此前 Stage B 本地 smoke 使用 checked-in sample images 验证数据结构；当前本地 `data/stage_b_pilot_crack` 为 Stage A 测试集自动标注代理数据。在真实试点媒体到位前，仓库现已支持用 `SDNET2018 + RDD2022` 继续做 public surrogate 验证，但真实版 HE-007 仍必须等 reviewed pilot labels 后执行。
 
 ## 最新进展：HE-008 Full Inspection Flow Hardening
 
@@ -688,5 +711,5 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 ---
 
 **文档维护者**：Vision Analysis Pro Team  
-**最后更新**：2026-04-21
+**最后更新**：2026-04-22
 **下次更新**：HE-007 reviewed pilot labels 到位，或 public surrogate 数据被实际下载并完成一次重跑后

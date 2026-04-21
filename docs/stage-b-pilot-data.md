@@ -1,6 +1,6 @@
 # Stage B Pilot Data Loop
 
-Date: 2026-04-20
+Date: 2026-04-20, updated 2026-04-22
 
 Task: HE-006 Stage B Pilot Data Loop
 
@@ -20,6 +20,8 @@ data/stage_b_pilot_crack/
 This directory is ignored by git because raw pilot images, labels, videos, and generated train/val/test files must stay local.
 
 When real pilot media is not available yet, the repository now also supports a **public surrogate** path based on SDNET2018 and RDD2022. That path is for engineering validation only and must not be described as real pilot evidence.
+
+2026-04-22 status: no new self-owned pilot media or reviewed positive crack labels were found in the workspace. The existing local `data/stage_b_pilot_crack/` is a proxy dataset built from Stage A test images auto-labeled by the Stage A ONNX model; it validates successfully, but it is not real pilot evidence.
 
 ## Dataset Builder
 
@@ -183,6 +185,20 @@ The validator checks:
 - bbox coordinates are normalized to `[0, 1]`
 - bbox width and height are positive
 
+Latest validation:
+
+```bash
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  --output data/stage_b_pilot_crack \
+  --validate-only
+```
+
+Result on 2026-04-22:
+
+```text
+validated Stage B dataset: data/stage_b_pilot_crack
+```
+
 ## Annotation Rules
 
 Stage B is crack-only by default:
@@ -205,3 +221,5 @@ Before model training or HE-007 comparison:
 ## Decision
 
 HE-006 is accepted as the Stage B data intake loop. HE-007 remains the model-comparison step: train on reviewed Stage B labels, evaluate Stage A and Stage B on the same held-out pilot validation set, then decide whether to keep Stage A, switch to Stage B, or train a merged dataset.
+
+Until reviewed positive pilot crack labels exist, keep Stage A as the deployment model and treat Stage B/public surrogate outputs as engineering validation only.

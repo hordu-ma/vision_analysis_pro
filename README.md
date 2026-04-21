@@ -6,13 +6,14 @@
 
 针对输电塔等工程基础设施，使用图像识别技术结合无人机巡检，识别自然灾害或长期服役导致的潜在安全隐患。当前项目已具备前后端、边缘 Agent、上报持久化、复核与导出等工程闭环；算法主线先以裂缝检测试点和目标检测闭环为主，五类缺陷模型需要在数据集与权重补齐后再作为正式能力启用。
 
-### 当前路线决策（2026-04-20）
+### 当前路线决策（2026-04-22）
 
 - **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 Stage A 自训练 YOLO/ONNX 做真实模型路径。
 - **中期目标**：补齐真实数据集与评估报告后，再恢复五类缺陷 YOLO/ONNX 模型路线。
 - **数据层**：已提供 OpenCV 视频帧读取与关键帧抽取工具，先使用固定间隔、场景变化和模糊过滤等可解释规则。
 - **报告层**：已提供基于结构化检测结果的模板报告与版本化 LLM 报告契约，LLM 只作为解释与报告生成层，不参与检测判定。
 - **暂不作为当前主线**：DeepLab 语义分割、Transformer 趋势分析、LLM 自动结论判定。
+- **最新执行结论**：2026-04-22 已复核本地 Stage B 代理数据集和 Stage A/Stage B 同集评估；未发现新的真实试点媒体或人工复核正样本，当前继续推荐 Stage A 作为部署模型。
 
 ### 核心特性
 
@@ -49,7 +50,8 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --reload
 
 # 运行测试
 uv run pytest
-# 注：缺少 runs/train/exp/weights/best.pt、models/best.onnx 或 data/images/* 时，
+# 注：缺少 legacy runs/train/exp/weights/best.pt、models/best.onnx、
+# data/images/* 或可选本地模型产物时，
 # 对应模型/数据测试会按预期跳过
 ```
 
@@ -314,7 +316,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 199 passed, 44 skipped）
+├── tests/                      # Python 测试（当前轻量基线 204 passed, 44 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -341,8 +343,8 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 199 passed, 44 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
-- 前端：`npm run test -- --run`（86 passed）
+- 后端：`uv run pytest`（当前本地轻量环境为 204 passed, 44 skipped；legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物缺失时会跳过对应测试）
+- 前端：`npm run test -- --run`（90 passed）
 
 ### 提交规范
 
@@ -400,6 +402,7 @@ vision_analysis_pro/
 - **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
 - **分支 B：真实试点标签暂未到位（已完成）**。指标系统已升级为 `prometheus_client.Counter/Histogram/Gauge`，`/api/v1/metrics` 已暴露 histogram 分桶；审计日志列表也已补齐 `offset` / `total` 与前端分页控件。
 - **公开代理补位（新增）**。当真实试点媒体尚未到位时，可先用 `SDNET2018 + RDD2022` 通过 `scripts/prepare_public_surrogate_crack_dataset.py` 构建 public surrogate 数据集，继续做非真实试点开发验证。
+- **当前门禁**。若没有 reviewed positive pilot crack labels，不切换部署模型、不宣称真实试点精度、不推进五分类/分割/趋势模型主线。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

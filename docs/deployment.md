@@ -622,6 +622,38 @@ COMPOSE_UV_DEFAULT_INDEX=https://your.mirror/simple docker compose up --build -d
 
 在修复包源阻塞之前，本次曾用本地直接运行完成同一业务链路验证；以下记录保留为替代 smoke 参考。
 
+#### Stage B 代理模型复核（2026-04-22）
+
+本次复核没有发现新的真实试点媒体或 reviewed positive pilot crack labels，因此未触发真实试点版 HE-007，也不切换部署模型。
+
+执行结果：
+
+- `data/stage_b_pilot_crack/` 校验通过，确认当前本地 Stage B 数据仍为 Stage A 测试集自动标注代理数据。
+- Stage A 与 Stage B 代理模型在同一 Stage A val 集上复核评估，指标与 `docs/stage-b-model-comparison.md` 一致。
+- 当前部署推荐仍为 Stage A ONNX：`models/stage_a_crack/best.onnx`；链路 smoke 仍可使用 `INFERENCE_ENGINE=stub`。
+
+复核命令：
+
+```bash
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  --output data/stage_b_pilot_crack \
+  --validate-only
+
+uv run python scripts/evaluate.py \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --data data/stage_a_crack/data.yaml \
+  --split val \
+  --device cpu \
+  --batch 8
+
+uv run python scripts/evaluate.py \
+  --model runs/stage_b_pilot_crack/comparison_v0_1/weights/best.pt \
+  --data data/stage_a_crack/data.yaml \
+  --split val \
+  --device cpu \
+  --batch 8
+```
+
 Stub 回滚 smoke：
 
 ```bash

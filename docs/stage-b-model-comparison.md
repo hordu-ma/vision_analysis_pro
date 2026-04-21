@@ -1,12 +1,14 @@
 # Stage B Model Comparison — v0.1
 
-> 生成于 2026-04-21  
+> 生成于 2026-04-21，复核于 2026-04-22
 > 对应任务：HE-007 Stage B Model Comparison
 
 ## 摘要
 
 在相同验证集（Stage A val，462 张图像）上比较 Stage A 和 Stage B 模型，
 得出结论：**当前阶段保留 Stage A 作为部署模型**。
+
+2026-04-22 复核结论：本地未发现新的真实试点媒体或人工复核正样本；`data/stage_b_pilot_crack` 校验通过，Stage A/Stage B 代理模型在相同 Stage A val 集上的 CPU 评估复现下表指标。因此本文件仍是 **proxy run / 代理运行** 记录，不是 HE-007 真实试点版验收。
 
 ---
 
@@ -66,6 +68,13 @@ Stage A 测试集（225 张）经 ONNX 自动标注结果：
 >   --model runs/stage_b_pilot_crack/comparison_v0_1/weights/best.pt \
 >   --data data/stage_a_crack/data.yaml --split val
 > ```
+>
+> 2026-04-22 复核命令增加了 `--device cpu --batch 8`，指标与原记录一致；数据集校验命令为：
+> ```bash
+> uv run python scripts/prepare_stage_b_pilot_dataset.py \
+>   --output data/stage_b_pilot_crack \
+>   --validate-only
+> ```
 
 ---
 
@@ -97,6 +106,8 @@ Stage A 测试集（225 张）经 ONNX 自动标注结果：
 ## 建议
 
 **当前阶段：保留 Stage A 作为部署模型。**
+
+不要把当前 Stage B 代理模型发布为试点模型。真实试点版 HE-007 的触发条件仍是：已有来自目标场景的 reviewed positive pilot crack labels，并且可以在同一 held-out pilot validation set 上比较 Stage A 与 Stage B。
 
 Stage B 的改进路径（按优先级）：
 

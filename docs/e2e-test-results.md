@@ -35,7 +35,7 @@
 | 前端单元测试（vitest） | 28 | 28 | 0 | ✅ |
 | **总计** | **185** | **160** | **25** | **✅** |
 
-说明：当前轻量环境未提供 `models/best.onnx` 与 `data/images/*`，ONNX 模型测试和数据集测试按预期跳过。
+说明：当前轻量环境缺少 legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物时，ONNX 模型测试和数据集测试按预期跳过。
 
 ---
 
@@ -298,26 +298,20 @@ cd web && npm run lint
 
 ## 9. 下一步建议
 
+当前执行入口以根目录 `tasks.md` 为准。此前列出的 Pilot Deployment Runbook、metrics 升级、审计日志分页与筛选增强已完成。
+
 ### 高优先级
 
-1. Pilot Deployment Runbook 演练（Docker Compose + Stage A ONNX + Edge Agent）
-2. 真实 pilot crack 图片/视频收集与 reviewed positive labels 准备
-3. metrics 告警示例与 `prometheus_client` 指标升级评估
-4. 审计日志分页与筛选增强（按真实数据量决定）
+1. 真实 pilot crack 图片/视频收集与 reviewed positive labels 准备。
+2. 真实标签到位后重跑 HE-007：训练 Stage B 真实试点模型，并与 Stage A 在同一 held-out pilot validation set 上对比。
 
-### 中优先级
+### 条件推进
 
-5. MQTT 上报器实现
-6. Prometheus metrics 告警示例
-7. 结构化日志采集扩展到更多业务事件
-
-### 低优先级
-
-8. Rust/PyO3 性能优化
-9. 批量推理支持
+3. 真实试点媒体暂未到位时，可用 `SDNET2018 + RDD2022` public surrogate 继续做非真实试点验证，但结论必须标记为公开代理验证。
+4. MQTT、TensorRT、Rust/PyO3、分割细化和趋势分析保持 backlog，只有在真实需求或性能证据出现后再提升优先级。
 
 ---
 
 **测试完成**: 2026-04-18
-**最近更新**: 2026-04-21
-**结论**: ✅ 核心 API、前端单元测试、3 条浏览器 E2E 与 Edge Agent 上报契约通过；模型/数据相关测试在当前轻量环境中按预期跳过
+**最近更新**: 2026-04-22
+**结论**: 核心 API、前端单元测试、3 条浏览器 E2E 与 Edge Agent 上报契约通过；Stage B 代理数据校验和 Stage A/Stage B 同集评估已复核，当前仍保留 Stage A 作为部署模型

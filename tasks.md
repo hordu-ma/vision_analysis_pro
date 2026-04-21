@@ -2,11 +2,11 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 完成代理运行，等待真实试点数据后重跑真实版；公开代理数据入口已补齐；当前部署推荐 Stage A).
+- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 代理运行已复核，等待真实试点数据和 reviewed positive labels 后重跑真实版；公开代理数据入口已补齐；当前部署推荐 Stage A).
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -125,6 +125,7 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - Public surrogate crack-data support now includes `scripts/prepare_public_surrogate_crack_dataset.py`, which uses SDNET2018 negatives plus RDD2022 crack boxes to build a crack-only proxy dataset.
 - Current backend baseline: `204 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
+- 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
 ## Accepted Tasks
 
@@ -371,6 +372,7 @@ Result:
 - Comparison on Stage A val set (462 images):
   - Stage A: mAP50=0.9661, mAP50-95=0.6320, P=0.9434, R=0.9203
   - Stage B: mAP50=0.8711, mAP50-95=0.3898, P=0.8844, R=0.8383
+- 2026-04-22 CPU re-evaluation reproduced the same metrics and validated `data/stage_b_pilot_crack`.
 - **Recommendation: Keep Stage A as deployment model.**
 - Full evaluation note: `docs/stage-b-model-comparison.md`.
 - Repository support now also includes a second public surrogate intake path (`SDNET2018 + RDD2022`) for non-real-pilot validation before self-owned media arrives.
@@ -605,7 +607,7 @@ Priority: P1
 
 Scope:
 - Add unit test coverage for the four highest-risk interactive components.
-- Bring frontend spec count from 53 to ≥ 86 passed.
+- Bring frontend spec count from 53 to the current 90-test baseline.
 
 Result:
 - `web/src/components/ImageUpload.spec.ts`: 7 tests (upload mode toggle, file validation, clearFile, batch upload trigger).
@@ -663,7 +665,7 @@ Scope:
 
 ## 后续开发两项分支
 
-当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的后续工作均已完成到可记录状态。下一步只剩真实试点标签到位后的条件分支；否则保持当前部署主线并回到长期 backlog。
+当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的后续工作均已完成到可记录状态。2026-04-22 已再次确认本地没有新的真实试点媒体/人工复核正样本，代理 Stage B 对比结论未变化。下一步只剩真实试点标签到位后的条件分支；否则保持当前部署主线并回到长期 backlog。
 
 ### 分支 A：真实试点标签到位
 
