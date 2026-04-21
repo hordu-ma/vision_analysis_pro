@@ -614,27 +614,25 @@ Scope:
 - No committed model weights or public dataset archives.
 - No Rust/PyO3 work until profiling shows Python preprocessing or postprocessing is the bottleneck.
 
-## 下一步开发建议
+## 后续开发两项分支
 
-优先级参考如下。短期目标以完成 Stage C 工程闭环为主，中期补齐多 worker 运维能力。
+当前 Stage C 工程闭环和 Pilot Deployment Runbook 演练已完成到可记录状态。下一步只保留两条分支，按真实试点标签是否到位选择。
 
-### 短期（Immediate）
+### 分支 A：真实试点标签到位
 
-1. **解锁 HE-007 Stage B 模型对比（真实试点版）**
-   - 当前阻塞因素：缺少 reviewed positive pilot crack labels。
-   - 行动项：确认标注获取路径（手工标注一批试点帧 or 审阅 Stage A 自动预测结果），完成后直接执行 `scripts/train.py`。
+1. **HE-007 Stage B 模型对比（真实试点版）**
+   - 触发条件：已有 reviewed positive pilot crack labels。
+   - 行动项：确认标注来源与数据切分，使用 `scripts/train.py` 训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
+   - 验收标准：输出训练命令、评估指标、同集对比结论，并更新 `docs/stage-b-model-comparison.md`。
 
-2. **Pilot Deployment Runbook 演练**
-   - 在 Docker Compose 环境完整跑一次 HE-005 runbook（Stage A ONNX 模型路径 + Edge Agent）。
-   - 补充部署验收 checklist 至 `docs/deployment.md`。
+### 分支 B：真实试点标签暂未到位
 
-### 中期（Next Sprint）
-
-3. **指标系统升级**（对应原 P2 建议 #6）
+1. **指标系统升级**（对应原 P2 建议 #6）
    - 当前 `app.state.metrics` 是普通 dict，多 worker 下存在竞态。
    - 用 `prometheus_client.Counter/Histogram` 替换，减少 `main.py` 中的样板代码，支持 Grafana histogram 分桶。
+   - 验收标准：`/api/v1/metrics` 继续兼容 Prometheus scrape，新增或更新测试覆盖请求计数、延迟分桶和推理指标。
 
-4. **审计日志分页与筛选增强**
+2. **审计日志分页与筛选增强**
    - 当前核心 report/task/device 列表已接入 offset 分页；审计日志仍只有 limit 与 actor filter。
    - 可按真实审计数据量决定是否补 `offset`、`total` 和前端分页控件。
 

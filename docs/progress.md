@@ -53,6 +53,26 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ---
 
+## 🗓️ 2026-04-21：Pilot Deployment Runbook 演练 ✅
+
+### 核心成果
+
+- ✅ `docker compose config` 通过，确认默认 profile 为 `INFERENCE_ENGINE=stub`，Stage A ONNX/Yolo 路径与示例配置一致。
+- ✅ Web 容器镜像构建通过。
+- ⚠️ API 容器镜像构建阻塞于外部 Python 包源下载超时，失败依赖为 `nvidia-nvjitlink-cu12==12.8.93` 与 `nvidia-nvshmem-cu12==3.3.20`；判断为首次容器构建的网络/依赖下载 blocker，不是 Compose 配置错误。
+- ✅ 用本地直接运行完成替代 smoke：stub 回滚链路、Stage A ONNX health/ready/metrics/inference、Edge Agent ONNX 检测并上报到云端 API。
+- ✅ 演练记录、blocker、重跑命令和回滚结论已回填 `docs/deployment.md`。
+
+### 当前验证
+
+- ✅ `docker compose config`
+- ✅ `docker compose up --build -d`：Web build 通过；API build 因外部依赖下载超时阻塞
+- ✅ `INFERENCE_ENGINE=stub ... uv run uvicorn ...`：health 与 inference smoke 通过
+- ✅ `INFERENCE_ENGINE=onnx ONNX_MODEL_PATH=models/stage_a_crack/best.onnx ... uv run uvicorn ...`：health/ready/metrics/inference smoke 通过
+- ✅ `examples/run_edge_agent.py --engine onnx --confidence 0.1 ...`：1 帧、1 条检测、HTTP 上报 `202 Accepted`
+
+---
+
 ## 🗓️ 2026-04-21：HE-007 Stage B 模型对比（代理运行）✅
 
 ### 核心成果
@@ -610,12 +630,10 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 ## 📋 下一步计划
 
-下一步开发计划以根目录 `tasks.md` 为准。当前活跃队列：
+下一步开发计划以根目录 `tasks.md` 为准。当前只保留两条分支，按是否拿到 reviewed positive pilot crack labels 决策：
 
-1. **HE-007 Stage B Model Comparison（真实试点版）**：等待 reviewed positive pilot crack labels 后，训练自有数据模型并与 Stage A 公共数据模型做同集对比。
-2. **Pilot Deployment Runbook 演练**：用 Docker Compose + Stage A ONNX + Edge Agent 完整跑一次试点部署验收，并把结果回填 `docs/deployment.md`。
-3. **指标系统升级**：评估用 `prometheus_client.Counter/Histogram` 替换当前 `app.state.metrics` 普通 dict，解决多 worker 场景下的竞态与分桶能力。
-4. **HE-010 / HE-011**：继续保持证据门禁；只有出现裂缝长度/面积需求或同设备多批次历史后再推进。
+1. **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版），用 reviewed pilot labels 训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
+2. **分支 B：真实试点标签暂未到位**。推进指标系统升级，用 `prometheus_client.Counter/Histogram` 替换当前 `app.state.metrics` 普通 dict；随后按真实审计数据量决定是否补审计日志分页与筛选增强。
 
 非关键路径：MQTT、Rust/PyO3、DeepLab 和 Transformer 趋势分析均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
@@ -623,4 +641,4 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 
 **文档维护者**：Vision Analysis Pro Team  
 **最后更新**：2026-04-21
-**下次更新**：Pilot Deployment Runbook 演练或 HE-007 reviewed pilot labels 到位后
+**下次更新**：HE-007 reviewed pilot labels 到位，或指标系统升级开始实施后

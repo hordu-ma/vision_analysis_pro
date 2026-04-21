@@ -361,12 +361,10 @@ vision_analysis_pro/
   - [x] 优雅关闭（信号处理）
 - [x] 单元测试（40 tests）
 
-### 📋 当前任务队列
+### 📋 后续开发两项分支
 
-- **HE-007 Stage B Model Comparison（真实试点版）**：等待 reviewed positive pilot crack labels 后，训练自有数据模型并与 Stage A 公共数据模型在同一试点验证集上对比。
-- **Pilot Deployment Runbook 演练**：使用 Docker Compose + Stage A ONNX + Edge Agent 完整跑一次试点部署验收。
-- **指标系统升级**：评估将当前 `app.state.metrics` 替换为 `prometheus_client.Counter/Histogram`，提升多 worker 稳定性和 Grafana 分桶能力。
-- **HE-010 / HE-011**：语义分割和趋势分析继续保持证据门禁，只有在需要裂缝长度/面积或同设备多批次历史时再推进。
+- **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
+- **分支 B：真实试点标签暂未到位**。推进指标系统升级：将当前 `app.state.metrics` 替换为 `prometheus_client.Counter/Histogram`，提升多 worker 稳定性和 Grafana 分桶能力；随后按真实审计数据量决定是否补审计日志分页与筛选增强。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

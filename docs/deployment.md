@@ -581,7 +581,122 @@ Prometheus 告警规则示例见：
 
 ## 10. 常见问题
 
-### 10.0 推理引擎噪音排查
+### 10.0 试点部署演练记录（2026-04-21）
+
+本次按当前 Stage C 试点路径执行了部署演练，结论如下：
+
+#### 前置条件
+
+- `docker compose config`：通过，Compose 默认 profile 为 `INFERENCE_ENGINE=stub`。
+- Stage A YOLO 权重存在：`runs/stage_a_crack/baseline_v0_1/weights/best.pt`。
+- Stage A ONNX 权重存在：`models/stage_a_crack/best.onnx`。
+- Edge Agent 示例配置已指向 Stage A ONNX：`config/edge_agent.example.yaml`。
+
+#### Docker Compose 演练结果
+
+- Web 镜像构建：通过。
+- API 镜像构建：阻塞于外部 Python 包源下载超时，不是 Compose 配置错误。
+- 失败依赖：
+  - 第一次：`nvidia-nvjitlink-cu12==12.8.93`
+  - 第二次：`nvidia-nvshmem-cu12==3.3.20`
+- 触发路径：`uv sync --frozen` 安装 `ultralytics -> torch -> nvidia-*` 依赖时访问 PyPI 镜像超时。
+
+当前处理方式：
+
+- 保留 Docker Compose 配置现状。
+- 将该问题标记为首次容器构建的网络/依赖下载 blocker。
+- 在网络稳定或预置依赖缓存后重跑：
+
+```bash
+docker compose up --build -d
+```
+
+可选后续优化：
+
+- 评估 API 镜像是否需要 CPU-only Torch 依赖源或分层预缓存策略。
+- 将该优化独立为部署工程任务，避免在试点 smoke 中临时改动依赖锁定策略。
+
+#### 本地直接运行替代 smoke
+
+由于 Compose API 镜像构建被外部下载阻塞，本次用本地直接运行完成同一业务链路验证。
+
+Stub 回滚 smoke：
+
+```bash
+INFERENCE_ENGINE=stub API_RELOAD=false \
+  uv run uvicorn vision_analysis_pro.web.api.main:app --host 127.0.0.1 --port 8000
+
+curl http://127.0.0.1:8000/api/v1/health
+curl -X POST "http://127.0.0.1:8000/api/v1/inference/image" \
+  -F "file=@data/samples/autocrops/train_batch2_r3_c2.jpg;type=image/jpeg"
+```
+
+结果：
+
+- `/api/v1/health` 返回 `StubInferenceEngine`。
+- `/api/v1/inference/image` 返回 3 条 stub detections。
+- `stub` 模式下 `/api/v1/health/ready` 返回 degraded/503；这是因为 stub 不加载真实模型，适合链路 smoke，不作为真实模型就绪信号。
+
+Stage A ONNX smoke：
+
+```bash
+INFERENCE_ENGINE=onnx ONNX_MODEL_PATH=models/stage_a_crack/best.onnx API_RELOAD=false \
+  uv run uvicorn vision_analysis_pro.web.api.main:app --host 127.0.0.1 --port 8001
+
+curl http://127.0.0.1:8001/api/v1/health
+curl -i http://127.0.0.1:8001/api/v1/health/ready
+curl http://127.0.0.1:8001/api/v1/metrics
+curl -X POST "http://127.0.0.1:8001/api/v1/inference/image" \
+  -F "file=@data/samples/autocrops/train_batch2_r3_c2.jpg;type=image/jpeg"
+```
+
+结果：
+
+- `/api/v1/health` 返回 `model_loaded=true`，`engine=ONNXInferenceEngine`。
+- `/api/v1/health/ready` 返回 `200 OK`，`status=ready`。
+- `/api/v1/metrics` 返回 Prometheus 风格指标。
+- ONNX 推理接口返回 `200 OK`，样例图未检出缺陷，接口链路正常。
+
+Edge Agent ONNX 上报 smoke：
+
+```bash
+mkdir -p /tmp/vision-edge-smoke
+cp data/stage_a_crack/images/val/crack-1455-_jpg.rf.d78b0366a48c54f31295522b24dcf2f0.jpg \
+  /tmp/vision-edge-smoke/crack-smoke.jpg
+
+timeout 30s uv run python examples/run_edge_agent.py \
+  --device-id edge-agent-smoke-onnx-lowconf \
+  --source-type folder \
+  --source-path /tmp/vision-edge-smoke \
+  --engine onnx \
+  --model-path models/stage_a_crack/best.onnx \
+  --confidence 0.1 \
+  --report-url http://127.0.0.1:8001/api/v1/report \
+  --batch-size 1 \
+  --batch-interval 1 \
+  --cache-path /tmp/vision-edge-smoke-cache-lowconf.db
+```
+
+结果：
+
+- Edge Agent 处理 1 帧。
+- ONNX 检测总数为 1。
+- HTTP 上报返回 `202 Accepted`。
+- `/api/v1/reports/batches?limit=5` 可查询到 `edge-agent-smoke-onnx-lowconf-*` 批次。
+
+#### 回滚验证
+
+从 ONNX profile 回到 `stub` 后，单图推理链路可用：
+
+- `INFERENCE_ENGINE=stub`
+- `/api/v1/health` 返回 `StubInferenceEngine`
+- `/api/v1/inference/image` 返回固定 3 条检测结果
+
+因此当前回滚路径可用于 API、前端和报告链路 smoke；真实模型 ready 检查仍应使用 `onnx` 或 `yolo` profile。
+
+---
+
+### 10.1 推理引擎噪音排查
 
 当前主线只保留三类 API 推理引擎：
 
@@ -598,7 +713,7 @@ Prometheus 告警规则示例见：
 
 不满足这些条件的引擎应保持在实验脚本或归档文档中，不进入主线配置、部署文档或默认环境变量。
 
-### 10.1 健康检查返回 `model_loaded=false`
+### 10.2 健康检查返回 `model_loaded=false`
 
 可能原因：
 
@@ -612,7 +727,7 @@ Prometheus 告警规则示例见：
 - `YOLO_MODEL_PATH`
 - `ONNX_MODEL_PATH`
 
-### 10.2 启动时报模型加载失败
+### 10.3 启动时报模型加载失败
 
 可能原因：
 
@@ -629,7 +744,7 @@ uv sync --extra dev
 uv sync --extra onnx
 ```
 
-### 10.3 前端页面无法访问后端
+### 10.4 前端页面无法访问后端
 
 检查项：
 
@@ -637,7 +752,7 @@ uv sync --extra onnx
 - 前端代理是否仍指向 `http://localhost:8000`
 - 反向代理是否正确转发 `/api`
 
-### 10.4 生产环境是否可以继续使用 `--reload`
+### 10.5 生产环境是否可以继续使用 `--reload`
 
 不建议。  
 生产环境应关闭自动重载，即：
