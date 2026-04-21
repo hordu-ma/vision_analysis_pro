@@ -115,8 +115,11 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-P1A added `offset` pagination + `total` field to `/reports/batches`, `/reports/devices`, and `/inference/images/tasks` list endpoints; ORDER BY uses deterministic tie-breakers.
 - HE-P1B added X-Trace-ID propagation middleware: reads `x-trace-id` request header and echoes it as `X-Trace-ID` response header.
 - HE-P1C added 4 new frontend component spec files (ImageUpload, BatchTaskStatus, ReportBatchList, ReportDetailDrawer) and 6 new backend pagination/trace-id tests.
-- Current backend baseline: `198 passed, 44 skipped`.
-- Current frontend baseline: `85 passed`, lint and production build passing from the latest full validation run.
+- Stage C browser E2E now covers single-image upload, completed batch task history, and report detail review save.
+- Frontend pagination UI now drives report batch, task history, and device overview page offsets.
+- X-Trace-ID is now included in request completion/failure structured log records.
+- Current backend baseline: `199 passed, 44 skipped`.
+- Current frontend baseline: `86 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 
 ## Accepted Tasks
 
@@ -555,7 +558,7 @@ Priority: P1
 
 Scope:
 - Add unit test coverage for the four highest-risk interactive components.
-- Bring frontend spec count from 53 to ≥ 85 passed.
+- Bring frontend spec count from 53 to ≥ 86 passed.
 
 Result:
 - `web/src/components/ImageUpload.spec.ts`: 7 tests (upload mode toggle, file validation, clearFile, batch upload trigger).
@@ -617,29 +620,23 @@ Scope:
 
 ### 短期（Immediate）
 
-1. **解锁 HE-007 Stage B 模型对比**
+1. **解锁 HE-007 Stage B 模型对比（真实试点版）**
    - 当前阻塞因素：缺少 reviewed positive pilot crack labels。
    - 行动项：确认标注获取路径（手工标注一批试点帧 or 审阅 Stage A 自动预测结果），完成后直接执行 `scripts/train.py`。
 
-2. **Stage C E2E 自动化试点**
-   - 当前 Playwright E2E 只有 1 个 happy path 测试。
-   - 建议补：批次任务创建 → 推理 → 报告上报 → 复核全链路 E2E，在 `web/e2e/` 下扩展。
-
-3. **Pilot Deployment Runbook 演练**
+2. **Pilot Deployment Runbook 演练**
    - 在 Docker Compose 环境完整跑一次 HE-005 runbook（Stage A ONNX 模型路径 + Edge Agent）。
    - 补充部署验收 checklist 至 `docs/deployment.md`。
 
 ### 中期（Next Sprint）
 
-4. **指标系统升级**（对应原 P2 建议 #6）
+3. **指标系统升级**（对应原 P2 建议 #6）
    - 当前 `app.state.metrics` 是普通 dict，多 worker 下存在竞态。
    - 用 `prometheus_client.Counter/Histogram` 替换，减少 `main.py` 中的样板代码，支持 Grafana histogram 分桶。
 
-5. **结构化日志 trace_id 透传**
-   - X-Trace-ID 已在响应头回显，下一步将 `trace_id` 注入 Python 结构化日志（使用 `structlog` 或 `logging.LoggerAdapter`），方便跨服务链路追踪。
-
-6. **Report Store 分页前端集成**
-   - 后端已完成 `offset`+`total` 分页，前端 `api.ts` 已暴露参数，但 `ReportBatchList` 组件尚未驱动分页 UI（下一页/上一页按钮）。
+4. **审计日志分页与筛选增强**
+   - 当前核心 report/task/device 列表已接入 offset 分页；审计日志仍只有 limit 与 actor filter。
+   - 可按真实审计数据量决定是否补 `offset`、`total` 和前端分页控件。
 
 ### 长期（Backlog）
 

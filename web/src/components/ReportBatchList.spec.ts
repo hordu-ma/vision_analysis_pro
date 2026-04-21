@@ -6,8 +6,9 @@ import type { ReportBatchSummary } from '@/types/api'
 // Custom stubs for child components that must emit events
 const WorkspaceActionButtonStub = {
   name: 'WorkspaceActionButton',
-  template: '<button class="workspace-action-btn" @click="$emit(\'click\')">{{ label }}</button>',
-  props: ['label', 'icon', 'tone', 'compact'],
+  template:
+    '<button class="workspace-action-btn" :disabled="disabled" @click="$emit(\'click\')">{{ label }}</button>',
+  props: ['label', 'icon', 'tone', 'compact', 'disabled'],
   emits: ['click']
 }
 
@@ -115,5 +116,22 @@ describe('ReportBatchList.vue', () => {
     const emitted = wrapper.emitted('view-detail')
     expect(emitted).toBeTruthy()
     expect(emitted![0]).toEqual(['batch-xyz'])
+  })
+
+  it('点击下一页触发 page 事件并传递 offset', async () => {
+    const wrapper = mount(ReportBatchList, {
+      props: {
+        batches: [makeBatch({ batch_id: 'batch-001' }), makeBatch({ batch_id: 'batch-002' })],
+        total: 5,
+        limit: 2,
+        offset: 0
+      },
+      global: { stubs: globalStubs }
+    })
+    expect(wrapper.get('[data-testid="report-pagination"]').text()).toContain('1-2 / 5')
+    const nextBtn = wrapper.findAll('.workspace-action-btn').find(b => b.text() === '下一页')
+    expect(nextBtn).toBeDefined()
+    await nextBtn!.trigger('click')
+    expect(wrapper.emitted('page')![0]).toEqual([2])
   })
 })

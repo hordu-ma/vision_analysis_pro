@@ -1,5 +1,5 @@
 <template>
-  <el-card v-if="task" class="batch-task-card">
+  <el-card v-if="task" class="batch-task-card" data-testid="batch-task-status">
     <template #header>
       <div class="card-header">
         <span>批量任务状态</span>

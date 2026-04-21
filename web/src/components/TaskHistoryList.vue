@@ -96,11 +96,34 @@
         </template>
       </WorkspaceRecordItem>
     </div>
+
+    <div class="pagination-bar" data-testid="task-pagination">
+      <span>{{ pageSummary }}</span>
+      <div class="pagination-actions">
+        <WorkspaceActionButton
+          label="上一页"
+          icon="archive-stack"
+          tone="subtle"
+          compact
+          :disabled="!canPrevious"
+          @click="emitPage(offset - limit)"
+        />
+        <WorkspaceActionButton
+          label="下一页"
+          icon="spark-refresh"
+          tone="subtle"
+          compact
+          :disabled="!canNext"
+          @click="emitPage(offset + limit)"
+        />
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
 import { ElOption, ElSelect } from 'element-plus'
+import { computed } from 'vue'
 import WorkspaceActionButton from '@/components/WorkspaceActionButton.vue'
 import WorkspaceRecordItem from '@/components/WorkspaceRecordItem.vue'
 import WorkspaceSectionHeader from '@/components/WorkspaceSectionHeader.vue'
@@ -109,6 +132,8 @@ import type { InferenceTaskResponse, InferenceTaskStatus } from '@/types/api'
 const props = defineProps<{
   tasks: InferenceTaskResponse[]
   statusFilter: InferenceTaskStatus | ''
+  limit: number
+  offset: number
 }>()
 
 const emit = defineEmits<{
@@ -121,7 +146,22 @@ const emit = defineEmits<{
   delete: [taskId: string]
   cleanup: [status: 'completed' | 'failed' | null]
   'update:statusFilter': [status: InferenceTaskStatus | '']
+  page: [offset: number]
 }>()
+
+const offset = computed(() => props.offset)
+const limit = computed(() => props.limit)
+const canPrevious = computed(() => props.offset > 0)
+const canNext = computed(() => props.tasks.length >= props.limit)
+const pageSummary = computed(() => {
+  if (!props.tasks.length) return '0'
+  return `${props.offset + 1}-${props.offset + props.tasks.length}`
+})
+
+const emitPage = (nextOffset: number) => {
+  if (nextOffset < 0 || nextOffset === props.offset) return
+  emit('page', nextOffset)
+}
 
 const handleStatusChange = (value: InferenceTaskStatus | '' | undefined) => {
   emit('update:statusFilter', value ?? '')
@@ -282,5 +322,23 @@ const taskMeta = (task: InferenceTaskResponse) => {
   border: 1px solid var(--border-soft);
   color: #0f766e;
   font-size: 22px;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

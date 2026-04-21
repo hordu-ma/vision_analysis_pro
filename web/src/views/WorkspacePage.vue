@@ -49,8 +49,12 @@
       <el-col :lg="12" :xs="24">
         <ReportBatchList
           :batches="batches"
+          :total="batchTotal"
+          :limit="batchLimit"
+          :offset="batchOffset"
           :active-device-id="selectedDeviceId || undefined"
           @refresh="emit('refresh-reports')"
+          @page="emit('page-reports', $event)"
           @clear-filter="emit('clear-device-filter')"
           @view-detail="emit('open-batch', $event)"
         />
@@ -59,7 +63,10 @@
         <TaskHistoryList
           :tasks="taskHistory"
           :status-filter="taskStatusFilter"
+          :limit="taskLimit"
+          :offset="taskOffset"
           @refresh="emit('refresh-tasks')"
+          @page="emit('page-tasks', $event)"
           @select="emit('open-task', $event)"
           @retry="emit('retry-task', $event)"
           @retry-failed="emit('retry-failed-task', $event)"
@@ -97,7 +104,12 @@ defineProps<{
   batchTask: InferenceTaskDetailResponse | null
   taskHistory: InferenceTaskResponse[]
   taskStatusFilter: InferenceTaskStatus | ''
+  taskLimit: number
+  taskOffset: number
   batches: ReportBatchSummary[]
+  batchTotal: number
+  batchLimit: number
+  batchOffset: number
   selectedDeviceId: string
 }>()
 
@@ -106,7 +118,9 @@ const emit = defineEmits<{
   'batch-result': [data: BatchInferenceResponse]
   'batch-task': [data: InferenceTaskResponse]
   'refresh-reports': []
+  'page-reports': [offset: number]
   'refresh-tasks': []
+  'page-tasks': [offset: number]
   'retry-task': [taskId: string]
   'retry-failed-task': [taskId: string]
   'rerun-task': [taskId: string]

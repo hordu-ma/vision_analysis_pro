@@ -56,6 +56,7 @@
           <el-form label-width="88px" class="review-form">
             <el-form-item label="复核状态">
               <el-select
+                :data-testid="`review-status-${item.frame_id}`"
                 :model-value="
                   reviewDrafts[item.frame_id]?.status ?? item.review?.status ?? 'pending'
                 "
@@ -70,6 +71,7 @@
             </el-form-item>
             <el-form-item label="复核人">
               <el-input
+                :data-testid="`reviewer-input-${item.frame_id}`"
                 :model-value="reviewDrafts[item.frame_id]?.reviewer ?? item.review?.reviewer ?? ''"
                 placeholder="填写复核人"
                 @update:model-value="value => updateDraft(item.frame_id, 'reviewer', value)"
@@ -77,6 +79,7 @@
             </el-form-item>
             <el-form-item label="备注">
               <el-input
+                :data-testid="`review-note-${item.frame_id}`"
                 type="textarea"
                 :rows="2"
                 :model-value="reviewDrafts[item.frame_id]?.note ?? item.review?.note ?? ''"
@@ -86,6 +89,7 @@
             </el-form-item>
             <el-form-item>
               <el-button
+                :data-testid="`save-review-${item.frame_id}`"
                 type="primary"
                 @click="emit('save-review', item.frame_id, reviewPayload(item))"
               >

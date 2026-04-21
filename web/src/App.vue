@@ -86,17 +86,27 @@
             :batch-task="batchTask"
             :task-history="taskHistory"
             :task-status-filter="taskStatusFilter"
+            :task-limit="taskLimit"
+            :task-offset="taskOffset"
             :batches="batches"
+            :batch-total="batchTotal"
+            :batch-limit="batchLimit"
+            :batch-offset="batchOffset"
             :selected-device-id="selectedDeviceId"
             :summary="alertSummary"
             :devices="devices"
+            :device-total="deviceTotal"
+            :device-limit="deviceLimit"
+            :device-offset="deviceOffset"
             :logs="auditLogs"
             :actor-filter="auditActorFilter"
             @result="handleResult"
             @batch-result="handleBatchResult"
             @batch-task="handleBatchTask"
             @refresh-reports="loadReportData"
+            @page-reports="handleReportPageChange"
             @refresh-tasks="loadTaskHistory"
+            @page-tasks="handleTaskPageChange"
             @retry-task="handleRetryTask"
             @retry-failed-task="handleRetryFailedTask"
             @rerun-task="handleRerunTask"
@@ -109,6 +119,7 @@
             @update:task-status-filter="handleTaskStatusFilterChange"
             @refresh-alerts="loadAlertSummary"
             @refresh-devices="loadReportData"
+            @page-devices="handleDevicePageChange"
             @refresh-audit-logs="loadAuditLogs"
             @select-device="handleDeviceSelect"
             @edit-device="openDeviceMetadata"
@@ -175,12 +186,20 @@ const batchDetectionResult = ref<BatchInferenceResponse | null>(null)
 const batchTask = ref<InferenceTaskDetailResponse | null>(null)
 const taskHistory = ref<InferenceTaskResponse[]>([])
 const taskStatusFilter = ref<InferenceTaskStatus | ''>('')
+const taskLimit = 10
+const taskOffset = ref(0)
 const alertSummary = ref<AlertSummaryResponse | null>(null)
 const auditLogs = ref<AuditLogResponse[]>([])
 const actorName = ref('liguo ma')
 const auditActorFilter = ref('')
 const batches = ref<ReportBatchSummary[]>([])
+const batchLimit = 20
+const batchOffset = ref(0)
+const batchTotal = ref(0)
 const devices = ref<ReportDeviceSummary[]>([])
+const deviceLimit = 10
+const deviceOffset = ref(0)
+const deviceTotal = ref(0)
 const selectedDeviceId = ref('')
 const deviceDrawerVisible = ref(false)
 const editingDeviceId = ref('')
@@ -266,7 +285,11 @@ const handleBatchTask = (task: InferenceTaskResponse) => {
 
 const loadTaskHistory = async () => {
   try {
-    taskHistory.value = await apiService.listBatchTasks(10, taskStatusFilter.value)
+    taskHistory.value = await apiService.listBatchTasks(
+      taskLimit,
+      taskStatusFilter.value,
+      taskOffset.value
+    )
   } catch (error) {
     apiService.showError(error as Error)
   }
@@ -339,6 +362,12 @@ const handleRetryFailedTask = async (taskId: string) => {
 
 const handleTaskStatusFilterChange = (status: InferenceTaskStatus | '') => {
   taskStatusFilter.value = status
+  taskOffset.value = 0
+  void loadTaskHistory()
+}
+
+const handleTaskPageChange = (offset: number) => {
+  taskOffset.value = offset
   void loadTaskHistory()
 }
 
@@ -411,14 +440,30 @@ const handleCleanupTasks = async (status: 'completed' | 'failed' | null) => {
 const loadReportData = async () => {
   try {
     const [deviceResponse, batchResponse] = await Promise.all([
-      apiService.listReportDevices(10),
-      apiService.listReportBatches(20, selectedDeviceId.value || undefined)
+      apiService.listReportDevices(deviceLimit, deviceOffset.value),
+      apiService.listReportBatches(
+        batchLimit,
+        selectedDeviceId.value || undefined,
+        batchOffset.value
+      )
     ])
     devices.value = deviceResponse.items
+    deviceTotal.value = deviceResponse.total ?? deviceResponse.count
     batches.value = batchResponse.items
+    batchTotal.value = batchResponse.total ?? batchResponse.count
   } catch (error) {
     apiService.showError(error as Error)
   }
+}
+
+const handleReportPageChange = (offset: number) => {
+  batchOffset.value = offset
+  void loadReportData()
+}
+
+const handleDevicePageChange = (offset: number) => {
+  deviceOffset.value = offset
+  void loadReportData()
 }
 
 const loadAlertSummary = async () => {
@@ -444,11 +489,13 @@ const handleAuditActorFilterChange = (actor: string) => {
 
 const handleDeviceSelect = (deviceId: string) => {
   selectedDeviceId.value = deviceId
+  batchOffset.value = 0
   void loadReportData()
 }
 
 const clearDeviceFilter = () => {
   selectedDeviceId.value = ''
+  batchOffset.value = 0
   void loadReportData()
 }
 

@@ -2,6 +2,7 @@
 
 import asyncio
 import base64
+import logging
 import re
 import time
 from pathlib import Path
@@ -2026,6 +2027,26 @@ async def test_x_trace_id_echoed_when_present() -> None:
         )
     assert resp.status_code == 200
     assert resp.headers.get("x-trace-id") == trace_id
+
+
+@pytest.mark.asyncio
+async def test_x_trace_id_in_request_completed_log(caplog: pytest.LogCaptureFixture) -> None:
+    """当请求携带 x-trace-id 时，结构化日志记录 trace_id 字段。"""
+    trace_id = "trace-log-123"
+    caplog.set_level(logging.INFO, logger="vision_analysis_pro.web.api.main")
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get(
+            "/api/v1/health",
+            headers={"x-trace-id": trace_id},
+        )
+
+    assert resp.status_code == 200
+    completed_records = [
+        record for record in caplog.records if record.message == "request_completed"
+    ]
+    assert completed_records
+    assert completed_records[-1].trace_id == trace_id
 
 
 @pytest.mark.asyncio

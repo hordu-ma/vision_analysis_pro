@@ -4,7 +4,7 @@
 
 本文档保留系统级计划与里程碑背景。当前可执行任务、验收标准、验证命令与非目标以根目录 `tasks.md` 为准；项目进度与变更记录请参见 `docs/progress.md`。
 
-**当前进度快照（截至 2026-04-20）**
+**当前进度快照（截至 2026-04-21）**
 
 | 里程碑 | 状态 | 说明 |
 |--------|------|------|
@@ -13,9 +13,9 @@
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
 | M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
-- **后端测试**：192 passed, 44 skipped（当前轻量环境；缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
-- **前端测试**：53 passed（vitest），ESLint 全绿，生产构建与 browser smoke 通过
-- **下一步**：HE-007 Stage B Model Comparison 需等待 reviewed pilot labels 后再推进；HE-010/HE-011 继续保持证据门禁
+- **后端测试**：当前轻量环境基线为 199 passed, 44 skipped（缺少 `runs/train/exp/weights/best.pt`、`models/best.onnx` 与 `data/images/*` 时跳过对应测试），ruff 全绿
+- **前端测试**：86 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过
+- **下一步**：HE-007 真实试点版需等待 reviewed positive pilot crack labels；短期优先演练 Pilot Deployment Runbook；HE-010/HE-011 继续保持证据门禁
 
 **路线决策（2026-04-19）**
 
@@ -81,10 +81,10 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 192 passed, 44 skipped
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 199 passed, 44 skipped
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
-- ✅ 前端 Web：Vue3 + TS 页面闭环，53 个前端测试通过
+- ✅ 前端 Web：Vue3 + TS 页面闭环，86 个前端测试和 3 条浏览器 E2E 通过
 
 ### 4.2 剩余差距
 

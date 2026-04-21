@@ -35,25 +35,76 @@
         @select="emit('view-detail', batch.batch_id)"
       />
     </div>
+
+    <div class="pagination-bar" data-testid="report-pagination">
+      <span>{{ pageSummary }}</span>
+      <div class="pagination-actions">
+        <WorkspaceActionButton
+          label="上一页"
+          icon="archive-stack"
+          tone="subtle"
+          compact
+          :disabled="!canPrevious"
+          @click="emitPage(offset - limit)"
+        />
+        <WorkspaceActionButton
+          label="下一页"
+          icon="spark-refresh"
+          tone="subtle"
+          compact
+          :disabled="!canNext"
+          @click="emitPage(offset + limit)"
+        />
+      </div>
+    </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import WorkspaceRecordItem from '@/components/WorkspaceRecordItem.vue'
 import WorkspaceActionButton from '@/components/WorkspaceActionButton.vue'
 import WorkspaceSectionHeader from '@/components/WorkspaceSectionHeader.vue'
 import type { ReportBatchSummary } from '@/types/api'
 
-defineProps<{
-  batches: ReportBatchSummary[]
-  activeDeviceId?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    batches: ReportBatchSummary[]
+    activeDeviceId?: string
+    total?: number
+    limit?: number
+    offset?: number
+  }>(),
+  {
+    activeDeviceId: '',
+    total: 0,
+    limit: 20,
+    offset: 0
+  }
+)
 
 const emit = defineEmits<{
   refresh: []
   'clear-filter': []
   'view-detail': [batchId: string]
+  page: [offset: number]
 }>()
+
+const offset = computed(() => props.offset)
+const limit = computed(() => props.limit)
+const canPrevious = computed(() => props.offset > 0)
+const canNext = computed(() => props.offset + props.batches.length < props.total)
+const pageSummary = computed(() => {
+  if (props.total === 0) return '0 / 0'
+  const start = props.offset + 1
+  const end = props.offset + props.batches.length
+  return `${start}-${end} / ${props.total}`
+})
+
+const emitPage = (nextOffset: number) => {
+  if (nextOffset < 0 || nextOffset === props.offset) return
+  emit('page', nextOffset)
+}
 
 const formatTime = (timestamp: number): string => {
   return new Date(timestamp * 1000).toLocaleString('zh-CN', {
@@ -149,5 +200,23 @@ const batchIndex = (batch: ReportBatchSummary) => {
   border: 1px solid var(--border-soft);
   color: var(--brand);
   font-size: 22px;
+}
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 </style>

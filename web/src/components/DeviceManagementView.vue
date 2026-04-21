@@ -26,7 +26,11 @@
       <el-col :lg="16" :xs="24">
         <DeviceOverview
           :devices="devices"
+          :total="deviceTotal"
+          :limit="deviceLimit"
+          :offset="deviceOffset"
           @refresh="emit('refresh-devices')"
+          @page="emit('page-devices', $event)"
           @select-device="emit('select-device', $event)"
           @edit-device="emit('edit-device', $event)"
         />
@@ -57,6 +61,9 @@ import type { AlertSummaryResponse, AuditLogResponse, ReportDeviceSummary } from
 defineProps<{
   summary: AlertSummaryResponse | null
   devices: ReportDeviceSummary[]
+  deviceTotal: number
+  deviceLimit: number
+  deviceOffset: number
   logs: AuditLogResponse[]
   actorFilter: string
 }>()
@@ -64,6 +71,7 @@ defineProps<{
 const emit = defineEmits<{
   'refresh-alerts': []
   'refresh-devices': []
+  'page-devices': [offset: number]
   'refresh-audit-logs': []
   'select-device': [deviceId: string]
   'edit-device': [deviceId: string]

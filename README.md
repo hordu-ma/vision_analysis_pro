@@ -280,7 +280,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 198 passed, 44 skipped）
+├── tests/                      # Python 测试（当前轻量基线 199 passed, 44 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -307,8 +307,8 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 198 passed, 44 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
-- 前端：`npm run test -- --run`（85 passed）
+- 后端：`uv run pytest`（当前本地轻量环境为 199 passed, 44 skipped；YOLO/ONNX 模型和数据目录缺失时会跳过对应测试）
+- 前端：`npm run test -- --run`（86 passed）
 
 ### 提交规范
 
@@ -363,7 +363,9 @@ vision_analysis_pro/
 
 ### 📋 当前任务队列
 
-- **HE-007 Stage B Model Comparison**：等待 reviewed pilot labels 后，训练自有数据模型并与 Stage A 公共数据模型在同一试点验证集上对比。
+- **HE-007 Stage B Model Comparison（真实试点版）**：等待 reviewed positive pilot crack labels 后，训练自有数据模型并与 Stage A 公共数据模型在同一试点验证集上对比。
+- **Pilot Deployment Runbook 演练**：使用 Docker Compose + Stage A ONNX + Edge Agent 完整跑一次试点部署验收。
+- **指标系统升级**：评估将当前 `app.state.metrics` 替换为 `prometheus_client.Counter/Histogram`，提升多 worker 稳定性和 Grafana 分桶能力。
 - **HE-010 / HE-011**：语义分割和趋势分析继续保持证据门禁，只有在需要裂缝长度/面积或同设备多批次历史时再推进。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。

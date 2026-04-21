@@ -300,16 +300,16 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. 浏览器级 E2E 自动化测试
-2. Edge Agent 上报稳态测试（断网缓存、恢复回放、重复批次）
-3. docker-compose 与前后端统一部署说明
-4. metrics 告警示例与结构化日志采集
+1. Pilot Deployment Runbook 演练（Docker Compose + Stage A ONNX + Edge Agent）
+2. 真实 pilot crack 图片/视频收集与 reviewed positive labels 准备
+3. metrics 告警示例与 `prometheus_client` 指标升级评估
+4. 审计日志分页与筛选增强（按真实数据量决定）
 
 ### 中优先级
 
 5. MQTT 上报器实现
 6. Prometheus metrics 告警示例
-7. 结构化日志采集
+7. 结构化日志采集扩展到更多业务事件
 
 ### 低优先级
 
@@ -319,4 +319,5 @@ cd web && npm run lint
 ---
 
 **测试完成**: 2026-04-18
-**结论**: ✅ 核心 API、前端单元测试与 Edge Agent 上报契约通过；模型/数据相关测试在当前轻量环境中按预期跳过
+**最近更新**: 2026-04-21
+**结论**: ✅ 核心 API、前端单元测试、3 条浏览器 E2E 与 Edge Agent 上报契约通过；模型/数据相关测试在当前轻量环境中按预期跳过

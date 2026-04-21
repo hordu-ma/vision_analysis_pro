@@ -144,6 +144,7 @@ async def request_context_middleware(
             "request_failed",
             extra={
                 "request_id": request_id,
+                "trace_id": trace_id,
                 "method": request.method,
                 "path": route_path,
             },
@@ -171,6 +172,7 @@ async def request_context_middleware(
         "request_completed",
         extra={
             "request_id": request_id,
+            "trace_id": trace_id,
             "method": request.method,
             "path": route_path,
             "status_code": response.status_code,

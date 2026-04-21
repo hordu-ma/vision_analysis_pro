@@ -1,5 +1,10 @@
 <template>
-  <button class="workspace-action" :class="[`tone-${tone}`, { compact }]" type="button">
+  <button
+    class="workspace-action"
+    :class="[`tone-${tone}`, { compact }]"
+    type="button"
+    :disabled="disabled"
+  >
     <ProductIcon :name="icon" class="action-icon" />
     <span>{{ label }}</span>
   </button>
@@ -14,10 +19,12 @@ withDefaults(
     icon: 'spark-refresh' | 'archive-stack'
     tone?: 'default' | 'subtle'
     compact?: boolean
+    disabled?: boolean
   }>(),
   {
     tone: 'default',
-    compact: false
+    compact: false,
+    disabled: false
   }
 )
 </script>
@@ -47,6 +54,12 @@ withDefaults(
   border-color: rgba(29, 78, 216, 0.24);
   background: rgba(239, 246, 255, 0.96);
   transform: translateY(-1px);
+}
+
+.workspace-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
 }
 
 .workspace-action.tone-subtle {

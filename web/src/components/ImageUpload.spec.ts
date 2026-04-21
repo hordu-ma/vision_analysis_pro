@@ -58,6 +58,8 @@ const globalStubs = {
   ProductIcon: { template: '<span />', props: ['name', 'spinning'] }
 }
 
+const exposedVm = (vm: unknown): Record<string, unknown> => vm as Record<string, unknown>
+
 describe('ImageUpload.vue', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -65,37 +67,37 @@ describe('ImageUpload.vue', () => {
 
   it('默认为单图模式', () => {
     const wrapper = mount(ImageUpload, { global: { stubs: globalStubs } })
-    const vm = wrapper.vm as Record<string, unknown>
+    const vm = exposedVm(wrapper.vm)
     expect(vm.uploadMode).toBe('single')
   })
 
   it('初始无文件时 selectedFile 为 null', () => {
     const wrapper = mount(ImageUpload, { global: { stubs: globalStubs } })
-    const vm = wrapper.vm as Record<string, unknown>
+    const vm = exposedVm(wrapper.vm)
     expect(vm.selectedFile).toBeNull()
   })
 
   it('初始无文件时 analyzing 为 false', () => {
     const wrapper = mount(ImageUpload, { global: { stubs: globalStubs } })
-    const vm = wrapper.vm as Record<string, unknown>
+    const vm = exposedVm(wrapper.vm)
     expect(vm.analyzing).toBe(false)
   })
 
   it('批量模式 selectedFiles 应该是数组', async () => {
     const wrapper = mount(ImageUpload, { global: { stubs: globalStubs } })
-    const vm = wrapper.vm as Record<string, unknown>
+    const vm = exposedVm(wrapper.vm)
     // Vue 3 script setup: refs are unwrapped in the vm proxy, assign directly
-    ;(vm as Record<string, unknown>).uploadMode = 'batch'
+    vm.uploadMode = 'batch'
     await wrapper.vm.$nextTick()
     expect(Array.isArray(vm.selectedFiles)).toBe(true)
   })
 
   it('clearFile 应该清除 previewUrl 和 selectedFile', async () => {
     const wrapper = mount(ImageUpload, { global: { stubs: globalStubs } })
-    const vm = wrapper.vm as Record<string, unknown>
+    const vm = exposedVm(wrapper.vm)
     // Simulate a file being selected by setting refs directly
-    ;(vm as Record<string, unknown>).previewUrl = 'blob:mock-preview-url'
-    ;(vm as Record<string, unknown>).selectedFile = new File([''], 'test.jpg', {
+    vm.previewUrl = 'blob:mock-preview-url'
+    vm.selectedFile = new File([''], 'test.jpg', {
       type: 'image/jpeg'
     })
     await wrapper.vm.$nextTick()
