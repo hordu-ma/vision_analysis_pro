@@ -109,6 +109,8 @@ Stage A 测试集（225 张）经 ONNX 自动标注结果：
 
 不要把当前 Stage B 代理模型发布为试点模型。真实试点版 HE-007 的触发条件仍是：已有来自目标场景的 reviewed positive pilot crack labels，并且可以在同一 held-out pilot validation set 上比较 Stage A 与 Stage B。
 
+在人工复核正样本到位前，继续保持 Stage A ONNX 作为部署模型，并按 `docs/stage-b-pilot-data.md` 中的 handoff checklist 准备数据接收、预标注、人工复核和 Day-1 HE-007 重跑流程。
+
 Stage B 的改进路径（按优先级）：
 
 1. **获取真实巡检图像**（最高优先级）

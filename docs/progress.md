@@ -727,10 +727,10 @@ Stage A 可用于真实 YOLO/ONNX 链路验证；是否可用于试点仍需 Sta
 下一步开发计划以根目录 `tasks.md` 为准。当前只保留两条分支，按是否拿到 reviewed positive pilot crack labels 决策：
 
 1. **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版），用 reviewed pilot labels 训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
-2. **分支 B：真实试点标签暂未到位（已完成）**。指标系统升级与审计日志分页增强均已完成；继续保持 Stage A 部署主线与证据门禁。
-3. **公开代理补位（已完成）**。`SDNET2018 + RDD2022` 已接入 public surrogate 数据入口，可在没有真实试点媒体时继续做 crack-only 开发验证。
+2. **分支 B：真实试点标签暂未到位**。继续保持 Stage A 部署主线与证据门禁；样本到位前准备数据交接字段、预标注流程、复核规则、试点链路演练和 stub 回滚。
+3. **公开代理补位（已完成）**。`SDNET2018 + RDD2022` 已接入 public surrogate 数据入口，可在没有真实试点媒体时继续做 crack-only 开发验证，但结论必须标记为非真实试点证据。
 
-非关键路径：MQTT、Rust/PyO3、DeepLab 和 Transformer 趋势分析均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
+非关键路径：MQTT、DeepLab 和 Transformer 趋势分析均后置，除非 `tasks.md` 显式提升优先级。会话开头的四条方向已在 `tasks.md` 的 "Original Direction Traceability" 中映射到具体 HE 任务。
 
 ---
 

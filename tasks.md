@@ -10,7 +10,7 @@ Last updated: 2026-04-22
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
-- DeepLab, Transformer trend modeling, MQTT, and Rust/PyO3 are not on the critical path unless a task below explicitly promotes them.
+- DeepLab, Transformer trend modeling, and MQTT are not on the critical path unless a task below explicitly promotes them.
 
 ## Stage Definitions
 
@@ -697,7 +697,7 @@ Scope:
 - No five-class production claim without a real five-class dataset and evaluation report.
 - No DeepLab/Transformer chain as a prerequisite for Stage A.
 - No committed model weights or public dataset archives.
-- No Rust/PyO3 work until profiling shows Python preprocessing or postprocessing is the bottleneck.
+- No native acceleration work in the current stage; keep the implementation on the existing Python + YOLO/ONNX path.
 
 ## 后续开发两项分支
 
@@ -720,6 +720,13 @@ Scope:
 2. **审计日志分页与筛选增强** ✅ 已完成
    - `/reports/audit-logs` 已支持 `offset`、`total` 和 `actor` 过滤。
    - 前端设备页已补齐审计日志分页控件与服务层类型。
+
+3. **真实样本到位前的可执行工作**
+   - 保持 Stage A ONNX 为当前部署模型，不切换到 Stage B 代理模型。
+   - 准备数据接收目录、命名规范和标注交接清单，确保真实图片/视频到位后可直接进入 `scripts/prepare_stage_b_pilot_dataset.py`。
+   - 使用 `SDNET2018 + RDD2022` public surrogate 数据做非真实试点验证，所有结论必须标记为公开代理验证。
+   - 继续演练 API、前端、Edge Agent 上报、离线缓存、复核、导出和回滚路径，确保交付链路稳定。
+   - 记录现场需要补充的信息：设备/杆塔/线路标识、拍摄时间、拍摄角度、是否有裂缝正样本、人工复核人和复核规则。
 
 ### 长期（Backlog）
 

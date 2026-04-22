@@ -23,6 +23,89 @@ When real pilot media is not available yet, the repository now also supports a *
 
 2026-04-22 status: no new self-owned pilot media or reviewed positive crack labels were found in the workspace. The existing local `data/stage_b_pilot_crack/` is a proxy dataset built from Stage A test images auto-labeled by the Stage A ONNX model; it validates successfully, but it is not real pilot evidence.
 
+## Work Before Reviewed Labels Arrive
+
+Until reviewed positive pilot crack labels exist, the useful work is operational preparation, not model expansion:
+
+- keep `models/stage_a_crack/best.onnx` as the recommended deployment model
+- do not switch to the current Stage B proxy model
+- keep all real pilot media, labels, and generated datasets out of git
+- keep using `INFERENCE_ENGINE=stub` for link checks and Stage A YOLO/ONNX for real-model smoke
+- use public surrogate data only for engineering validation, and mark every result as non-real-pilot evidence
+- rehearse API, frontend, Edge Agent reporting, offline cache replay, review save, report summary, export, and rollback paths
+
+### Pilot Data Handoff Checklist
+
+Collect the following fields before or alongside the first real media drop:
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `asset_id` | yes | Tower, pole, bridge span, line segment, or other stable inspection target ID. |
+| `device_id` | yes | Must match the Edge Agent or acquisition device where possible. |
+| `site_name` | yes | Human-readable site or route name for report filtering. |
+| `capture_time` | yes | Local timestamp or UTC timestamp; keep the original timezone if known. |
+| `source_type` | yes | `image_folder`, `video`, `rtsp_capture`, or `manual_upload`. |
+| `camera_angle` | preferred | Front/side/top/detail, or a short free-text description. |
+| `weather_lighting` | preferred | Clear/rain/night/backlight/low-light if known. |
+| `reviewer` | yes for labels | Person or role that confirmed each positive or negative label. |
+| `review_rule_version` | yes for labels | Use the current rules in `docs/annotation_guidelines.md` unless a newer rule is recorded. |
+| `known_positive_count` | preferred | Estimate of frames/images containing visible cracks before annotation starts. |
+
+Recommended local staging layout:
+
+```text
+data/pilot_inbox/
+  raw_images/
+  raw_videos/
+  metadata/
+  prelabels/
+  reviewed_labels/
+```
+
+`data/` is ignored for local data caches, so these directories should be created locally when needed and not committed. If the media arrives through another storage path, keep the same logical split and pass those paths to the dataset builder.
+
+### Prelabel Dry Run
+
+When Stage A ONNX weights exist locally, use them to prelabel candidate images before human review:
+
+```bash
+uv run python scripts/auto_label_onnx.py \
+  --model models/stage_a_crack/best.onnx \
+  --images data/pilot_inbox/raw_images \
+  --output data/pilot_inbox/prelabels \
+  --conf 0.30
+```
+
+Human review then edits or replaces the generated `.txt` labels under `data/pilot_inbox/reviewed_labels`. Empty files are valid only after a reviewer confirms the image is a negative crack sample.
+
+### Day-1 HE-007 Path After Labels Arrive
+
+Once reviewed labels contain positive `crack` boxes, run the real-pilot branch in this order:
+
+```bash
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  data/pilot_inbox/raw_images \
+  --labels-dir data/pilot_inbox/reviewed_labels \
+  --output data/stage_b_pilot_crack \
+  --mark-reviewed
+
+uv run python scripts/prepare_stage_b_pilot_dataset.py \
+  --output data/stage_b_pilot_crack \
+  --validate-only
+
+uv run python scripts/train.py \
+  --data data/stage_b_pilot_crack/data.yaml \
+  --model runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+  --epochs 30 \
+  --batch 8 \
+  --imgsz 640 \
+  --project runs/stage_b_pilot_crack \
+  --name real_pilot_v0_1 \
+  --exist-ok
+```
+
+After training, evaluate Stage A and Stage B on the same held-out pilot validation split. Only update the deployment recommendation if Stage B wins on that real-pilot comparison.
+
 ## Dataset Builder
 
 Use `scripts/prepare_stage_b_pilot_dataset.py` to create a crack-only YOLO dataset.

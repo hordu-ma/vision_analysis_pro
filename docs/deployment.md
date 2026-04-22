@@ -631,6 +631,7 @@ COMPOSE_UV_DEFAULT_INDEX=https://your.mirror/simple docker compose up --build -d
 - `data/stage_b_pilot_crack/` 校验通过，确认当前本地 Stage B 数据仍为 Stage A 测试集自动标注代理数据。
 - Stage A 与 Stage B 代理模型在同一 Stage A val 集上复核评估，指标与 `docs/stage-b-model-comparison.md` 一致。
 - 当前部署推荐仍为 Stage A ONNX：`models/stage_a_crack/best.onnx`；链路 smoke 仍可使用 `INFERENCE_ENGINE=stub`。
+- 真实样本到位前，部署演练应聚焦 Stage A ONNX、stub 回滚、Edge Agent 上报、离线缓存、人工复核、报告摘要和导出链路；样本交接字段与 Day-1 HE-007 命令见 `docs/stage-b-pilot-data.md`。
 
 复核命令：
 

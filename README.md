@@ -402,9 +402,9 @@ vision_analysis_pro/
 ### 📋 后续开发两项分支
 
 - **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
-- **分支 B：真实试点标签暂未到位（已完成）**。指标系统已升级为 `prometheus_client.Counter/Histogram/Gauge`，`/api/v1/metrics` 已暴露 histogram 分桶；审计日志列表也已补齐 `offset` / `total` 与前端分页控件。
+- **分支 B：真实试点标签暂未到位**。保持 Stage A ONNX 为部署模型，准备真实样本交接清单、预标注流程和试点链路演练；具体执行口径见 `docs/stage-b-pilot-data.md`。
 - **公开代理补位（新增）**。当真实试点媒体尚未到位时，可先用 `SDNET2018 + RDD2022` 通过 `scripts/prepare_public_surrogate_crack_dataset.py` 构建 public surrogate 数据集，继续做非真实试点开发验证。
-- **当前门禁**。若没有 reviewed positive pilot crack labels，不切换部署模型、不宣称真实试点精度、不推进五分类/分割/趋势模型主线。
+- **当前门禁**。若没有 reviewed positive pilot crack labels，不切换部署模型、不宣称真实试点精度、不推进五分类/分割/趋势模型主线，也不新增原生扩展路线。
 
 完整验收标准、验证命令和非目标参见 [`tasks.md`](tasks.md)。
 

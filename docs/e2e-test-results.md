@@ -308,7 +308,7 @@ cd web && npm run lint
 ### 条件推进
 
 3. 真实试点媒体暂未到位时，可用 `SDNET2018 + RDD2022` public surrogate 继续做非真实试点验证，但结论必须标记为公开代理验证。
-4. MQTT、TensorRT、Rust/PyO3、分割细化和趋势分析保持 backlog，只有在真实需求或性能证据出现后再提升优先级。
+4. MQTT、TensorRT、分割细化和趋势分析保持 backlog，只有在真实需求或性能证据出现后再提升优先级。
 
 ---
 
