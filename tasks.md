@@ -728,6 +728,13 @@ Scope:
    - 继续演练 API、前端、Edge Agent 上报、离线缓存、复核、导出和回滚路径，确保交付链路稳定。
    - 记录现场需要补充的信息：设备/杆塔/线路标识、拍摄时间、拍摄角度、是否有裂缝正样本、人工复核人和复核规则。
 
+4. **用户演示前准备**
+   - 明确演示模式：`stub` 用于稳定展示产品流程，Stage A ONNX 用于真实模型路径；没有 reviewed positive pilot crack labels 时不宣称真实试点精度。
+   - 准备 3-5 张演示图片和 1 个 Edge Agent 上报样例，覆盖单图检测、批量任务、上报批次、人工复核、报告摘要和导出。
+   - 演示前确认 `models/stage_a_crack/best.onnx` 是否存在；若缺失或 ready 失败，切回 `INFERENCE_ENGINE=stub` 演示链路。
+   - 演练启动、健康检查、前端访问、Edge Agent 上报和回滚命令，确保 API、前端、设备页、审计日志和导出路径可重复。
+   - 演示前运行最小质量门禁：`uv run ruff check .`、`uv run pytest`、`cd web && npm run lint && npm run test -- --run && npm run build && npm run test:e2e`。
+
 ### 长期（Backlog）
 
 - HE-010 分割细化（DeepLab/SAM）：仅在需要像素级裂缝面积/长度估计时推进。
