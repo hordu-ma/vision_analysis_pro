@@ -21,7 +21,7 @@ This directory is ignored by git because raw pilot images, labels, videos, and g
 
 When real pilot media is not available yet, the repository now also supports a **public surrogate** path based on SDNET2018 and RDD2022. That path is for engineering validation only and must not be described as real pilot evidence.
 
-2026-04-22 status: no new self-owned pilot media or reviewed positive crack labels were found in the workspace. The existing local `data/stage_b_pilot_crack/` is a proxy dataset built from Stage A test images auto-labeled by the Stage A ONNX model; it validates successfully, but it is not real pilot evidence.
+2026-04-26 status: no new self-owned pilot media or reviewed positive crack labels are committed to the workspace. The existing local `data/stage_b_pilot_crack/` is a proxy dataset built from Stage A test images auto-labeled by the Stage A ONNX model; it validates successfully, but it is not real pilot evidence. `scripts/validate_pilot_inbox.py` now provides the real-pilot handoff preflight for local `data/pilot_inbox/` drops.
 
 ## Work Before Reviewed Labels Arrive
 
@@ -64,6 +64,49 @@ data/pilot_inbox/
 
 `data/` is ignored for local data caches, so these directories should be created locally when needed and not committed. If the media arrives through another storage path, keep the same logical split and pass those paths to the dataset builder.
 
+### Pilot Inbox Preflight
+
+Before running HE-007 real-pilot training, validate the local handoff inbox:
+
+```bash
+uv run python scripts/validate_pilot_inbox.py \
+  --root data/pilot_inbox
+```
+
+Expected success output includes:
+
+```text
+pilot_inbox=data/pilot_inbox
+total_images=<n>
+labeled_images=<n>
+pending_images=0
+reviewed_positive_images=<n>
+reviewed_positive_boxes=<n>
+reviewed_negative_images=<n>
+metadata_records=<n>
+ready_for_he007=true
+```
+
+The command checks:
+
+- `raw_images/` contains readable image files
+- `reviewed_labels/` has no orphan `.txt` label files
+- metadata exists for each raw image
+- required media fields are present: `asset_id`, `device_id`, `site_name`, `capture_time`, `source_type`
+- reviewed labels also have `reviewer` and `review_rule_version`
+- YOLO labels are crack-only class `0` with normalized bbox values
+- at least one reviewed positive crack box exists before HE-007 training
+
+For a structure-only rehearsal before labels arrive, use:
+
+```bash
+uv run python scripts/validate_pilot_inbox.py \
+  --root data/pilot_inbox \
+  --allow-no-positive
+```
+
+`--allow-no-positive` can pass metadata/structure checks, but `ready_for_he007` remains `false` until reviewed positive crack boxes exist.
+
 ### Prelabel Dry Run
 
 When Stage A ONNX weights exist locally, use them to prelabel candidate images before human review:
@@ -83,6 +126,9 @@ Human review then edits or replaces the generated `.txt` labels under `data/pilo
 Once reviewed labels contain positive `crack` boxes, run the real-pilot branch in this order:
 
 ```bash
+uv run python scripts/validate_pilot_inbox.py \
+  --root data/pilot_inbox
+
 uv run python scripts/prepare_stage_b_pilot_dataset.py \
   data/pilot_inbox/raw_images \
   --labels-dir data/pilot_inbox/reviewed_labels \

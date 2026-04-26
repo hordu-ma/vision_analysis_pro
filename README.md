@@ -317,7 +317,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 204 passed, 44 skipped）
+├── tests/                      # Python 测试（当前轻量基线 209 passed, 44 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -344,7 +344,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 204 passed, 44 skipped；legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 209 passed, 44 skipped；legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（90 passed）
 
 ### 提交规范
@@ -402,7 +402,7 @@ vision_analysis_pro/
 ### 📋 后续开发两项分支
 
 - **分支 A：真实试点标签到位**。推进 HE-007 Stage B Model Comparison（真实试点版）：训练自有试点数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
-- **分支 B：真实试点标签暂未到位**。保持 Stage A ONNX 为部署模型，准备真实样本交接清单、预标注流程和试点链路演练；具体执行口径见 `docs/stage-b-pilot-data.md`。
+- **分支 B：真实试点标签暂未到位**。保持 Stage A ONNX 为部署模型，使用 `scripts/validate_pilot_inbox.py` 校验真实样本交接清单、预标注结果和 reviewed positive crack boxes；具体执行口径见 `docs/stage-b-pilot-data.md`。
 - **公开代理补位（新增）**。当真实试点媒体尚未到位时，可先用 `SDNET2018 + RDD2022` 通过 `scripts/prepare_public_surrogate_crack_dataset.py` 构建 public surrogate 数据集，继续做非真实试点开发验证。
 - **当前门禁**。若没有 reviewed positive pilot crack labels，不切换部署模型、不宣称真实试点精度、不推进五分类/分割/趋势模型主线，也不新增原生扩展路线。
 

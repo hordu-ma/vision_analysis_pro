@@ -2,7 +2,7 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-22
+Last updated: 2026-04-26
 
 ## Operating Rules
 
@@ -52,6 +52,7 @@ Status:
 - HE-006 completed the repeatable Stage B data intake loop and generated `data/stage_b_pilot_crack/` locally.
 - The current local Stage B smoke dataset uses readable checked-in sample images with reviewed-negative empty labels to validate structure only.
 - `scripts/prepare_public_surrogate_crack_dataset.py` now supports SDNET2018 + RDD2022 as public surrogate inputs while real pilot media is still unavailable.
+- `scripts/validate_pilot_inbox.py` now validates the local real-pilot handoff inbox before HE-007 real-pilot training.
 - HE-007 real-pilot rerun remains the model-comparison step once reviewed positive pilot crack labels exist.
 
 ### Stage C Engineering Pilot
@@ -124,7 +125,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - Audit logs now support `offset` pagination, `total`, and actor filtering in the API; the device page includes matching audit-log pagination controls.
 - X-Trace-ID is now included in request completion/failure structured log records.
 - Public surrogate crack-data support now includes `scripts/prepare_public_surrogate_crack_dataset.py`, which uses SDNET2018 negatives plus RDD2022 crack boxes to build a crack-only proxy dataset.
-- Current backend baseline: `204 passed, 44 skipped`.
+- HE-014 added a Pilot Inbox preflight validator for `data/pilot_inbox/`, covering raw image readability, reviewed label pairing, required handoff metadata, review fields, and reviewed positive crack-box gating before HE-007.
+- Current backend baseline: `209 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
@@ -465,6 +467,40 @@ Rollback:
 
 ## Completed Task
 
+### HE-014 Pilot Inbox Preflight
+
+Status: Done
+Priority: P1
+
+Scope:
+- Turn the real-pilot handoff checklist into an executable validation step before HE-007.
+- Validate local-only `data/pilot_inbox/` structure without committing pilot media, labels, or metadata.
+- Block HE-007 training when no reviewed positive crack boxes exist.
+
+Result:
+- `scripts/validate_pilot_inbox.py` validates `raw_images/`, `reviewed_labels/`, and `metadata/` under `data/pilot_inbox/` by default.
+- The validator checks readable images, orphan labels, required media metadata (`asset_id`, `device_id`, `site_name`, `capture_time`, `source_type`), label review metadata (`reviewer`, `review_rule_version`), YOLO crack-only label format, pending images, reviewed negatives, and reviewed positive box counts.
+- Metadata can be provided as per-image JSON files, a mapping JSON file, or a JSON file with an `items` list.
+- The default mode exits non-zero if reviewed positive crack boxes are absent; `--allow-no-positive` is available for structure-only rehearsal before labels arrive.
+- `tests/test_validate_pilot_inbox.py` covers positive readiness, missing metadata, no-positive gating, structure-only mode, and metadata manifest input.
+
+Acceptance criteria:
+- [x] One command can determine whether `data/pilot_inbox/` is ready for HE-007 real-pilot training.
+- [x] The command reports total images, labeled images, pending images, reviewed positives, reviewed negatives, metadata count, and readiness.
+- [x] Missing metadata or missing reviewed positive boxes prevents accidental Stage B training.
+
+Validation commands:
+
+```bash
+uv run ruff check scripts/validate_pilot_inbox.py tests/test_validate_pilot_inbox.py
+uv run pytest tests/test_validate_pilot_inbox.py tests/test_prepare_stage_b_dataset.py -q
+```
+
+Rollback:
+- Remove `scripts/validate_pilot_inbox.py` and `tests/test_validate_pilot_inbox.py`; keep HE-006/HE-007 dataset preparation unchanged.
+
+## Completed Task
+
 ### HE-008 Full Inspection Flow Hardening
 
 Status: Done
@@ -701,7 +737,7 @@ Scope:
 
 ## 后续开发两项分支
 
-当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的后续工作均已完成到可记录状态。2026-04-22 已再次确认本地没有新的真实试点媒体/人工复核正样本，代理 Stage B 对比结论未变化。下一步只剩真实试点标签到位后的条件分支；否则保持当前部署主线并回到长期 backlog。
+当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的前置工程工作均已完成到可记录状态。2026-04-26 已补齐 `data/pilot_inbox/` 前置校验工具；下一步在真实标签到位前继续保持 Stage A 部署主线，真实标签到位后进入 HE-007 真实试点版。
 
 ### 分支 A：真实试点标签到位
 
@@ -723,7 +759,7 @@ Scope:
 
 3. **真实样本到位前的可执行工作**
    - 保持 Stage A ONNX 为当前部署模型，不切换到 Stage B 代理模型。
-   - 准备数据接收目录、命名规范和标注交接清单，确保真实图片/视频到位后可直接进入 `scripts/prepare_stage_b_pilot_dataset.py`。
+   - 使用 `scripts/validate_pilot_inbox.py` 校验数据接收目录、命名规范、标注交接字段和 reviewed positive crack boxes，确保真实图片/视频到位后可直接进入 `scripts/prepare_stage_b_pilot_dataset.py`。
    - 使用 `SDNET2018 + RDD2022` public surrogate 数据做非真实试点验证，所有结论必须标记为公开代理验证。
    - 继续演练 API、前端、Edge Agent 上报、离线缓存、复核、导出和回滚路径，确保交付链路稳定。
    - 记录现场需要补充的信息：设备/杆塔/线路标识、拍摄时间、拍摄角度、是否有裂缝正样本、人工复核人和复核规则。
