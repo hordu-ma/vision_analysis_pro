@@ -88,7 +88,8 @@ Exit criteria:
 
 Status:
 - HE-015 completed the route pivot, local inbox preparation, and annotation queue generation.
-- Training remains blocked until human-reviewed bbox labels exist.
+- HE-016 converted the AI-assisted reviewed labels into a YOLO dataset and completed a 1-epoch smoke training run.
+- Model quality remains non-claimable until the labels are reviewed and the dataset grows beyond the current 24-image prototype set.
 
 ## Noise Control
 
@@ -153,7 +154,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-014 added a Pilot Inbox preflight validator for `data/pilot_inbox/`, covering raw image readability, reviewed label pairing, required handoff metadata, review fields, and reviewed positive crack-box gating before HE-007.
 - HE-015 pivoted the active prototype path away from crack-only gating and prepared the 24-image multiclass tower-defect inbox from `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/`.
 - `scripts/prepare_multiclass_prototype_inbox.py` now writes the ignored local `data/multiclass_inbox/` structure, including `raw_images/`, `metadata/`, `reviewed_labels/`, `classes.json`, `manifest.json`, and `annotation_queue.csv`.
-- Current backend baseline: `212 passed, 44 skipped`.
+- HE-016 added `scripts/prepare_multiclass_tower_dataset.py`, generated local `data/multiclass_tower_defect/`, and completed a CPU 1-epoch YOLO smoke training run under `runs/multiclass_tower_defect/smoke_v0_1/`.
+- Current backend baseline: `215 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
@@ -528,6 +530,63 @@ Rollback:
 
 ## Completed Task
 
+### HE-016 Multiclass Tower Dataset and Smoke Training
+
+Status: Done
+Priority: P0
+
+Scope:
+- Convert AI-assisted reviewed labels from `data/multiclass_inbox/` into a YOLO dataset.
+- Validate image/label pairing, class IDs, bbox ranges, and split directories.
+- Run a minimum smoke training pass to prove the multiclass prototype training path works.
+
+Result:
+- Added `scripts/prepare_multiclass_tower_dataset.py`.
+- Added tests in `tests/test_prepare_multiclass_tower_dataset.py`.
+- Generated ignored local dataset `data/multiclass_tower_defect/`:
+  - total images: 24
+  - total boxes: 24
+  - train/val/test: 16 / 4 / 4
+  - class boxes: `deformation=4`, `tower_corrosion=5`, `loose_bolt=7`, `bolt_rust=8`
+- Completed 1-epoch CPU smoke training:
+  - command uses `yolov8n.pt`, `imgsz=320`, `batch=4`, `workers=0`
+  - output: `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt`
+  - smoke metrics: mAP50 `0.0412`, mAP50-95 `0.0061`, precision `0.0039`, recall `0.7500`
+
+Acceptance criteria:
+- [x] Reviewed local labels are transformed into a YOLO data directory.
+- [x] `data.yaml` records the 4-class prototype mapping.
+- [x] Dataset validation passes.
+- [x] YOLO smoke training completes and writes a local model artifact.
+- [x] Docs state that smoke metrics are not an accuracy claim.
+
+Validation commands:
+
+```bash
+uv run python scripts/prepare_multiclass_tower_dataset.py
+uv run python scripts/prepare_multiclass_tower_dataset.py --validate-only
+uv run python scripts/train.py \
+  --data data/multiclass_tower_defect/data.yaml \
+  --model yolov8n.pt \
+  --epochs 1 \
+  --batch 4 \
+  --imgsz 320 \
+  --device cpu \
+  --workers 0 \
+  --project runs/multiclass_tower_defect \
+  --name smoke_v0_1 \
+  --exist-ok \
+  --patience 1
+uv run ruff check scripts/prepare_multiclass_tower_dataset.py tests/test_prepare_multiclass_tower_dataset.py
+uv run pytest tests/test_prepare_multiclass_tower_dataset.py -q
+```
+
+Rollback:
+- Remove `scripts/prepare_multiclass_tower_dataset.py` and `tests/test_prepare_multiclass_tower_dataset.py`.
+- Remove ignored local `data/multiclass_tower_defect/` and `runs/multiclass_tower_defect/` if the prototype dataset definition changes.
+
+## Completed Task
+
 ### HE-015 Multiclass Tower Defect Prototype Inbox
 
 Status: Done
@@ -826,9 +885,9 @@ Scope:
    - 标签格式：YOLO bbox，每行 `<class_id> <x_center> <y_center> <width> <height>`，坐标归一化到 0-1。
 
 2. **标注完成后的原型训练**
-   - 生成 `data/multiclass_tower_defect/data.yaml`。
-   - 使用 `yolov8n.pt` 做 smoke training。
-   - 目标是跑通数据、训练、ONNX 导出、API 推理和前端展示，不宣称真实精度。
+   - ✅ 已生成 `data/multiclass_tower_defect/data.yaml`。
+   - ✅ 已使用 `yolov8n.pt` 完成 1-epoch smoke training。
+   - 当前产物证明数据与训练链路可运行；下一步是基于 `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` 做一次本地推理 smoke，再决定是否导出 ONNX 和接入 API/前端。
 
 3. **原型验收口径**
    - 每类至少有可读图片和人工复核标签。

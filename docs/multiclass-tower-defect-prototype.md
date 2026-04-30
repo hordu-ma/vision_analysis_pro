@@ -79,7 +79,9 @@ If an image is not usable for training, leave it unlabeled and mark it outside t
 
 ## Next Step After Annotation
 
-After human-reviewed bbox labels exist:
+The current local labels are AI-assisted reviewed labels for prototype smoke work. They are enough to validate the training path, but they should still receive human or domain-expert review before any accuracy claim.
+
+After labels exist:
 
 1. Generate `data/multiclass_tower_defect/data.yaml`.
 2. Run a small YOLO smoke training from `yolov8n.pt`.
@@ -87,3 +89,61 @@ After human-reviewed bbox labels exist:
 4. Wire the prototype model into API inference and frontend display.
 
 The first goal is a runnable prototype, not a reliable accuracy claim.
+
+## Dataset and Smoke Training
+
+Generate the local YOLO dataset:
+
+```bash
+uv run python scripts/prepare_multiclass_tower_dataset.py
+uv run python scripts/prepare_multiclass_tower_dataset.py --validate-only
+```
+
+Current local result:
+
+```text
+dataset=data/multiclass_tower_defect
+total_images=24
+total_boxes=24
+train_images=16
+val_images=4
+test_images=4
+deformation_boxes=4
+tower_corrosion_boxes=5
+loose_bolt_boxes=7
+bolt_rust_boxes=8
+ready_for_smoke_training=true
+```
+
+Run smoke training:
+
+```bash
+uv run python scripts/train.py \
+  --data data/multiclass_tower_defect/data.yaml \
+  --model yolov8n.pt \
+  --epochs 1 \
+  --batch 4 \
+  --imgsz 320 \
+  --device cpu \
+  --workers 0 \
+  --project runs/multiclass_tower_defect \
+  --name smoke_v0_1 \
+  --exist-ok \
+  --patience 1
+```
+
+Current smoke result:
+
+```text
+best_model=runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt
+mAP50=0.0412
+mAP50-95=0.0061
+precision=0.0039
+recall=0.7500
+```
+
+These metrics only prove the prototype path can train and validate. They should not be used as model-quality evidence.
+
+## Immediate Next Step
+
+Run one local inference smoke with `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt`, then decide whether to export ONNX and connect the prototype model to the API/frontend demo path.

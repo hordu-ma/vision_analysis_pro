@@ -13,7 +13,7 @@
 | M3: 边缘 Agent | ✅ 完成 | 多数据源、HTTP 上报、离线缓存 |
 | M4: 生产化 | 🚧 进行中 | CI/CD、Dockerfile、API CLI、最小 metrics、边缘上报持久化已落地，质量基线与文档正在重新对齐 |
 
-- **后端测试**：当前轻量环境基线为 212 passed, 44 skipped（缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试），ruff 全绿
+- **后端测试**：当前轻量环境基线为 215 passed, 44 skipped（缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试），ruff 全绿
 - **前端测试**：90 passed（vitest），ESLint 全绿，生产构建与 3 条 browser E2E 通过；2026-04-22 已完成产品化视觉提升并通过桌面/移动截图复核
 - **下一步**：当前原型焦点已切换为多类塔材缺陷原型。先基于 `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/` 的 24 张图片完成人工 bbox 标注，再生成 YOLO 数据集并训练小样本原型模型。HE-007 真实裂缝试点版保留为后续专项分支，不再阻塞当前原型。
 
@@ -22,7 +22,8 @@
 - 数据入口：`data/multiclass_inbox/`，由 `scripts/prepare_multiclass_prototype_inbox.py` 生成。
 - 类别映射：`0 deformation`、`1 tower_corrosion`、`2 loose_bolt`、`3 bolt_rust`。
 - 当前本地统计：24 张图片，分别为 4 / 5 / 7 / 8 张。
-- 当前状态：图片整理和标注清单已完成；训练前必须先生成人工复核 YOLO bbox 标签。
+- 当前状态：图片整理、AI 辅助 bbox 标注、YOLO 数据集生成和 1-epoch smoke training 已完成；当前 smoke 权重只证明链路可运行，不代表模型质量。
+- 下一步：使用 `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` 做本地推理 smoke，再决定是否导出 ONNX 并接入 API/前端。
 - 详细说明：`docs/multiclass-tower-defect-prototype.md`。
 
 **路线决策（2026-04-19）**
@@ -89,7 +90,7 @@
 - ✅ Python 代码骨架：`core/inference`、`core/preprocessing`、`web/api`、`edge_agent` 完整实现
 - ✅ 工具链：`uv` 管理依赖；`ruff`/`pytest` 用于质量控制
 - ✅ 数据与训练：数据集配置（`data/data.yaml`）、训练脚本（`scripts/train.py`）、ONNX 导出（`scripts/export_onnx.py`）
-- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 212 passed, 44 skipped
+- ✅ API 与测试：`/api/v1/health`、`/api/v1/inference/image`、`/api/v1/report`、`/api/v1/report/{batch_id}/summary` 闭环，当前轻量后端基线为 215 passed, 44 skipped
 - ✅ 推理引擎：Stub、YOLO、ONNX 三种引擎，ONNX 相比 YOLO 提升 7.25x
 - ✅ 边缘 Agent：完整实现多数据源采集、推理、HTTP 上报、SQLite 离线缓存
 - ✅ 前端 Web：Vue3 + TS 页面闭环，90 个前端测试和 3 条浏览器 E2E 通过

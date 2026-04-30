@@ -302,9 +302,9 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. 按 `data/multiclass_inbox/annotation_queue.csv` 完成人工 bbox 标注。
-2. 标注输出到 `data/multiclass_inbox/reviewed_labels/` 后，生成多类 YOLO 数据集并训练小样本原型模型。
-3. 将原型模型接入 API 推理和前端展示，先证明端到端可运行，不宣称真实准确率。
+1. 使用 `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` 做一次本地图像推理 smoke。
+2. smoke 推理可用后，决定是否导出 ONNX 并接入 API 推理路径。
+3. 将原型模型接入前端展示，先证明端到端可运行，不宣称真实准确率。
 
 ### 条件推进
 

@@ -431,7 +431,7 @@ cd web && npm run test -- --run
 ```
 
 **预期结果**：
-- 后端：212 passed, 44 skipped（当前轻量环境；缺少 legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
+- 后端：215 passed, 44 skipped（当前轻量环境；缺少 legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
 - 前端：90 passed，浏览器 E2E 3 passed
 
 ---
