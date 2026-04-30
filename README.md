@@ -4,9 +4,17 @@
 
 ## 项目简介
 
-针对输电塔等工程基础设施，使用图像识别技术结合无人机巡检，识别自然灾害或长期服役导致的潜在安全隐患。当前项目已具备前后端、边缘 Agent、上报持久化、复核与导出等工程闭环；算法主线先以裂缝检测试点和目标检测闭环为主，五类缺陷模型需要在数据集与权重补齐后再作为正式能力启用。
+针对输电塔等工程基础设施，使用图像识别技术结合无人机巡检，识别自然灾害或长期服役导致的潜在安全隐患。当前项目已具备前后端、边缘 Agent、上报持久化、复核与导出等工程闭环；最新原型焦点已切换为基于本地塔材缺陷图片的多类目标检测，历史裂缝检测试点路线保留为可复用的演示和模型链路。
 
-### 当前路线决策（2026-04-22）
+### 当前路线决策（2026-04-30）
+
+- **当前原型焦点**：基于 `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/` 的 24 张本地塔材缺陷图片，推进多类缺陷原型，而不是继续被 crack-only HE-007 门禁阻塞。
+- **原型类别**：`deformation`、`tower_corrosion`、`loose_bolt`、`bolt_rust` 四类，类别映射与整理流程见 `docs/multiclass-tower-defect-prototype.md`。
+- **数据入口**：`scripts/prepare_multiclass_prototype_inbox.py` 会生成本地 ignored inbox：`data/multiclass_inbox/raw_images/`、`metadata/`、`reviewed_labels/`、`annotation_queue.csv`、`classes.json` 和 `manifest.json`。
+- **训练门禁**：当前已完成图片整理和标注清单，下一步是人工 bbox 标注；没有 `reviewed_labels/*.txt` 前不训练、不宣称准确率。
+- **历史路线保留**：Stage A crack-only YOLO/ONNX 仍可作为演示/链路模型，HE-007 真实裂缝试点版保留为后续专项分支。
+
+### 历史路线决策（2026-04-22）
 
 - **短期目标**：先交付裂缝检测试点闭环，使用 `stub` 做链路验证，使用 Stage A 自训练 YOLO/ONNX 做真实模型路径。
 - **中期目标**：补齐真实数据集与评估报告后，再恢复五类缺陷 YOLO/ONNX 模型路线。
@@ -317,7 +325,7 @@ vision_analysis_pro/
 ├── data/                       # YOLO 数据集与 data.yaml
 ├── models/                     # 训练/导出模型产物
 ├── web/                        # 前端（Vue3 + Vite + TS）
-├── tests/                      # Python 测试（当前轻量基线 209 passed, 44 skipped）
+├── tests/                      # Python 测试（当前轻量基线 212 passed, 44 skipped）
 ├── docs/                       # 计划与进度文档
 ├── tasks.md                    # 当前 Harness Engineering 任务台账
 ├── pyproject.toml              # Python 依赖与工具链
@@ -344,7 +352,7 @@ vision_analysis_pro/
 
 ### 测试
 
-- 后端：`uv run pytest`（当前本地轻量环境为 209 passed, 44 skipped；legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物缺失时会跳过对应测试）
+- 后端：`uv run pytest`（当前本地轻量环境为 212 passed, 44 skipped；legacy `models/best.onnx`、`data/images/*` 或可选本地模型产物缺失时会跳过对应测试）
 - 前端：`npm run test -- --run`（90 passed）
 
 ### 提交规范

@@ -2,11 +2,11 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-26
+Last updated: 2026-04-30
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **Stage C Engineering Pilot** (HE-007 代理运行已复核，等待真实试点数据和 reviewed positive labels 后重跑真实版；公开代理数据入口已补齐；当前部署推荐 Stage A).
+- Keep exactly one active delivery focus at a time. The current active focus is **Multiclass Tower Defect Prototype** (基于 `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/` 的 24 张塔材缺陷图片推进原型；crack-only HE-007 暂停作为当前阻塞门禁，保留为历史路线).
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -64,6 +64,31 @@ Exit criteria:
 - Browser E2E and Edge Agent reporting steady-state tests pass.
 - Pilot deployment runbook is complete.
 - Rollback path to `stub` remains documented for link testing; model rollback uses the previous local YOLO/ONNX artifact.
+
+### Multiclass Tower Defect Prototype
+
+Goal:
+- Use the user's local tower-defect image set to build a small, inspectable prototype loop for deformation, tower corrosion, loose bolts, and bolt rust.
+- Prioritize data organization, annotation readiness, YOLO-compatible labels, and end-to-end prototype wiring over crack-only model accuracy.
+
+Inputs:
+- Source images: `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/`
+- Local ignored inbox: `data/multiclass_inbox/`
+- Proposed class mapping:
+  - `0 deformation`
+  - `1 tower_corrosion`
+  - `2 loose_bolt`
+  - `3 bolt_rust`
+
+Exit criteria:
+- Source images are copied into `data/multiclass_inbox/raw_images/`.
+- `metadata/`, `classes.json`, `manifest.json`, and `annotation_queue.csv` exist locally.
+- Human-reviewed YOLO bbox labels are created under `data/multiclass_inbox/reviewed_labels/`.
+- A prototype dataset can be generated from the reviewed labels for YOLO smoke training.
+
+Status:
+- HE-015 completed the route pivot, local inbox preparation, and annotation queue generation.
+- Training remains blocked until human-reviewed bbox labels exist.
 
 ## Noise Control
 
@@ -126,7 +151,9 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - X-Trace-ID is now included in request completion/failure structured log records.
 - Public surrogate crack-data support now includes `scripts/prepare_public_surrogate_crack_dataset.py`, which uses SDNET2018 negatives plus RDD2022 crack boxes to build a crack-only proxy dataset.
 - HE-014 added a Pilot Inbox preflight validator for `data/pilot_inbox/`, covering raw image readability, reviewed label pairing, required handoff metadata, review fields, and reviewed positive crack-box gating before HE-007.
-- Current backend baseline: `209 passed, 44 skipped`.
+- HE-015 pivoted the active prototype path away from crack-only gating and prepared the 24-image multiclass tower-defect inbox from `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/`.
+- `scripts/prepare_multiclass_prototype_inbox.py` now writes the ignored local `data/multiclass_inbox/` structure, including `raw_images/`, `metadata/`, `reviewed_labels/`, `classes.json`, `manifest.json`, and `annotation_queue.csv`.
+- Current backend baseline: `212 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
@@ -501,6 +528,57 @@ Rollback:
 
 ## Completed Task
 
+### HE-015 Multiclass Tower Defect Prototype Inbox
+
+Status: Done
+Priority: P0
+
+Scope:
+- Pivot the current prototype away from crack-only HE-007 gating.
+- Use the local Downloads image set as the immediate prototype data source.
+- Define the 4-class prototype mapping.
+- Prepare an ignored local inbox with metadata and an annotation queue.
+
+Class mapping:
+
+| ID | Class | Source folder |
+|----|-------|---------------|
+| 0 | `deformation` | `变形` |
+| 1 | `tower_corrosion` | `塔材腐蚀` |
+| 2 | `loose_bolt` | `螺栓松动` |
+| 3 | `bolt_rust` | `螺栓锈蚀` |
+
+Result:
+- Added `scripts/prepare_multiclass_prototype_inbox.py`.
+- Added tests in `tests/test_prepare_multiclass_prototype_inbox.py`.
+- Prepared local ignored inbox `data/multiclass_inbox/` from 24 source images:
+  - `deformation`: 4
+  - `tower_corrosion`: 5
+  - `loose_bolt`: 7
+  - `bolt_rust`: 8
+- Generated `annotation_queue.csv` for manual bbox annotation.
+
+Acceptance criteria:
+- [x] Current task ledger names the multiclass prototype as the active focus.
+- [x] Class mapping is explicit and separate from the historical crack-only dataset.
+- [x] Local image inbox is prepared without committing raw data.
+- [x] Annotation checklist is generated before training.
+- [x] Tests cover metadata, queue generation, and unreadable-image rejection.
+
+Validation commands:
+
+```bash
+uv run python scripts/prepare_multiclass_prototype_inbox.py
+uv run ruff check scripts/prepare_multiclass_prototype_inbox.py tests/test_prepare_multiclass_prototype_inbox.py
+uv run pytest tests/test_prepare_multiclass_prototype_inbox.py -q
+```
+
+Rollback:
+- Remove `scripts/prepare_multiclass_prototype_inbox.py` and `tests/test_prepare_multiclass_prototype_inbox.py`.
+- Remove ignored local `data/multiclass_inbox/` if the prototype data source changes.
+
+## Completed Task
+
 ### HE-008 Full Inspection Flow Hardening
 
 Status: Done
@@ -735,18 +813,36 @@ Scope:
 - No committed model weights or public dataset archives.
 - No native acceleration work in the current stage; keep the implementation on the existing Python + YOLO/ONNX path.
 
-## 后续开发两项分支
+## 后续开发分支
 
-当前 Stage C 工程闭环、Pilot Deployment Runbook 修复项，以及“真实试点标签暂未到位”分支的前置工程工作均已完成到可记录状态。2026-04-26 已补齐 `data/pilot_inbox/` 前置校验工具；下一步在真实标签到位前继续保持 Stage A 部署主线，真实标签到位后进入 HE-007 真实试点版。
+当前优先级已切换为基于 24 张本地塔材缺陷图片的多类缺陷原型。crack-only HE-007 真实试点版暂不作为当前阻塞门禁；它保留为后续如果重新回到裂缝专项路线时的历史分支。2026-04-30 已补齐 `data/multiclass_inbox/` 本地整理、类别映射和标注清单；下一步是人工 bbox 标注，标注完成后再生成 YOLO 数据集并训练原型模型。
 
-### 分支 A：真实试点标签到位
+### 当前分支：多类塔材缺陷原型
+
+1. **人工 bbox 标注**
+   - 输入清单：`data/multiclass_inbox/annotation_queue.csv`
+   - 图像目录：`data/multiclass_inbox/raw_images/`
+   - 标签输出：`data/multiclass_inbox/reviewed_labels/`
+   - 标签格式：YOLO bbox，每行 `<class_id> <x_center> <y_center> <width> <height>`，坐标归一化到 0-1。
+
+2. **标注完成后的原型训练**
+   - 生成 `data/multiclass_tower_defect/data.yaml`。
+   - 使用 `yolov8n.pt` 做 smoke training。
+   - 目标是跑通数据、训练、ONNX 导出、API 推理和前端展示，不宣称真实精度。
+
+3. **原型验收口径**
+   - 每类至少有可读图片和人工复核标签。
+   - 模型可以完成一次本地图像推理。
+   - 前端能展示多类缺陷检测结果。
+
+### 历史分支 A：真实裂缝试点标签到位
 
 1. **HE-007 Stage B 模型对比（真实试点版）**
    - 触发条件：已有 reviewed positive pilot crack labels。
    - 行动项：确认标注来源与数据切分，使用 `scripts/train.py` 训练自有数据模型，并与 Stage A 公共数据模型在同一试点验证集上对比。
    - 验收标准：输出训练命令、评估指标、同集对比结论，并更新 `docs/stage-b-model-comparison.md`。
 
-### 分支 B：真实试点标签暂未到位
+### 历史分支 B：真实裂缝试点标签暂未到位
 
 1. **指标系统升级** ✅ 已完成
    - `app.state.metrics` 已替换为基于 `prometheus_client.Counter/Histogram/Gauge` 的封装。

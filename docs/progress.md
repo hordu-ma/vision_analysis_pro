@@ -6,9 +6,9 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ## 📊 项目概览
 
-**当前状态**：工程闭环已成型；短期路线收敛为裂缝检测试点 + 目标检测主线；当前执行入口为根目录 `tasks.md`
-**最后更新**：2026-04-26
-**后端测试**：209 passed, 44 skipped（当前轻量环境；缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
+**当前状态**：工程闭环已成型；当前原型焦点已切换为基于 24 张本地塔材缺陷图片的多类缺陷原型；当前执行入口为根目录 `tasks.md`
+**最后更新**：2026-04-30
+**后端测试**：212 passed, 44 skipped（当前轻量环境；缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
 **前端测试**：90 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 3 条 browser E2E 通过；工作台与设备页产品化视觉提升已完成
 
@@ -22,6 +22,30 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 | M2: 性能与可视化 | ✅ 完成 | Week 3-4 |
 | M3: 边缘 Agent | ✅ 完成 | Week 5 |
 | M4: 生产化与运营 | 🚧 进行中 | CI/Docker/metrics/report 持久化已落地，文档和质量基线继续收敛 |
+
+## 🗓️ 2026-04-30：多类塔材缺陷原型入口 ✅
+
+### 核心成果
+
+- ✅ 当前开发焦点从 crack-only HE-007 门禁切换为多类塔材缺陷原型。
+- ✅ 明确 4 类原型映射：`deformation`、`tower_corrosion`、`loose_bolt`、`bolt_rust`。
+- ✅ 新增 `scripts/prepare_multiclass_prototype_inbox.py`，用于整理 `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/` 下的本地图片。
+- ✅ 已生成本地 ignored inbox：`data/multiclass_inbox/raw_images/`、`metadata/`、`reviewed_labels/`、`annotation_queue.csv`、`classes.json` 和 `manifest.json`。
+- ✅ 当前本地图片统计：24 张，其中 `deformation=4`、`tower_corrosion=5`、`loose_bolt=7`、`bolt_rust=8`。
+- ✅ 新增 `docs/multiclass-tower-defect-prototype.md` 记录原型范围、类别映射、标注规则和训练前置条件。
+
+### 当前验证
+
+- ✅ `uv run python scripts/prepare_multiclass_prototype_inbox.py`
+- ✅ `uv run ruff check scripts/prepare_multiclass_prototype_inbox.py tests/test_prepare_multiclass_prototype_inbox.py`
+- ✅ `uv run pytest tests/test_prepare_multiclass_prototype_inbox.py -q`
+
+### 口径说明
+
+- 本次不提交原始图片、metadata 或标签数据；`data/` 仍保持 git ignored。
+- 当前状态是 `ready_for_annotation=true`、`ready_for_training=false`。
+- 下一步是人工 bbox 标注，标注完成后再生成 YOLO 数据集并训练原型模型。
+- Stage A crack-only ONNX 保留为历史演示/链路模型，HE-007 真实裂缝试点版暂不作为当前原型阻塞条件。
 
 ## 🧭 当前路线决策（2026-04-19）
 
@@ -624,7 +648,7 @@ vision_analysis_pro/
 ├── data/                           # 数据集
 ├── models/                         # 模型文件
 │   └── .gitkeep                    # 本地模型缓存目录，权重不提交
-├── tests/                          # 测试 (当前轻量基线 209 passed, 44 skipped) ✅
+├── tests/                          # 测试 (当前轻量基线 212 passed, 44 skipped) ✅
 ├── docs/                           # 文档
 ├── examples/                       # 示例脚本
 └── tasks.md                        # 当前 Harness Engineering 任务台账

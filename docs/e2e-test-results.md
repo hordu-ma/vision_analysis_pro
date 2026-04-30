@@ -298,17 +298,18 @@ cd web && npm run lint
 
 ## 9. 下一步建议
 
-当前执行入口以根目录 `tasks.md` 为准。此前列出的 Pilot Deployment Runbook、metrics 升级、审计日志分页与筛选增强已完成。
+当前执行入口以根目录 `tasks.md` 为准。此前列出的 Pilot Deployment Runbook、metrics 升级、审计日志分页与筛选增强已完成。2026-04-30 起，当前原型焦点切换为基于 24 张本地塔材缺陷图片的多类缺陷原型。
 
 ### 高优先级
 
-1. 真实 pilot crack 图片/视频收集与 reviewed positive labels 准备。
-2. 真实标签到位后重跑 HE-007：训练 Stage B 真实试点模型，并与 Stage A 在同一 held-out pilot validation set 上对比。
+1. 按 `data/multiclass_inbox/annotation_queue.csv` 完成人工 bbox 标注。
+2. 标注输出到 `data/multiclass_inbox/reviewed_labels/` 后，生成多类 YOLO 数据集并训练小样本原型模型。
+3. 将原型模型接入 API 推理和前端展示，先证明端到端可运行，不宣称真实准确率。
 
 ### 条件推进
 
-3. 真实试点媒体暂未到位时，可用 `SDNET2018 + RDD2022` public surrogate 继续做非真实试点验证，但结论必须标记为公开代理验证。
-4. MQTT、TensorRT、分割细化和趋势分析保持 backlog，只有在真实需求或性能证据出现后再提升优先级。
+4. 如果后续重新回到裂缝专项，再准备真实 pilot crack 图片/视频和 reviewed positive labels，并重跑 HE-007 真实试点版。
+5. MQTT、TensorRT、分割细化和趋势分析保持 backlog，只有在真实需求或性能证据出现后再提升优先级。
 
 ---
 
