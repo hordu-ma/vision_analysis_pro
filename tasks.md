@@ -89,7 +89,8 @@ Exit criteria:
 Status:
 - HE-015 completed the route pivot, local inbox preparation, and annotation queue generation.
 - HE-016 converted the AI-assisted reviewed labels into a YOLO dataset and completed a 1-epoch smoke training run.
-- Model quality remains non-claimable until the labels are reviewed and the dataset grows beyond the current 24-image prototype set.
+- HE-017 added local inference smoke verification; model loading and class-name propagation work, but current weights are not ready for ONNX/API/frontend demo because normal confidence thresholds return no detections.
+- Model quality remains non-claimable until the labels are reviewed, target boxes are tightened, and the dataset grows beyond the current 24-image prototype set.
 
 ## Noise Control
 
@@ -155,7 +156,8 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - HE-015 pivoted the active prototype path away from crack-only gating and prepared the 24-image multiclass tower-defect inbox from `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/`.
 - `scripts/prepare_multiclass_prototype_inbox.py` now writes the ignored local `data/multiclass_inbox/` structure, including `raw_images/`, `metadata/`, `reviewed_labels/`, `classes.json`, `manifest.json`, and `annotation_queue.csv`.
 - HE-016 added `scripts/prepare_multiclass_tower_dataset.py`, generated local `data/multiclass_tower_defect/`, and completed a CPU 1-epoch YOLO smoke training run under `runs/multiclass_tower_defect/smoke_v0_1/`.
-- Current backend baseline: `215 passed, 44 skipped`.
+- HE-017 added `scripts/smoke_multiclass_tower_inference.py` and verified that `prototype_v0_1` loads with the expected 4-class mapping. At `conf=0.25` and `conf=0.05`, the test split returns zero detections; at `conf=0.001`, detections are noisy and biased toward `tower_corrosion` / `bolt_rust`, so ONNX/API/frontend integration is deliberately deferred.
+- Current backend baseline: `218 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
@@ -530,6 +532,68 @@ Rollback:
 
 ## Completed Task
 
+### HE-017 Multiclass Prototype Inference Smoke
+
+Status: Done
+Priority: P0
+
+Scope:
+- Run local inference smoke against the multiclass prototype weights.
+- Verify that the YOLO engine loads the model and exposes the expected 4-class mapping.
+- Produce ignored JSON and preview artifacts for inspection.
+- Decide whether the model is ready for ONNX export and API/frontend wiring.
+
+Result:
+- Added `scripts/smoke_multiclass_tower_inference.py`.
+- Added tests in `tests/test_smoke_multiclass_tower_inference.py`.
+- Verified `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` loads and runs.
+- Trained a slightly longer local `prototype_v0_1` run:
+  - output: `runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt`
+  - stopped at epoch 14 by early stopping
+  - mAP50 `0.0624`, mAP50-95 `0.0251`, precision `0.0020`, recall `0.2500`
+- Inference smoke results for `prototype_v0_1`:
+  - test split at `conf=0.25`: 4 images, 0 detections
+  - test split at `conf=0.05`: 4 images, 0 detections
+  - test split at `conf=0.001`: 4 images, 191 noisy detections, biased toward `tower_corrosion` and `bolt_rust`
+  - train split at `conf=0.25`: 16 images, 0 detections
+  - train split at `conf=0.01`: 16 images, 114 noisy detections
+
+Decision:
+- Do not export ONNX yet.
+- Do not wire this model into the API/frontend demo yet.
+- Next prototype step is data/label improvement, not deployment integration.
+
+Acceptance criteria:
+- [x] A repeatable inference smoke command exists.
+- [x] The script validates the expected 4-class mapping before inference.
+- [x] JSON and preview outputs are written under ignored local data directories.
+- [x] The docs record that current weights are not demo-ready.
+
+Validation commands:
+
+```bash
+uv run python scripts/smoke_multiclass_tower_inference.py \
+  --model runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt \
+  --conf 0.25 \
+  --output data/multiclass_tower_defect/inference_smoke/prototype_v0_1_conf025.json \
+  --preview-dir data/multiclass_tower_defect/inference_smoke/prototype_v0_1_previews_conf025
+
+uv run python scripts/smoke_multiclass_tower_inference.py \
+  --model runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt \
+  --conf 0.001 \
+  --output data/multiclass_tower_defect/inference_smoke/prototype_v0_1_conf0001.json \
+  --preview-dir data/multiclass_tower_defect/inference_smoke/prototype_v0_1_previews_conf0001
+
+uv run ruff check scripts/smoke_multiclass_tower_inference.py tests/test_smoke_multiclass_tower_inference.py
+uv run pytest tests/test_smoke_multiclass_tower_inference.py -q
+```
+
+Rollback:
+- Remove `scripts/smoke_multiclass_tower_inference.py` and `tests/test_smoke_multiclass_tower_inference.py`.
+- Remove ignored local `data/multiclass_tower_defect/inference_smoke/` if the smoke output format changes.
+
+## Completed Task
+
 ### HE-016 Multiclass Tower Dataset and Smoke Training
 
 Status: Done
@@ -887,7 +951,13 @@ Scope:
 2. **标注完成后的原型训练**
    - ✅ 已生成 `data/multiclass_tower_defect/data.yaml`。
    - ✅ 已使用 `yolov8n.pt` 完成 1-epoch smoke training。
-   - 当前产物证明数据与训练链路可运行；下一步是基于 `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` 做一次本地推理 smoke，再决定是否导出 ONNX 和接入 API/前端。
+   - 当前产物证明数据与训练链路可运行；本地推理 smoke 已证明当前权重还不适合导出 ONNX 或接入 API/前端。
+
+3. **下一步：数据/标注改进**
+   - 收紧过大的 bbox，优先把目标框改为缺陷局部而不是整段塔材。
+   - 每类补充更多正样本，优先补齐 `deformation` 和 `tower_corrosion` 的近景局部图。
+   - 为每张图补充多个缺陷框，而不是每张只标一个主框。
+   - 重新生成数据集并训练 `prototype_v0_2` 后，再重复 HE-017 推理 smoke。
 
 3. **原型验收口径**
    - 每类至少有可读图片和人工复核标签。

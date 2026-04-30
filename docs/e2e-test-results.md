@@ -302,9 +302,9 @@ cd web && npm run lint
 
 ### 高优先级
 
-1. 使用 `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt` 做一次本地图像推理 smoke。
-2. smoke 推理可用后，决定是否导出 ONNX 并接入 API 推理路径。
-3. 将原型模型接入前端展示，先证明端到端可运行，不宣称真实准确率。
+1. 收紧当前 AI 辅助 bbox，优先把框从整段塔材改为局部缺陷区域。
+2. 每类补充更多近景正样本，优先补 `deformation` 和 `tower_corrosion`。
+3. 训练 `prototype_v0_2` 并重跑本地推理 smoke；只有正常阈值下有稳定输出后，再考虑 ONNX/API/前端接入。
 
 ### 条件推进
 

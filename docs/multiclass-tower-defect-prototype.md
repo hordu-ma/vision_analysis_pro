@@ -144,6 +144,51 @@ recall=0.7500
 
 These metrics only prove the prototype path can train and validate. They should not be used as model-quality evidence.
 
+## Inference Smoke
+
+Run local inference smoke:
+
+```bash
+uv run python scripts/smoke_multiclass_tower_inference.py \
+  --model runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt \
+  --conf 0.25 \
+  --output data/multiclass_tower_defect/inference_smoke/prototype_v0_1_conf025.json \
+  --preview-dir data/multiclass_tower_defect/inference_smoke/prototype_v0_1_previews_conf025
+```
+
+Current result:
+
+```text
+model=runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt
+images=4
+detections=0
+```
+
+Low-threshold diagnostic smoke:
+
+```bash
+uv run python scripts/smoke_multiclass_tower_inference.py \
+  --model runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt \
+  --conf 0.001 \
+  --output data/multiclass_tower_defect/inference_smoke/prototype_v0_1_conf0001.json \
+  --preview-dir data/multiclass_tower_defect/inference_smoke/prototype_v0_1_previews_conf0001
+```
+
+Current result:
+
+```text
+images=4
+detections=191
+label_counts={"tower_corrosion": 52, "bolt_rust": 139}
+```
+
+This means the model and class mapping load correctly, but current detections are not stable enough for ONNX export or API/frontend wiring.
+
 ## Immediate Next Step
 
-Run one local inference smoke with `runs/multiclass_tower_defect/smoke_v0_1/weights/best.pt`, then decide whether to export ONNX and connect the prototype model to the API/frontend demo path.
+Improve the dataset before deployment integration:
+
+1. Tighten overly broad boxes so they target local defect regions instead of whole tower members.
+2. Add more close-up positive samples per class, especially `deformation` and `tower_corrosion`.
+3. Allow multiple boxes per image where multiple visible defects exist.
+4. Rebuild `data/multiclass_tower_defect/`, train `prototype_v0_2`, and rerun inference smoke.
