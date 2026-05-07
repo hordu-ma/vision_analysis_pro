@@ -120,6 +120,8 @@ uv run python examples/demo_request.py test_image.jpg
 
 HE-008 后，Demo 的单一 happy path 固定为：上传/批量任务 → 推理与可视化 → 上报批次 → 人工复核 → 模板摘要 → 导出。
 
+2026-05-07 后，演示口径调整为“试点系统封装优先”：在真实环境样本暂不可得前，演示重点是部署、采集、上报、复核、报告、导出、观测和回滚链路，而不是宣称多类塔材模型精度。`stub` 是稳定链路演示模式，Stage A ONNX 是真实模型路径演示模式，当前多类塔材权重仍为实验模型。
+
 ### Happy path
 
 1. 启动 API 和前端：
@@ -171,6 +173,23 @@ curl "http://127.0.0.1:8000/api/v1/report/edge-agent-001-demo/summary"
 curl "http://127.0.0.1:8000/api/v1/report/edge-agent-001-demo/export.csv" \
   -o edge-agent-001-demo.csv
 ```
+
+### Trial rehearsal checklist
+
+本地试点预演建议按以下顺序执行：
+
+1. `docker compose config`，确认 Compose profile 可解析。
+2. 用 `INFERENCE_ENGINE=stub` 启动 API，验证 `/api/v1/health`、`/api/v1/health/live`、`/api/v1/metrics`。
+3. 上传单张有效图片，验证 `/api/v1/inference/image`。
+4. 创建批量任务，验证 `/api/v1/inference/images/tasks` 到 `completed`。
+5. 上报一个巡检批次，验证 `/api/v1/report`。
+6. 写入人工复核，验证 `/api/v1/report/{batch_id}/reviews/{frame_id}`。
+7. 生成摘要并导出 CSV，验证 `/summary` 和 `/export.csv`。
+8. 检查 `/reports/batches`、`/reports/devices`、`/reports/alerts/summary`。
+9. 如本地存在 `models/stage_a_crack/best.onnx`，用 Stage A ONNX 启动独立 API 端口做 readiness 和单图推理 smoke。
+10. 用 Edge Agent + Stage A ONNX + 有效 Stage A 样本上报一帧，确认 API 批次列表可见。
+
+真实模型 smoke 不要使用 `data/samples/web_rust_bolt.jpg`；该文件当前是 HTML 文档而不是有效 JPEG。可使用 `data/samples/web_rust_chain.jpg` 或 `data/stage_a_crack/images/val/` 下的有效样本。
 
 ### Recovery path
 

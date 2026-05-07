@@ -6,8 +6,8 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 
 ## 📊 项目概览
 
-**当前状态**：工程闭环已成型；当前原型焦点已切换为基于 24 张本地塔材缺陷图片的多类缺陷原型；当前执行入口为根目录 `tasks.md`
-**最后更新**：2026-04-30
+**当前状态**：工程闭环已成型；在真实环境样本暂不可得前，当前交付焦点切换为试点系统封装与完整预演；当前执行入口为根目录 `tasks.md`
+**最后更新**：2026-05-07
 **后端测试**：218 passed, 44 skipped（当前轻量环境；缺少 legacy `runs/train/exp/weights/best.pt`、`models/best.onnx`、`data/images/*` 或可选本地模型产物时跳过对应测试）
 **前端测试**：90 passed（vitest）
 **代码质量**：ruff 全绿，ESLint 全绿，前端 build 与 3 条 browser E2E 通过；工作台与设备页产品化视觉提升已完成
@@ -22,6 +22,42 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 | M2: 性能与可视化 | ✅ 完成 | Week 3-4 |
 | M3: 边缘 Agent | ✅ 完成 | Week 5 |
 | M4: 生产化与运营 | 🚧 进行中 | CI/Docker/metrics/report 持久化已落地，文档和质量基线继续收敛 |
+
+## 🗓️ 2026-05-07：试点系统封装与完整预演 ✅
+
+### 核心成果
+
+- ✅ 将主账本当前焦点调整为 **Trial System Packaging and Rehearsal**：先把系统封装为可部署、可演示、可采集真实样本的输电塔巡检试点系统，再在现场数据到位后扩充样本并训练多类模型。
+- ✅ 明确 6 步顺序：系统封装、当前模型能力接入、真实数据采集入口、人工复核与标注准备、完整试点预演、现场数据到位后的 `prototype_v0_2` 训练与替换。
+- ✅ 完成 `stub` 模式 API 预演：health、live、metrics、单图上传、两图批量任务均通过。
+- ✅ 完成上报与报告链路预演：设备 metadata、`POST /api/v1/report`、人工复核、模板摘要、CSV 导出、批次列表、设备列表和告警摘要均通过。
+- ✅ 完成 Stage A ONNX readiness 检查：`models/stage_a_crack/best.onnx` 可加载，使用有效 JPEG 样本可完成真实模型路径推理。
+- ✅ 完成 Edge Agent ONNX 上报预演：Stage A crack 样本检测到 1 个目标并上报到 API，成功上报 1 批次。
+- ✅ 提交前质量门禁通过：后端 ruff/pytest、前端 lint/test/build 和 browser E2E 全部通过。
+
+### 当前验证
+
+- ✅ `docker compose config`
+- ✅ `REPORT_STORE_DB_PATH=/tmp/vision-analysis-pro-trial.db INFERENCE_ENGINE=stub API_RELOAD=false uv run uvicorn vision_analysis_pro.web.api.main:app --host 127.0.0.1 --port 8000`
+- ✅ `curl` 验证 `/api/v1/health`、`/api/v1/health/live`、`/api/v1/metrics`
+- ✅ `curl -F file=@data/samples/web_rust_bolt.jpg http://127.0.0.1:8000/api/v1/inference/image?visualize=true`
+- ✅ `curl -F files=@... http://127.0.0.1:8000/api/v1/inference/images/tasks?visualize=false`
+- ✅ `curl` 验证 report intake、review、summary、CSV export、batch list、device list、alert summary
+- ✅ `REPORT_STORE_DB_PATH=/tmp/vision-analysis-pro-trial-onnx.db INFERENCE_ENGINE=onnx ONNX_MODEL_PATH=models/stage_a_crack/best.onnx ... --port 8001`
+- ✅ `uv run python examples/run_edge_agent.py --engine onnx --model-path models/stage_a_crack/best.onnx --confidence 0.1 ...`
+- ✅ `uv run ruff check .`
+- ✅ `uv run pytest`：218 passed, 44 skipped
+- ✅ `cd web && npm run lint`
+- ✅ `cd web && npm run test -- --run`：90 passed
+- ✅ `cd web && npm run build`
+- ✅ `cd web && npm run test:e2e`：3 passed（本机先执行过一次 `cd web && npx playwright install chromium` 补齐浏览器）
+
+### 口径说明
+
+- 这次预演验证的是系统封装和现场试点链路，不是多类塔材模型精度。
+- 当前多类塔材模型仍保持实验状态；在正常阈值下稳定检测前，不作为默认部署模型。
+- 真实现场数据到位后，系统本身将作为采集、复核、导出和训练集沉淀入口。
+- 预演中发现 `data/samples/web_rust_bolt.jpg` 实际是 HTML 文档伪装成 `.jpg`，`stub` 可通过但真实 ONNX 解码会失败；后续真实模型 smoke 应使用 `data/samples/web_rust_chain.jpg` 或 Stage A 数据集中的有效 JPEG。
 
 ## 🗓️ 2026-04-30：多类塔材缺陷原型入口 ✅
 

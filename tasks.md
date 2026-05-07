@@ -2,11 +2,11 @@
 
 Harness Engineering task ledger for the current project direction.
 
-Last updated: 2026-04-30
+Last updated: 2026-05-07
 
 ## Operating Rules
 
-- Keep exactly one active delivery focus at a time. The current active focus is **Multiclass Tower Defect Prototype** (基于 `/home/liguoma/Downloads/锈蚀、松动、变形、腐蚀/` 的 24 张塔材缺陷图片推进原型；crack-only HE-007 暂停作为当前阻塞门禁，保留为历史路线).
+- Keep exactly one active delivery focus at a time. The current active focus is **Trial System Packaging and Rehearsal** (在真实环境样本暂不可得前，优先把系统封装成可部署、可演示、可采集真实样本的输电塔巡检试点系统；多类塔材模型继续保留为实验模型，不作为当前默认部署能力).
 - Every task must include scope, acceptance criteria, validation commands, artifacts, and rollback notes.
 - Data, model weights, run outputs, and private credentials stay out of git. Commit scripts, configs, tests, docs, and small reproducibility metadata only.
 - `data/data.yaml` remains the legacy five-class target. Stage A uses `data/stage_a_crack/data.yaml` and must not overwrite the five-class config.
@@ -92,6 +92,24 @@ Status:
 - HE-017 added local inference smoke verification; model loading and class-name propagation work, but current weights are not ready for ONNX/API/frontend demo because normal confidence thresholds return no detections.
 - Model quality remains non-claimable until the labels are reviewed, target boxes are tightened, and the dataset grows beyond the current 24-image prototype set.
 
+### Trial System Packaging and Rehearsal
+
+Goal:
+- Package the existing API, frontend, Edge Agent, reporting, review, export, and observability path into a deployable trial system before more real tower samples are available.
+- Make the system useful as the real-data capture and review entry point once it reaches the field.
+
+Current six-step order:
+1. Package the trial system first: make the deployment, startup, demo, metrics, reporting, and rollback flow repeatable.
+2. Use the currently available model surfaces without waiting for the multiclass model to mature: keep `stub` as the stable link-test default, Stage A ONNX as the real-model route demo, and keep the multiclass tower model experimental.
+3. Turn the system into the real-data intake entry point: Edge Agent collection, batch upload, metadata, review status, and export should be ready before field access.
+4. Keep the human review and labeling preparation loop ready: inbox rules, annotation queue, reviewed-label validation, and dataset generation stay ready for later real samples.
+5. Run a full trial rehearsal with existing samples and `stub` / Stage A ONNX, validating the system path rather than claiming multiclass model accuracy.
+6. After field access, expand samples, review labels, train `prototype_v0_2`, evaluate, export ONNX, replace the trial model, and rerun system regression.
+
+Status:
+- HE-018 records the first full rehearsal under this packaging-first route.
+- Sample expansion and multiclass retraining are intentionally deferred until the system can enter the real environment and collect representative data.
+
 ## Noise Control
 
 Removed from the mainline:
@@ -117,13 +135,13 @@ The conversation started with four candidate directions. They map to the current
 
 ## Current Decision
 
-The best-practice path is not to build a four-model chain immediately. The project should first finish a reliable crack-only inspection loop:
+The best-practice path is not to build a four-model chain or block on more real samples immediately. Because real tower-environment data is unavailable before the system reaches the field, the project should first finish a deployable trial package:
 
-1. Public crack dataset to YOLO data format.
-2. Reproducible YOLO training and evaluation.
-3. Exported inference artifact wired into the existing API/Edge Agent paths.
-4. Browser and Edge Agent end-to-end checks.
-5. Only then expand to segmentation or temporal trends; LLM report text is now limited to the report layer and must not alter detection facts.
+1. Keep `stub` as the stable system-link test mode.
+2. Keep Stage A ONNX as the real-model route demo.
+3. Keep the current multiclass tower model experimental until it produces stable detections at normal thresholds.
+4. Use the system itself to capture, review, export, and later convert real field data into training data.
+5. Only after representative field samples and reviewed labels exist, train and promote the next multiclass model.
 
 ## Done Recently
 
@@ -157,11 +175,68 @@ The best-practice path is not to build a four-model chain immediately. The proje
 - `scripts/prepare_multiclass_prototype_inbox.py` now writes the ignored local `data/multiclass_inbox/` structure, including `raw_images/`, `metadata/`, `reviewed_labels/`, `classes.json`, `manifest.json`, and `annotation_queue.csv`.
 - HE-016 added `scripts/prepare_multiclass_tower_dataset.py`, generated local `data/multiclass_tower_defect/`, and completed a CPU 1-epoch YOLO smoke training run under `runs/multiclass_tower_defect/smoke_v0_1/`.
 - HE-017 added `scripts/smoke_multiclass_tower_inference.py` and verified that `prototype_v0_1` loads with the expected 4-class mapping. At `conf=0.25` and `conf=0.05`, the test split returns zero detections; at `conf=0.001`, detections are noisy and biased toward `tower_corrosion` / `bolt_rust`, so ONNX/API/frontend integration is deliberately deferred.
+- HE-018 accepted the packaging-first route: complete a full trial rehearsal before more real tower samples are available, then use the deployed system as the real-data capture and review entry point.
 - Current backend baseline: `218 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
 ## Accepted Tasks
+
+### HE-018 Trial System Packaging Rehearsal
+
+Status: Done
+Priority: P0
+Owner: project maintainer
+
+Scope:
+- Record the six-step packaging-first route in this ledger.
+- Run a full trial rehearsal with existing local samples and stable engines.
+- Validate deployment configuration, API health, single-image upload, batch task, Edge Agent / report intake, human review, summary, export, metrics, and rollback readiness.
+- Align README and deployment/demo/progress docs after rehearsal.
+
+Acceptance criteria:
+- [x] `docker compose config` passes.
+- [x] API health/live/metrics endpoints respond in `stub` mode.
+- [x] Single-image inference succeeds with a checked-in sample image.
+- [x] Batch task reaches `completed`.
+- [x] Edge/report intake accepts a batch.
+- [x] Report review, summary, CSV export, batch list, device list, and alert summary respond.
+- [x] Stage A ONNX readiness is checked if `models/stage_a_crack/best.onnx` exists.
+- [x] Edge Agent runs with Stage A ONNX and reports one detected frame to the API.
+- [x] Frontend lint/test/build and browser E2E pass.
+- [x] Docs are aligned with the packaging-first route and latest rehearsal result.
+
+Result:
+- `docker compose config` passed.
+- `stub` API rehearsal used `REPORT_STORE_DB_PATH=/tmp/vision-analysis-pro-trial.db` and validated health/live/metrics, single-image upload, and a two-image batch task.
+- Manual report batch `trial-rehearsal-*` validated device metadata, report intake, frame review, template summary, CSV export, batch list, device list, and alert summary.
+- Stage A ONNX readiness passed on port `8001`; inference on valid sample `data/samples/web_rust_chain.jpg` returned successfully with zero detections. The invalid checked-in sample `data/samples/web_rust_bolt.jpg` is an HTML document despite its `.jpg` suffix and should not be used for real-engine smoke.
+- Edge Agent ran against `models/stage_a_crack/best.onnx` with a Stage A crack sample and reported one detected frame to the `stub` API receiver.
+- Quality gates passed: `uv run ruff check .`, `uv run pytest`, `cd web && npm run lint`, `cd web && npm run test -- --run`, `cd web && npm run build`, and `cd web && npm run test:e2e`. Playwright Chromium had to be installed once with `cd web && npx playwright install chromium` before E2E could run on this machine.
+
+Validation commands:
+
+```bash
+docker compose config
+
+REPORT_STORE_DB_PATH=/tmp/vision-analysis-pro-trial.db \
+INFERENCE_ENGINE=stub \
+API_RELOAD=false \
+uv run uvicorn vision_analysis_pro.web.api.main:app \
+  --host 127.0.0.1 \
+  --port 8000
+
+cd web
+npm run lint
+npm run test -- --run
+npm run build
+npm run test:e2e
+```
+
+Rollback:
+- Stop the rehearsal API/frontend processes.
+- Remove temporary rehearsal stores under `/tmp/vision-analysis-pro-trial*.db`.
+- Keep `INFERENCE_ENGINE=stub` as the safe fallback if ONNX/model paths are unavailable.
 
 ### HE-001 Stage A YOLO Baseline v0.1
 
