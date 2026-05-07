@@ -59,7 +59,7 @@
 - Stage A ONNX：`models/stage_a_crack/best.onnx`
 - Stage A 数据集：`data/stage_a_crack/data.yaml`
 
-默认 Compose profile 使用 `INFERENCE_ENGINE=stub`，用于不依赖模型文件的链路验证。切换到 `yolo` 或 `onnx` 时，请先确认上面的 Stage A 模型文件已存在，或通过环境变量覆盖为其他已验证模型路径。
+默认 Compose profile 使用 `INFERENCE_ENGINE=stub`，用于不依赖模型文件的内部链路验证。客户正式演示或真实模型 smoke 应切换到 `onnx` 或 `yolo`，并先确认上面的 Stage A 模型文件已存在，或通过环境变量覆盖为其他已验证模型路径。
 
 当前多类塔材模型仍是实验模型：它可以用于离线训练/推理 smoke，但在正常阈值下没有稳定检测前，不建议作为试点部署默认模型，也不建议导出为默认 ONNX。
 
@@ -206,9 +206,9 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 
 | Profile | 环境变量 | 用途 | 模型依赖 |
 |---------|----------|------|----------|
-| 链路 smoke | `INFERENCE_ENGINE=stub` | API、前端、Edge 上报、报告摘要联调 | 无 |
-| Stage A YOLO | `INFERENCE_ENGINE=yolo` | 训练产物验证和实验 | `runs/stage_a_crack/baseline_v0_1/weights/best.pt` |
-| Stage A ONNX | `INFERENCE_ENGINE=onnx` + `COMPOSE_INSTALL_ONNX=true` | 试点部署和边缘推理优先路径 | `models/stage_a_crack/best.onnx` |
+| 内部链路 smoke | `INFERENCE_ENGINE=stub` | API、前端、Edge 上报、报告摘要联调；不用于客户检测结果展示 | 无 |
+| Stage A YOLO | `INFERENCE_ENGINE=yolo` | 训练产物验证、真实模型 fallback | `runs/stage_a_crack/baseline_v0_1/weights/best.pt` |
+| Stage A ONNX | `INFERENCE_ENGINE=onnx` + `COMPOSE_INSTALL_ONNX=true` | 客户演示优先真实模型路径、试点部署和边缘推理优先路径 | `models/stage_a_crack/best.onnx` |
 
 2026-05-07 预演结果：
 
@@ -218,6 +218,8 @@ uv run uvicorn vision_analysis_pro.web.api.main:app --host 0.0.0.0 --port 8000
 - Stage A ONNX readiness 通过；使用有效 JPEG 样本 `data/samples/web_rust_chain.jpg` 可完成 ONNX 推理请求。
 - Edge Agent 使用 `models/stage_a_crack/best.onnx` 和 Stage A crack 样本完成 1 帧检测并成功上报。
 - 注意：`data/samples/web_rust_bolt.jpg` 实际是 HTML 文档，不能用于真实引擎 smoke；真实模型 smoke 应使用有效 JPEG 或 Stage A 数据集样本。
+
+2026-05-07 模型 profile 完成度复核见 `docs/model-profile-status.md`。结论：Stage A YOLO 和 Stage A ONNX 均可在真实裂缝样本上检出 `crack`；多类塔材 YOLO `prototype_v0_1` 在正常阈值仍不稳定，未完成 ONNX/API/前端部署。
 
 ### 6.2 Stage A YOLO 模型
 

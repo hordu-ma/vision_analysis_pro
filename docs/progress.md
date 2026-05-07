@@ -64,7 +64,24 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 ### 核心成果
 
 - ✅ 补齐客户远程演示流程：部署机器不带到客户现场时，推荐屏幕共享远程演示；如客户需要自行访问，需提前准备 HTTPS/反代/CORS/API Key，不在会议中临时排障。
-- ✅ 补齐当前模型能力使用规则：`stub` 做稳定流程演示，Stage A ONNX 做真实模型路径展示，多类塔材模型保持实验状态。
+- ✅ 补齐当前模型能力使用规则：`stub` 只做内部链路自检，客户正式演示优先使用 Stage A ONNX，必要时回退 Stage A YOLO，多类塔材模型保持实验状态。
+
+## 🗓️ 2026-05-07：真实模型演示口径与 YOLO/ONNX 完成度复核 ✅
+
+### 核心成果
+
+- ✅ 修正客户演示口径：客户正式演示不能使用 `stub` 作为检测结果来源；`stub` 仅用于内部预检和故障 fallback 说明。
+- ✅ 新增 `docs/model-profile-status.md`，明确 `stub`、`yolo`、`onnx` 的关系、完成度和客户演示使用边界。
+- ✅ 复核 Stage A YOLO：`runs/stage_a_crack/baseline_v0_1/weights/best.pt` 可加载，在真实 Stage A 裂缝样本上检出 1 个 `crack`。
+- ✅ 复核 Stage A ONNX：`models/stage_a_crack/best.onnx` 可加载，在同一真实 Stage A 裂缝样本上检出 1 个 `crack`。
+- ✅ 复核多类塔材 YOLO 原型：`runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt` 可加载，但在正常阈值 `conf=0.25` 下仍 0 检出，继续保持实验状态。
+
+### 口径说明
+
+- 客户正式演示：优先 `INFERENCE_ENGINE=onnx` + `models/stage_a_crack/best.onnx`。
+- 真实模型 fallback：`INFERENCE_ENGINE=yolo` + `runs/stage_a_crack/baseline_v0_1/weights/best.pt`。
+- 内部链路自检：`INFERENCE_ENGINE=stub`。
+- 当前可演示真实模型能力是 crack-only；不能宣称四类塔材缺陷模型已成熟。
 - ✅ 补齐真实数据采集入口 SOP：明确前端上传、Edge Agent 文件夹源、视频关键帧三条入口，以及现场 metadata 字段。
 - ✅ 补齐人工复核与标注准备 SOP：明确 review 与 training annotation 的边界、reviewed labels 目录、预标注、数据集生成和 `prototype_v0_2` 训练门禁。
 

@@ -10,8 +10,9 @@ Use this wording:
 
 - The system trial package is ready for remote demonstration and pilot rehearsal.
 - The current demo proves deployment, upload, batch task, Edge Agent reporting, human review, summary, export, metrics, and rollback paths.
-- `stub` is the stable system-link mode.
-- Stage A ONNX is the real-model route demonstration.
+- Customer-facing detection results should come from a real model profile: Stage A ONNX first, Stage A YOLO as fallback.
+- `stub` is internal-only for pre-demo link checks and must be clearly labeled as simulated if it is ever mentioned.
+- Stage A ONNX is the recommended real-model route demonstration.
 - The multiclass tower-defect model remains experimental until real field data is collected, reviewed, and used to train `prototype_v0_2`.
 
 Avoid these claims:
@@ -51,10 +52,11 @@ Run these checks on the deployment machine before the customer session:
 docker compose config
 ```
 
-For a stable flow demo:
+For a customer-facing real-model demo:
 
 ```bash
-INFERENCE_ENGINE=stub \
+INFERENCE_ENGINE=onnx \
+ONNX_MODEL_PATH=models/stage_a_crack/best.onnx \
 API_RELOAD=false \
 uv run uvicorn vision_analysis_pro.web.api.main:app \
   --host 0.0.0.0 \
@@ -76,21 +78,25 @@ curl http://127.0.0.1:8000/api/v1/health/live
 curl http://127.0.0.1:8000/api/v1/metrics
 ```
 
-If showing the real-model route, verify Stage A ONNX separately:
+If ONNX is unavailable, use Stage A YOLO as the real-model fallback:
 
 ```bash
-INFERENCE_ENGINE=onnx \
-ONNX_MODEL_PATH=models/stage_a_crack/best.onnx \
+INFERENCE_ENGINE=yolo \
+YOLO_MODEL_PATH=runs/stage_a_crack/baseline_v0_1/weights/best.pt \
+API_RELOAD=false \
+uv run uvicorn vision_analysis_pro.web.api.main:app \
+  --host 0.0.0.0 \
+  --port 8000
+```
+
+Use `stub` only for internal pre-demo checks:
+
+```bash
+INFERENCE_ENGINE=stub \
 API_RELOAD=false \
 uv run uvicorn vision_analysis_pro.web.api.main:app \
   --host 127.0.0.1 \
   --port 8001
-```
-
-Then:
-
-```bash
-curl http://127.0.0.1:8001/api/v1/health/ready
 ```
 
 Use valid JPEG samples such as `data/samples/web_rust_chain.jpg` or Stage A images under `data/stage_a_crack/images/val/`. Do not use `data/samples/web_rust_bolt.jpg` for real-engine smoke because it is currently an HTML document despite the `.jpg` suffix.
@@ -119,8 +125,8 @@ Upload one valid sample image.
 
 Explain:
 
-- `stub` mode gives stable demo detections for workflow verification.
-- In a real model profile, labels and confidence come from YOLO/ONNX inference.
+- Stage A ONNX produces real model results for the crack-only route.
+- If a customer image returns no detections, show it as a real negative/uncertain result and move into human review and data-capture discussion.
 
 ### 4. Batch Task
 
@@ -176,13 +182,14 @@ Show or explain:
 
 ## Fallback Plan
 
-If ONNX readiness or sample inference fails:
+If ONNX readiness or sample inference fails, try YOLO:
 
 ```bash
-export INFERENCE_ENGINE=stub
+export INFERENCE_ENGINE=yolo
+export YOLO_MODEL_PATH=runs/stage_a_crack/baseline_v0_1/weights/best.pt
 ```
 
-Then continue the demo as a workflow demonstration.
+If both real-model profiles fail, use `stub` only to explain the workflow and state clearly that the displayed detections are simulated.
 
 If frontend dev server fails:
 

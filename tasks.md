@@ -177,11 +177,65 @@ The best-practice path is not to build a four-model chain or block on more real 
 - HE-017 added `scripts/smoke_multiclass_tower_inference.py` and verified that `prototype_v0_1` loads with the expected 4-class mapping. At `conf=0.25` and `conf=0.05`, the test split returns zero detections; at `conf=0.001`, detections are noisy and biased toward `tower_corrosion` / `bolt_rust`, so ONNX/API/frontend integration is deliberately deferred.
 - HE-018 accepted the packaging-first route: complete a full trial rehearsal before more real tower samples are available, then use the deployed system as the real-data capture and review entry point.
 - HE-019 completed the first four packaging tasks as docs/SOP deliverables: remote customer demo flow, current model profile usage, field data intake, and review/labeling preparation.
+- HE-020 corrected the customer-demo rule: `stub` is internal-only, while customer-facing detection results must use Stage A ONNX or Stage A YOLO with real images. Stage A YOLO and ONNX were both rechecked on the same real crack sample and returned one `crack` detection; multiclass tower YOLO remains experimental.
 - Current backend baseline: `218 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
 ## Accepted Tasks
+
+### HE-020 Real Model Demo Rule and Profile Status
+
+Status: Done
+Priority: P0
+Owner: project maintainer
+
+Scope:
+- Correct the customer-demo rule so `stub` is internal-only and customer-facing detection results use a real model profile.
+- Confirm current YOLO and ONNX completion with direct model smoke tests.
+- Document the current boundary between Stage A crack-only models and the multiclass tower prototype.
+- Align README, demo, deployment, progress, and customer demo docs.
+
+Acceptance criteria:
+- [x] Stage A YOLO loads and detects `crack` on a real Stage A validation sample.
+- [x] Stage A ONNX loads and detects `crack` on the same real Stage A validation sample.
+- [x] Multiclass tower YOLO prototype status is documented as experimental.
+- [x] Customer demo docs say `stub` must not be used as the main customer-facing detection source.
+- [x] `docs/model-profile-status.md` records profile status and commands.
+
+Result:
+- Stage A YOLO smoke:
+  - model: `runs/stage_a_crack/baseline_v0_1/weights/best.pt`
+  - sample: `data/stage_a_crack/images/val/crack-1455-_jpg.rf.d78b0366a48c54f31295522b24dcf2f0.jpg`
+  - detection: `1 crack`, confidence `0.425392`
+- Stage A ONNX smoke:
+  - model: `models/stage_a_crack/best.onnx`
+  - sample: same as YOLO smoke
+  - detection: `1 crack`, confidence `0.425472`
+- Multiclass tower YOLO smoke:
+  - model: `runs/multiclass_tower_defect/prototype_v0_1/weights/best.pt`
+  - sample: `data/multiclass_tower_defect/images/test/bolt_rust_004.jpg`
+  - detection at `conf=0.25`: `0`
+
+Validation commands:
+
+```bash
+uv run python - <<'PY'
+from pathlib import Path
+from vision_analysis_pro.core.inference import YOLOInferenceEngine, ONNXInferenceEngine
+
+sample = next(Path("data/stage_a_crack/images/val").glob("*.jpg"))
+for engine in [
+    YOLOInferenceEngine("runs/stage_a_crack/baseline_v0_1/weights/best.pt"),
+    ONNXInferenceEngine("models/stage_a_crack/best.onnx"),
+]:
+    print(engine.__class__.__name__, engine.predict(sample, conf=0.1, iou=0.5))
+PY
+```
+
+Rollback:
+- Revert the documentation changes if the customer-demo policy changes.
+- Do not change model artifacts in this task.
 
 ### HE-019 Trial Packaging Steps 1-4
 
@@ -1107,7 +1161,7 @@ Scope:
    - 记录现场需要补充的信息：设备/杆塔/线路标识、拍摄时间、拍摄角度、是否有裂缝正样本、人工复核人和复核规则。
 
 4. **用户演示前准备**
-   - 明确演示模式：`stub` 用于稳定展示产品流程，Stage A ONNX 用于真实模型路径；没有 reviewed positive pilot crack labels 时不宣称真实试点精度。
+   - 明确演示模式：客户正式演示使用 Stage A ONNX；必要时回退 Stage A YOLO；`stub` 只用于内部链路自检或故障说明，不能作为客户检测结果来源。没有 reviewed positive pilot crack labels 时不宣称真实试点精度。
    - 准备 3-5 张演示图片和 1 个 Edge Agent 上报样例，覆盖单图检测、批量任务、上报批次、人工复核、报告摘要和导出。
    - 演示前确认 `models/stage_a_crack/best.onnx` 是否存在；若缺失或 ready 失败，切回 `INFERENCE_ENGINE=stub` 演示链路。
    - 演练启动、健康检查、前端访问、Edge Agent 上报和回滚命令，确保 API、前端、设备页、审计日志和导出路径可重复。
