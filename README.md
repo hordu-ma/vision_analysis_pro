@@ -12,6 +12,7 @@
 - **封装优先顺序**：先完成试点启动、API/前端/Edge Agent/报告/导出/metrics/回滚预演；再把系统作为真实数据采集、复核和训练集沉淀入口；现场数据到位后再训练并提升多类塔材模型。
 - **默认运行口径**：`stub` 用于稳定链路验证，Stage A ONNX 用于真实模型路径演示；当前多类塔材模型保留为实验模型，不作为默认部署模型。
 - **2026-05-07 试点预演结论**：`docker compose config`、stub API health/live/metrics、单图上传、批量任务、Edge/report 上报、人工复核、摘要、CSV 导出、设备/告警列表、Stage A ONNX readiness、Edge Agent ONNX 上报均已验证通过；前端 lint/test/build/E2E 也已通过。
+- **客户演示与数据闭环 SOP**：部署机器不带到客户现场时，按 `docs/customer-remote-demo.md` 做远程演示；真实样本进入现场后，按 `docs/field-data-intake-and-review.md` 完成采集、metadata、复核、标注交接和后续训练准备。
 
 ### 多类塔材原型状态（2026-04-30）
 
@@ -116,6 +117,8 @@ edge-agent
 当前稳定主路径是：在前端或 API 上传单张/批量图片，创建批量任务并执行推理，查看检测结果；Edge Agent 或外部巡检批次上报到 `POST /api/v1/report` 后，云端持久化批次，人工在报告详情中复核单帧结果，再通过 `GET /api/v1/report/{batch_id}/summary` 生成模板摘要或配置化 LLM 报告文本，并按需导出任务 CSV/JSON/ZIP 或报告 CSV。
 
 在真实环境样本到位前，系统封装目标不是宣称多类塔材模型精度，而是把部署、采集、上报、复核、导出、观测和回滚链路做成现场可用的数据闭环。真实现场图片/视频进入系统后，再进行人工复核标注、训练 `prototype_v0_2`、评估、ONNX 导出和部署模型替换。
+
+客户远程演示流程见 `docs/customer-remote-demo.md`；现场数据采集、复核和标注交接流程见 `docs/field-data-intake-and-review.md`。
 
 恢复路径是：批量任务失败时先查看任务详情，整体失败可调用 retry，部分失败可调用 retry-failed，已完成任务可 rerun；Edge Agent 网络故障时先进入本地 SQLite 缓存，云端恢复后按 FIFO 回放，同一 `batch_id` 的重复上报返回 `duplicate` 且不会重复累计检测数。需要鉴权的环境统一使用 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
 

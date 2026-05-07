@@ -59,6 +59,21 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - 真实现场数据到位后，系统本身将作为采集、复核、导出和训练集沉淀入口。
 - 预演中发现 `data/samples/web_rust_bolt.jpg` 实际是 HTML 文档伪装成 `.jpg`，`stub` 可通过但真实 ONNX 解码会失败；后续真实模型 smoke 应使用 `data/samples/web_rust_chain.jpg` 或 Stage A 数据集中的有效 JPEG。
 
+## 🗓️ 2026-05-07：试点封装 1-4 交付化补齐 ✅
+
+### 核心成果
+
+- ✅ 补齐客户远程演示流程：部署机器不带到客户现场时，推荐屏幕共享远程演示；如客户需要自行访问，需提前准备 HTTPS/反代/CORS/API Key，不在会议中临时排障。
+- ✅ 补齐当前模型能力使用规则：`stub` 做稳定流程演示，Stage A ONNX 做真实模型路径展示，多类塔材模型保持实验状态。
+- ✅ 补齐真实数据采集入口 SOP：明确前端上传、Edge Agent 文件夹源、视频关键帧三条入口，以及现场 metadata 字段。
+- ✅ 补齐人工复核与标注准备 SOP：明确 review 与 training annotation 的边界、reviewed labels 目录、预标注、数据集生成和 `prototype_v0_2` 训练门禁。
+
+### 产物
+
+- `docs/customer-remote-demo.md`
+- `docs/field-data-intake-and-review.md`
+- README、demo、deployment、progress 和主账本均已加入入口。
+
 ## 🗓️ 2026-04-30：多类塔材缺陷原型入口 ✅
 
 ### 核心成果

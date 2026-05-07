@@ -176,11 +176,53 @@ The best-practice path is not to build a four-model chain or block on more real 
 - HE-016 added `scripts/prepare_multiclass_tower_dataset.py`, generated local `data/multiclass_tower_defect/`, and completed a CPU 1-epoch YOLO smoke training run under `runs/multiclass_tower_defect/smoke_v0_1/`.
 - HE-017 added `scripts/smoke_multiclass_tower_inference.py` and verified that `prototype_v0_1` loads with the expected 4-class mapping. At `conf=0.25` and `conf=0.05`, the test split returns zero detections; at `conf=0.001`, detections are noisy and biased toward `tower_corrosion` / `bolt_rust`, so ONNX/API/frontend integration is deliberately deferred.
 - HE-018 accepted the packaging-first route: complete a full trial rehearsal before more real tower samples are available, then use the deployed system as the real-data capture and review entry point.
+- HE-019 completed the first four packaging tasks as docs/SOP deliverables: remote customer demo flow, current model profile usage, field data intake, and review/labeling preparation.
 - Current backend baseline: `218 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
 ## Accepted Tasks
+
+### HE-019 Trial Packaging Steps 1-4
+
+Status: Done
+Priority: P0
+Owner: project maintainer
+
+Scope:
+- Complete step 1: system trial packaging for remote customer demonstration when the deployment machine is not brought to the customer site.
+- Complete step 2: document current model usage rules: `stub` for stable flow, Stage A ONNX for real-model route, multiclass tower model as experimental.
+- Complete step 3: define the system as the field-data intake entry point with upload, Edge Agent reporting, metadata, review, and export.
+- Complete step 4: define the human review, annotation handoff, and later dataset-generation SOP.
+- Align README, demo, deployment, progress, and this ledger.
+
+Acceptance criteria:
+- [x] Customer remote demo flow is documented.
+- [x] Access modes, pre-demo checks, demo script, fallback plan, and customer follow-up are documented.
+- [x] Current model profile rules are documented without claiming multiclass production accuracy.
+- [x] Field data intake paths and required metadata are documented.
+- [x] Review status, annotation handoff, prelabeling, dataset generation, and training gate are documented.
+- [x] README and existing demo/deployment/progress docs link to the new SOPs.
+
+Artifacts:
+- `docs/customer-remote-demo.md`
+- `docs/field-data-intake-and-review.md`
+- Updated `README.md`
+- Updated `docs/demo.md`
+- Updated `docs/deployment.md`
+- Updated `docs/progress.md`
+- Updated `tasks.md`
+
+Validation commands:
+
+```bash
+git diff --check
+uv run ruff check .
+```
+
+Rollback:
+- Revert the documentation changes in this task.
+- Continue using HE-018 rehearsal commands and `INFERENCE_ENGINE=stub` as the stable fallback demo mode.
 
 ### HE-018 Trial System Packaging Rehearsal
 
