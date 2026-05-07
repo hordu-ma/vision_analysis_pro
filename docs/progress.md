@@ -82,6 +82,21 @@ Vision Analysis Pro 项目开发进度跟踪，按时间顺序记录每日开发
 - 真实模型 fallback：`INFERENCE_ENGINE=yolo` + `runs/stage_a_crack/baseline_v0_1/weights/best.pt`。
 - 内部链路自检：`INFERENCE_ENGINE=stub`。
 - 当前可演示真实模型能力是 crack-only；不能宣称四类塔材缺陷模型已成熟。
+
+## 🗓️ 2026-05-07：软硬一体试点包建议 ✅
+
+### 核心成果
+
+- ✅ 新增 `docs/hardware-bundle.md`，形成可用于售前方案和控标的最小硬件包建议。
+- ✅ 推荐当前阶段先卖 **标准试点包**：边缘 AI 计算盒、三防平板/笔记本、4G/5G 路由、便携供电、本地存储和交付箱。
+- ✅ 明确无人机不进入最小硬件包，作为高级可选包，避免飞手、空域、保险、维修和安全责任过早进入项目范围。
+- ✅ 给出边缘 AI 盒能力参数：Jetson Orin NX 或同等级边缘 AI 模组、70 TOPS 以上、16GB 内存、1TB NVMe、Linux/Docker/JetPack/ONNX Runtime、远程维护和本地缓存。
+
+### 口径说明
+
+- 标准试点包用于统一客户日常使用体验，并让系统进入真实数据回流路径。
+- 无人机巡检包只在客户需要完整采集装备时作为高阶套餐。
+- 客户正式演示仍使用 Stage A ONNX 或 Stage A YOLO，`stub` 仅用于内部链路自检。
 - ✅ 补齐真实数据采集入口 SOP：明确前端上传、Edge Agent 文件夹源、视频关键帧三条入口，以及现场 metadata 字段。
 - ✅ 补齐人工复核与标注准备 SOP：明确 review 与 training annotation 的边界、reviewed labels 目录、预标注、数据集生成和 `prototype_v0_2` 训练门禁。
 

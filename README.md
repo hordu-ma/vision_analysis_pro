@@ -14,6 +14,7 @@
 - **2026-05-07 试点预演结论**：`docker compose config`、stub API health/live/metrics、单图上传、批量任务、Edge/report 上报、人工复核、摘要、CSV 导出、设备/告警列表、Stage A ONNX readiness、Edge Agent ONNX 上报均已验证通过；前端 lint/test/build/E2E 也已通过。
 - **客户演示与数据闭环 SOP**：部署机器不带到客户现场时，按 `docs/customer-remote-demo.md` 做远程演示；真实样本进入现场后，按 `docs/field-data-intake-and-review.md` 完成采集、metadata、复核、标注交接和后续训练准备。
 - **模型 profile 完成度**：`docs/model-profile-status.md` 记录 `stub`、`yolo`、`onnx` 的当前边界。Stage A YOLO 与 Stage A ONNX 已通过真实裂缝样本 smoke；多类塔材 YOLO 原型仍未达到客户演示/部署条件。
+- **软硬一体试点包**：建议优先销售标准试点包（边缘 AI 计算盒、三防平板/笔记本、4G/5G 路由、便携供电、本地存储和交付箱），硬件配置与控标参数见 `docs/hardware-bundle.md`。
 
 ### 多类塔材原型状态（2026-04-30）
 
@@ -119,7 +120,7 @@ edge-agent
 
 在真实环境样本到位前，系统封装目标不是宣称多类塔材模型精度，而是把部署、采集、上报、复核、导出、观测和回滚链路做成现场可用的数据闭环。真实现场图片/视频进入系统后，再进行人工复核标注、训练 `prototype_v0_2`、评估、ONNX 导出和部署模型替换。
 
-客户远程演示流程见 `docs/customer-remote-demo.md`；现场数据采集、复核和标注交接流程见 `docs/field-data-intake-and-review.md`；模型 profile 完成度见 `docs/model-profile-status.md`。
+客户远程演示流程见 `docs/customer-remote-demo.md`；现场数据采集、复核和标注交接流程见 `docs/field-data-intake-and-review.md`；模型 profile 完成度见 `docs/model-profile-status.md`；软硬一体试点包建议见 `docs/hardware-bundle.md`。
 
 恢复路径是：批量任务失败时先查看任务详情，整体失败可调用 retry，部分失败可调用 retry-failed，已完成任务可 rerun；Edge Agent 网络故障时先进入本地 SQLite 缓存，云端恢复后按 FIFO 回放，同一 `batch_id` 的重复上报返回 `duplicate` 且不会重复累计检测数。需要鉴权的环境统一使用 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
 

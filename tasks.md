@@ -178,11 +178,49 @@ The best-practice path is not to build a four-model chain or block on more real 
 - HE-018 accepted the packaging-first route: complete a full trial rehearsal before more real tower samples are available, then use the deployed system as the real-data capture and review entry point.
 - HE-019 completed the first four packaging tasks as docs/SOP deliverables: remote customer demo flow, current model profile usage, field data intake, and review/labeling preparation.
 - HE-020 corrected the customer-demo rule: `stub` is internal-only, while customer-facing detection results must use Stage A ONNX or Stage A YOLO with real images. Stage A YOLO and ONNX were both rechecked on the same real crack sample and returned one `crack` detection; multiclass tower YOLO remains experimental.
+- HE-021 added the recommended soft-hardware trial bundle, procurement-control parameters, and package tiers in `docs/hardware-bundle.md`.
 - Current backend baseline: `218 passed, 44 skipped`.
 - Current frontend baseline: `90 passed`, lint, production build, and 3 Playwright E2E tests passing from the latest validation run.
 - 2026-04-22 execution check: local `data/stage_b_pilot_crack` validates successfully; Stage A and Stage B proxy models were re-evaluated on the same Stage A val set and the recommendation remains **keep Stage A**.
 
 ## Accepted Tasks
+
+### HE-021 Trial Hardware Bundle
+
+Status: Done
+Priority: P1
+Owner: project maintainer
+
+Scope:
+- Define the minimum hardware package for selling Vision Analysis Pro as a soft-hardware trial kit.
+- Keep drones outside the minimum package and place them in an optional higher-tier UAV package.
+- Provide procurement-control parameters that avoid locking to one brand while preserving user experience consistency.
+- Link the hardware bundle from README, deployment docs, progress, and this ledger.
+
+Acceptance criteria:
+- [x] Standard Trial Kit hardware modules are documented.
+- [x] Edge AI box capability parameters are documented.
+- [x] Operator terminal, network, power, storage, and delivery accessories are documented.
+- [x] Optional Field Collection Kit and UAV Inspection Kit tiers are documented.
+- [x] Sales wording and avoided claims are documented.
+- [x] Integration with current ONNX/Yolo/stub software profiles is documented.
+
+Artifacts:
+- `docs/hardware-bundle.md`
+- Updated `README.md`
+- Updated `docs/deployment.md`
+- Updated `docs/progress.md`
+- Updated `tasks.md`
+
+Validation commands:
+
+```bash
+git diff --check
+uv run ruff check .
+```
+
+Rollback:
+- Revert this documentation-only package definition if the commercial packaging strategy changes.
 
 ### HE-020 Real Model Demo Rule and Profile Status
 
